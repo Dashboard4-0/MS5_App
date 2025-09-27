@@ -151,4 +151,4 @@ jobs:
           status: success
           text: 'MS5.0 Floor Dashboard release ${{ github.ref_name }} has been created!'
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
