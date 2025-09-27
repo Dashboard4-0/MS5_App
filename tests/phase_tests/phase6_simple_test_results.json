@@ -1,0 +1,744 @@
+{
+  "total_tests": 92,
+  "passed_tests": 92,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": [
+    {
+      "test_name": "File backend/app/services/notification_service.py exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Required file is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.695700"
+    },
+    {
+      "test_name": "File backend/app/services/andon_service.py exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Required file is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.695832"
+    },
+    {
+      "test_name": "File backend/app/services/andon_escalation_service.py exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Required file is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.695839"
+    },
+    {
+      "test_name": "File backend/app/services/andon_escalation_monitor.py exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Required file is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.695844"
+    },
+    {
+      "test_name": "SQL migration file 005_andon_escalation_system.sql exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Andon escalation system SQL migration is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.695851"
+    },
+    {
+      "test_name": "NotificationService.send_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696063"
+    },
+    {
+      "test_name": "NotificationService.send_push_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_push_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696066"
+    },
+    {
+      "test_name": "NotificationService.send_email_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_email_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696070"
+    },
+    {
+      "test_name": "NotificationService.send_sms_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_sms_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696078"
+    },
+    {
+      "test_name": "NotificationService.send_bulk_push_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_bulk_push_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696081"
+    },
+    {
+      "test_name": "NotificationService.send_notification_to_role method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_notification_to_role method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696084"
+    },
+    {
+      "test_name": "NotificationService.send_andon_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_andon_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696088"
+    },
+    {
+      "test_name": "NotificationService.send_maintenance_reminder method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_maintenance_reminder method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696092"
+    },
+    {
+      "test_name": "NotificationService.send_quality_alert method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "send_quality_alert method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696097"
+    },
+    {
+      "test_name": "NotificationService._send_websocket_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_websocket_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696104"
+    },
+    {
+      "test_name": "NotificationService._get_user_notification_preferences method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_get_user_notification_preferences method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696112"
+    },
+    {
+      "test_name": "NotificationService class exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "NotificationService class is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696114"
+    },
+    {
+      "test_name": "Global notification_service instance exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Global notification service instance is created",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696120"
+    },
+    {
+      "test_name": "AndonService.create_andon_event method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "create_andon_event method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696319"
+    },
+    {
+      "test_name": "AndonService.get_andon_event method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_andon_event method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696325"
+    },
+    {
+      "test_name": "AndonService.acknowledge_andon_event method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "acknowledge_andon_event method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696330"
+    },
+    {
+      "test_name": "AndonService.resolve_andon_event method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "resolve_andon_event method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696337"
+    },
+    {
+      "test_name": "AndonService.escalate_andon_event method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "escalate_andon_event method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696342"
+    },
+    {
+      "test_name": "AndonService.list_andon_events method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "list_andon_events method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696350"
+    },
+    {
+      "test_name": "AndonService.get_active_andon_events method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_active_andon_events method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696357"
+    },
+    {
+      "test_name": "AndonService.get_andon_statistics method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_andon_statistics method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696366"
+    },
+    {
+      "test_name": "AndonService._send_andon_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_andon_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696377"
+    },
+    {
+      "test_name": "AndonService._send_acknowledgment_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_acknowledgment_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696387"
+    },
+    {
+      "test_name": "AndonService._send_resolution_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_resolution_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696399"
+    },
+    {
+      "test_name": "AndonService._send_escalation_notification method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_escalation_notification method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696411"
+    },
+    {
+      "test_name": "AndonService class exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "AndonService class is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696412"
+    },
+    {
+      "test_name": "AndonService.ESCALATION_LEVELS configuration exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Escalation levels configuration is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696414"
+    },
+    {
+      "test_name": "AndonService imports notification_service",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Notification service integration is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696415"
+    },
+    {
+      "test_name": "AndonService imports AndonEscalationService",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Escalation service integration is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696417"
+    },
+    {
+      "test_name": "AndonEscalationService.create_escalation method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "create_escalation method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696597"
+    },
+    {
+      "test_name": "AndonEscalationService.acknowledge_escalation method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "acknowledge_escalation method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696600"
+    },
+    {
+      "test_name": "AndonEscalationService.resolve_escalation method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "resolve_escalation method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696604"
+    },
+    {
+      "test_name": "AndonEscalationService.escalate_manually method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "escalate_manually method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696619"
+    },
+    {
+      "test_name": "AndonEscalationService.get_active_escalations method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_active_escalations method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696625"
+    },
+    {
+      "test_name": "AndonEscalationService.get_escalation_history method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_escalation_history method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696640"
+    },
+    {
+      "test_name": "AndonEscalationService.get_escalation_statistics method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_escalation_statistics method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696647"
+    },
+    {
+      "test_name": "AndonEscalationService.process_automatic_escalations method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "process_automatic_escalations method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696656"
+    },
+    {
+      "test_name": "AndonEscalationService._get_escalation method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_get_escalation method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696667"
+    },
+    {
+      "test_name": "AndonEscalationService._get_escalation_rules method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_get_escalation_rules method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696677"
+    },
+    {
+      "test_name": "AndonEscalationService._get_escalation_rule method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_get_escalation_rule method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696690"
+    },
+    {
+      "test_name": "AndonEscalationService._log_escalation_action method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_log_escalation_action method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696699"
+    },
+    {
+      "test_name": "AndonEscalationService._send_escalation_notifications method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_escalation_notifications method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696708"
+    },
+    {
+      "test_name": "AndonEscalationService class exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "AndonEscalationService class is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696710"
+    },
+    {
+      "test_name": "AndonEscalationMonitor.start method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "start method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696862"
+    },
+    {
+      "test_name": "AndonEscalationMonitor.stop method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "stop method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696864"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._monitor_loop method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_monitor_loop method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696867"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._process_escalations method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_process_escalations method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696869"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._check_overdue_escalations method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_check_overdue_escalations method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696872"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._send_reminder_notifications method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_reminder_notifications method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696874"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._send_acknowledgment_reminder method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_acknowledgment_reminder method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696879"
+    },
+    {
+      "test_name": "AndonEscalationMonitor._send_resolution_reminder method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "_send_resolution_reminder method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696885"
+    },
+    {
+      "test_name": "AndonEscalationMonitor.get_monitoring_status method exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_monitoring_status method is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696892"
+    },
+    {
+      "test_name": "AndonEscalationMonitor class exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "AndonEscalationMonitor class is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696893"
+    },
+    {
+      "test_name": "Global escalation_monitor instance exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Global escalation monitor instance is created",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696899"
+    },
+    {
+      "test_name": "Global function start_escalation_monitor exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "start_escalation_monitor function is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696906"
+    },
+    {
+      "test_name": "Global function stop_escalation_monitor exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "stop_escalation_monitor function is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696914"
+    },
+    {
+      "test_name": "Global function get_escalation_monitor_status exists",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_escalation_monitor_status function is implemented",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.696922"
+    },
+    {
+      "test_name": "Table andon_escalations exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "andon_escalations table is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697098"
+    },
+    {
+      "test_name": "Table andon_escalation_history exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "andon_escalation_history table is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697100"
+    },
+    {
+      "test_name": "Table andon_escalation_rules exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "andon_escalation_rules table is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697103"
+    },
+    {
+      "test_name": "Table andon_escalation_recipients exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "andon_escalation_recipients table is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697106"
+    },
+    {
+      "test_name": "View v_active_andon_escalations exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "v_active_andon_escalations view is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697114"
+    },
+    {
+      "test_name": "View v_andon_escalation_statistics exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "v_andon_escalation_statistics view is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697124"
+    },
+    {
+      "test_name": "Function auto_escalate_andon_events exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "auto_escalate_andon_events function is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697133"
+    },
+    {
+      "test_name": "Function get_escalation_recipients exists in migration",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "get_escalation_recipients function is defined",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697143"
+    },
+    {
+      "test_name": "Default escalation rules are inserted",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Default escalation rules data is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697146"
+    },
+    {
+      "test_name": "Default escalation recipients are inserted",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "Default escalation recipients data is present",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697149"
+    },
+    {
+      "test_name": "backend/app/services/notification_service.py has docstrings",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains docstrings",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697224"
+    },
+    {
+      "test_name": "backend/app/services/notification_service.py has imports",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains import statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697230"
+    },
+    {
+      "test_name": "backend/app/services/notification_service.py has async functions",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains async functions",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697233"
+    },
+    {
+      "test_name": "backend/app/services/notification_service.py has error handling",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains error handling",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697237"
+    },
+    {
+      "test_name": "backend/app/services/notification_service.py has logging",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains logging statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697239"
+    },
+    {
+      "test_name": "backend/app/services/andon_service.py has docstrings",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains docstrings",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697270"
+    },
+    {
+      "test_name": "backend/app/services/andon_service.py has imports",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains import statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697273"
+    },
+    {
+      "test_name": "backend/app/services/andon_service.py has async functions",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains async functions",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697275"
+    },
+    {
+      "test_name": "backend/app/services/andon_service.py has error handling",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains error handling",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697278"
+    },
+    {
+      "test_name": "backend/app/services/andon_service.py has logging",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains logging statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697282"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_service.py has docstrings",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains docstrings",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697302"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_service.py has imports",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains import statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697305"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_service.py has async functions",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains async functions",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697306"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_service.py has error handling",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains error handling",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697309"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_service.py has logging",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains logging statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697311"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_monitor.py has docstrings",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains docstrings",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697328"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_monitor.py has imports",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains import statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697330"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_monitor.py has async functions",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains async functions",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697332"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_monitor.py has error handling",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains error handling",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697335"
+    },
+    {
+      "test_name": "backend/app/services/andon_escalation_monitor.py has logging",
+      "status": "\u2705 PASS",
+      "passed": true,
+      "message": "File contains logging statements",
+      "details": {},
+      "timestamp": "2025-09-23T05:42:46.697337"
+    }
+  ]
+}

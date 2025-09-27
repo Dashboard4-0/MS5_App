@@ -1,0 +1,57 @@
+Tag,Description,Source
+Fault[0],Bagger Inverter / Circuit Breaker Fault,internal
+Fault[1],Bagger Inverter / Circuit Breaker Fault,internal
+Fault[53],not defined,internal
+Fault[54],not defined,internal
+Fault[55],not defined,internal
+Fault[57],OK To Press Start,internal
+Fault[58],OK To Start Slicer,internal
+Fault[59],Machine Running,internal
+Fault[Error],Error,internal
+Fault[41],Check / Replace Discharge Roller,internal
+Fault[42],Torque Limit Exceeded,internal
+Fault[43],Re-Start Bagger,internal
+Fault[44],Wicket Height Overtravel,internal
+Fault[45],Manually Change Wicket,internal
+Fault[46],not defined,internal
+Fault[47],Batch Complete,internal
+Fault[48],Turn Off Or Reset Batch Count,internal
+Fault[49],Blockage At Scoops,internal
+Fault[50],Check Scoops And Remove Blockage,internal
+Fault[31],Broken Blade Detected,internal
+Fault[32],Check Slicer Frames,internal
+Fault[33],not defined,internal
+Fault[34],Metal Detector Fault,internal
+Fault[35],Basket Loader Fault,internal
+Fault[36],Double Loaf Bagger Infeed,internal
+Fault[37],Remove Front Product,internal
+Fault[38],Wicket Change-Over,internal
+Fault[39],Bag Inflation Failure,internal
+Fault[40],Discharge Roller Fault,internal
+Fault[20],Bagger Rear Scoop Guard Open,internal
+Fault[22],Close The Guard,internal
+Fault[23],Bagger Emergency Stop Active,internal
+Fault[24],Slicer Emergency Stop Active,internal
+Fault[25],Release Emergency Stop Button,internal
+Fault[26],not defined,internal
+Fault[27],Tagger Fault,internal
+Fault[28],Check Tagging Machine,internal
+Fault[29],OK To Press Reset,internal
+Fault[30],not defined,internal
+Fault[8],Slicer Low Oil Pressure,internal
+Fault[12],Slicer Infeed Guard Open,internal
+Fault[13],Slicer Discharge Guard Open,internal
+Fault[14],Bagger Under Infeed Guard Open,internal
+Fault[15],Bagger Infeed Guard Open,internal
+Fault[16],Bagger Front Scoop Guard Open,internal
+Fault[17],Bagger Brush Motor Guard Open,internal
+Fault[18],Bagger Main Motor Guard Open,internal
+Fault[19],Bagger Under Discharge Guard Open,internal
+Fault[0],Bagger Inverter / Circuit Breaker Fault,internal
+Fault[1],Flusher Inverter / Circuit Breaker Fault,internal
+Fault[2],Slicer Blades Inverter / Circuit Breaker Fault,internal
+Fault[3],Slicer Belts Inverter / Circuit Breaker Fault,internal
+Fault[4],Bagger Infeed Servo Fault,internal
+Fault[5],Bagger Discharge Servo Fault,internal
+Fault[6],Wicket Servo Fault,internal
+Fault[7],Low Main Air Pressure,internal

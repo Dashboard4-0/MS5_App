@@ -1,0 +1,222 @@
+{
+  "test_suite": "Phase 3 Comprehensive Test Suite",
+  "timestamp": "2025-09-27T16:07:47.940887",
+  "summary": {
+    "total_tests": 28,
+    "passed_tests": 4,
+    "failed_tests": 24,
+    "success_rate": 14.285714285714285
+  },
+  "detailed_results": {
+    "production_service": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "ProductionStatisticsService class exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.939821",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "get_production_statistics method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.939961",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "get_line_performance_metrics method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.939994",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "ProductionStatisticsService is instantiable",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940025",
+          "error": "No module named 'app'"
+        }
+      ]
+    },
+    "oee_service": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "calculate_equipment_oee_with_analytics method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940057",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "_generate_oee_recommendations method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940090",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "get_oee_dashboard_data method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940120",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "OEECalculator is instantiable",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940150",
+          "error": "No module named 'app'"
+        }
+      ]
+    },
+    "andon_service": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "get_andon_dashboard_data method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940179",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "get_andon_analytics_report method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940206",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "_calculate_response_metrics method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940233",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "_generate_andon_insights method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940265",
+          "error": "No module named 'app'"
+        }
+      ]
+    },
+    "notification_service": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "EnhancedNotificationService class exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940293",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "send_scheduled_notification method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940320",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "send_escalation_notification method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940346",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "send_daily_summary_notification method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940373",
+          "error": "No module named 'app'"
+        }
+      ]
+    },
+    "api_endpoints": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "Production analytics statistics endpoint exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940404",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "OEE analytics equipment endpoint exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940433",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "Andon dashboard endpoint exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940461",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "All API routers are properly configured",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940489",
+          "error": "No module named 'app'"
+        }
+      ]
+    },
+    "database_optimization": {
+      "passed": 4,
+      "failed": 0,
+      "tests": [
+        {
+          "test_name": "Database optimization script exists",
+          "passed": true,
+          "timestamp": "2025-09-27T16:07:47.940498",
+          "error": null
+        },
+        {
+          "test_name": "Database optimization script has index creation",
+          "passed": true,
+          "timestamp": "2025-09-27T16:07:47.940700",
+          "error": null
+        },
+        {
+          "test_name": "Database optimization script has materialized views",
+          "passed": true,
+          "timestamp": "2025-09-27T16:07:47.940722",
+          "error": null
+        },
+        {
+          "test_name": "Database optimization script has optimization functions",
+          "passed": true,
+          "timestamp": "2025-09-27T16:07:47.940738",
+          "error": null
+        }
+      ]
+    },
+    "service_integration": {
+      "passed": 0,
+      "failed": 4,
+      "tests": [
+        {
+          "test_name": "RealTimeIntegrationService exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940768",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "Enhanced notification integration method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940795",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "Production statistics processor exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940821",
+          "error": "No module named 'app'"
+        },
+        {
+          "test_name": "Notification event broadcasting method exists",
+          "passed": false,
+          "timestamp": "2025-09-27T16:07:47.940847",
+          "error": "No module named 'app'"
+        }
+      ]
+    }
+  }
+}
