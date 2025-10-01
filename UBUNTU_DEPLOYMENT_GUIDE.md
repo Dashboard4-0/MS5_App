@@ -1,737 +1,1102 @@
-# MS5.0 Floor Dashboard - Ubuntu Deployment Guide
+# MS5.0 Floor Dashboard - Complete Ubuntu Edge Deployment Guide
+
+## Document Information
+- **Version:** 2.0 (Updated for current codebase)
+- **Last Updated:** October 1, 2025
+- **Repository:** https://github.com/Dashboard4-0/MS5_App.git
+- **Deployment Target:** Ubuntu 20.04/22.04 LTS Edge Device
+- **Related Documents:** 
+  - CODE_REVIEW_REPORT.md (comprehensive system analysis)
+  - IMPLEMENTATION_PLAN_TO_READY.md (deployment options & roadmap)
+  - MS5.0_System.md (full system specification)
+
+---
 
 ## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [System Requirements](#system-requirements)
-3. [Initial Server Setup](#initial-server-setup)
-4. [Installation Steps](#installation-steps)
-5. [Configuration](#configuration)
-6. [Database Setup](#database-setup)
-7. [SSL Certificate Setup](#ssl-certificate-setup)
-8. [Deployment](#deployment)
-9. [Verification](#verification)
-10. [Common Gotchas & Troubleshooting](#common-gotchas--troubleshooting)
-11. [Maintenance & Updates](#maintenance--updates)
-12. [Security Hardening](#security-hardening)
-13. [Monitoring Setup](#monitoring-setup)
-14. [Backup & Recovery](#backup--recovery)
+1. [Executive Summary](#executive-summary)
+2. [Prerequisites](#prerequisites)
+3. [System Requirements](#system-requirements)
+4. [Pre-Deployment Checklist](#pre-deployment-checklist)
+5. [Initial Server Setup](#initial-server-setup)
+6. [Docker Installation](#docker-installation)
+7. [Repository Setup](#repository-setup)
+8. [Environment Configuration](#environment-configuration)
+9. [Database Setup](#database-setup)
+10. [PLC Integration Configuration](#plc-integration-configuration)
+11. [SSL Certificate Setup](#ssl-certificate-setup)
+12. [Service Deployment](#service-deployment)
+13. [Frontend Tablet Deployment](#frontend-tablet-deployment)
+14. [Verification & Testing](#verification--testing)
+15. [Monitoring Setup](#monitoring-setup)
+16. [Backup Configuration](#backup-configuration)
+17. [Security Hardening](#security-hardening)
+18. [Troubleshooting Guide](#troubleshooting-guide)
+19. [Maintenance Procedures](#maintenance-procedures)
+20. [Quick Reference](#quick-reference)
+
+---
+
+## Executive Summary
+
+This guide provides **complete step-by-step instructions** to deploy the MS5.0 Floor Dashboard system on an Ubuntu edge device for **production use**. 
+
+### What This Deployment Provides
+
+✅ **PLC Data Collection:** Real-time data from Allen-Bradley CompactLogix and MicroLogix PLCs  
+✅ **Production Monitoring:** OEE calculation, line status, equipment monitoring  
+✅ **Andon System:** Real-time alerts with escalation paths  
+✅ **Quality Tracking:** Defect recording and quality checks  
+✅ **Job Management:** Work assignments and checklists  
+✅ **Tablet Frontend:** PWA and native apps for floor operators  
+✅ **Real-time Dashboards:** Live production metrics via WebSocket  
+✅ **Monitoring Stack:** Prometheus + Grafana for system health  
+
+### Current System Capabilities
+
+Based on the comprehensive code review (see CODE_REVIEW_REPORT.md):
+- **Readiness Score:** 45/100 for full MS5.0 specification
+- **Production Ready For:** Allen-Bradley PLC data collection, basic OEE, Andon, production monitoring
+- **Not Yet Implemented:** Event streaming (Kafka), workflows (Temporal), full IWS/TPM features
+- **Architecture:** Monolithic Python/FastAPI backend (not microservices yet)
+
+### Deployment Timeline
+
+- **Pre-deployment setup:** 2-4 hours
+- **Installation & configuration:** 4-6 hours
+- **PLC setup & testing:** 2-4 hours
+- **Frontend deployment:** 2-3 hours
+- **Verification & training:** 4-6 hours
+- **Total:** 1-2 days for complete deployment
 
 ---
 
 ## Prerequisites
 
 ### Required Knowledge
-- Basic Linux command line experience
-- Understanding of Docker and Docker Compose
-- Basic networking concepts
+
+**Essential:**
+- Linux command line (bash, file navigation, text editing)
+- Basic networking (IP addresses, ports, firewall rules)
+- Docker and Docker Compose fundamentals
+- PostgreSQL database basics
+
+**Helpful:**
+- PLC programming concepts (tag structure, data types)
+- Allen-Bradley Logix/SLC familiarity
+- REST API concepts
 - SSL/TLS certificate management
-- Database administration basics
 
 ### Required Access
-- Root or sudo access to Ubuntu server
-- Domain name pointing to your server (for SSL)
-- Email access for SSL certificate validation
-- GitHub account access
+
+**System Access:**
+- [ ] Root/sudo access to Ubuntu server
+- [ ] Network access from server to factory PLCs
+- [ ] SSH access to server (port 22)
+
+**PLC Access:**
+- [ ] IP addresses of all PLCs
+- [ ] Network access to PLCs (same VLAN or routed)
+- [ ] Knowledge of PLC tag names and data types
+- [ ] Ability to configure PLC to allow EtherNet/IP connections
+
+**External Access:**
+- [ ] GitHub account with access to repository
+- [ ] Email address for SSL certificate validation (if using Let's Encrypt)
+- [ ] Domain name (optional, for HTTPS)
+
+### Required Information
+
+Before starting, gather:
+
+**Network Information:**
+```
+Edge Server IP: ________________
+Server Hostname: ________________
+DNS/Domain (if any): ________________
+Default Gateway: ________________
+Subnet Mask: ________________
+```
+
+**PLC Information:**
+```
+PLC 1:
+  - Name: ________________
+  - IP Address: ________________
+  - PLC Type (Logix/SLC): ________________
+  - Equipment Code: ________________
+
+PLC 2:
+  - Name: ________________
+  - IP Address: ________________
+  - PLC Type (Logix/SLC): ________________
+  - Equipment Code: ________________
+```
 
 ---
 
 ## System Requirements
 
 ### Minimum Hardware Requirements
-```bash
-# CPU: 2 cores (4 cores recommended)
-# RAM: 4GB (8GB recommended)
-# Storage: 50GB SSD (100GB recommended)
-# Network: 100Mbps (1Gbps recommended)
+
+For basic deployment (1-2 lines, <100 tags):
+```
+CPU:     2 cores (Intel/AMD x86_64)
+RAM:     4GB
+Storage: 50GB SSD
+Network: 100Mbps Ethernet
+```
+
+### Recommended Hardware Requirements
+
+For production deployment (3-5 lines, 200+ tags):
+```
+CPU:     4 cores @ 2.0GHz+
+RAM:     8GB
+Storage: 100GB SSD (NVMe preferred)
+Network: 1Gbps Ethernet
 ```
 
 ### Software Requirements
-- Ubuntu 20.04 LTS or 22.04 LTS (recommended)
+
+**Operating System:**
+- Ubuntu 20.04 LTS (Focal Fossa) ✅ Recommended
+- Ubuntu 22.04 LTS (Jammy Jellyfish) ✅ Recommended
+
+**Required Software (installed during setup):**
 - Docker Engine 20.10+
 - Docker Compose 2.0+
-- Git
-- curl/wget
-- nano/vim (text editor)
+- Git 2.25+
+- PostgreSQL client tools
+
+---
+
+## Pre-Deployment Checklist
+
+**Complete this checklist before starting deployment:**
+
+### Infrastructure Readiness
+- [ ] Ubuntu server provisioned and accessible via SSH
+- [ ] Server has internet connectivity
+- [ ] Server can reach factory network/PLCs
+- [ ] Firewall rules documented and approved
+- [ ] DNS records configured (if using domain name)
+
+### Network Validation
+- [ ] Can ping PLCs from server
+- [ ] No firewall blocking between server and PLCs
+- [ ] PLC IP addresses documented and verified
+- [ ] PLC tag lists available
 
 ---
 
 ## Initial Server Setup
 
 ### Step 1: Update System Packages
-```bash
+
+Login to your Ubuntu server and update:
+
+\`\`\`bash
+ssh your-username@<server-ip>
+
 # Update package lists
 sudo apt update
 
 # Upgrade existing packages
 sudo apt upgrade -y
 
-# Install essential packages
-sudo apt install -y curl wget git nano htop unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release
-```
+# Install essential tools
+sudo apt install -y curl wget git nano vim htop net-tools unzip \
+  software-properties-common apt-transport-https ca-certificates \
+  gnupg lsb-release postgresql-client
 
-### Step 2: Create Application User
-```bash
-# Create dedicated user for the application
-sudo adduser ms5app
+# Reboot if kernel was updated
+sudo reboot
+\`\`\`
 
-# Add user to docker group (will be created later)
-sudo usermod -aG sudo ms5app
+### Step 2: Configure Firewall
 
-# Switch to application user
-su - ms5app
-```
-
-### Step 3: Configure Firewall
-```bash
-# Enable UFW firewall
+\`\`\`bash
+# IMPORTANT: Allow SSH FIRST to avoid lockout!
+sudo ufw allow 22/tcp comment 'SSH'
 sudo ufw enable
 
-# Allow SSH (IMPORTANT: Do this first!)
-sudo ufw allow ssh
-
 # Allow HTTP and HTTPS
-sudo ufw allow 80
-sudo ufw allow 443
+sudo ufw allow 80/tcp comment 'HTTP'
+sudo ufw allow 443/tcp comment 'HTTPS'
 
-# Allow application ports (if needed for direct access)
-sudo ufw allow 8000  # Backend API
-sudo ufw allow 3000  # Grafana (optional, should be behind reverse proxy)
+# Allow backend API
+sudo ufw allow 8000/tcp comment 'MS5 Backend API'
+
+# Allow Grafana
+sudo ufw allow 3000/tcp comment 'Grafana Dashboard'
 
 # Check firewall status
-sudo ufw status
-```
+sudo ufw status verbose
+\`\`\`
 
-**⚠️ GOTCHA:** Always configure SSH access before enabling firewall to avoid locking yourself out!
+### Step 3: Create Application User
+
+\`\`\`bash
+# Create user
+sudo adduser ms5app
+
+# Add to sudo group
+sudo usermod -aG sudo ms5app
+
+# Switch to new user
+su - ms5app
+\`\`\`
 
 ---
 
-## Installation Steps
+## Docker Installation
 
 ### Step 1: Install Docker Engine
-```bash
+
+\`\`\`bash
 # Remove old Docker versions
 sudo apt remove -y docker docker-engine docker.io containerd runc
 
 # Add Docker's official GPG key
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+  sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
 # Add Docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Update package lists
+# Install Docker
 sudo apt update
-
-# Install Docker Engine
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Add current user to docker group
-sudo usermod -aG docker $USER
-
-# Enable Docker service
-sudo systemctl enable docker
-sudo systemctl start docker
 
 # Verify installation
 docker --version
 docker compose version
-```
+\`\`\`
 
-**⚠️ GOTCHA:** You need to log out and back in for docker group membership to take effect!
+### Step 2: Configure Docker
 
-### Step 2: Install Docker Compose (if not included)
-```bash
-# Download Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+\`\`\`bash
+# Add user to docker group
+sudo usermod -aG docker \$USER
+sudo usermod -aG docker ms5app
 
-# Make it executable
-sudo chmod +x /usr/local/bin/docker-compose
+# Log out and back in, or run:
+newgrp docker
 
-# Verify installation
-docker-compose --version
-```
-
-### Step 3: Clone Repository
-```bash
-# Create application directory
-sudo mkdir -p /opt/ms5-backend
-sudo chown ms5app:ms5app /opt/ms5-backend
-
-# Switch to application user
-su - ms5app
-
-# Clone the repository
-cd /opt/ms5-backend
-git clone https://github.com/Dashboard4-0/ms5-backend.git .
-
-# Verify files
-ls -la
-```
+# Test Docker
+docker run hello-world
+\`\`\`
 
 ---
 
-## Configuration
+## Repository Setup
 
-### Step 1: Environment Configuration
-```bash
-# Copy production environment template
-cp env.production .env
+### Step 1: Clone Repository
 
-# Edit environment file
-nano .env
-```
+\`\`\`bash
+# Create directory
+sudo mkdir -p /opt/ms5
+sudo chown -R ms5app:ms5app /opt/ms5
 
-### Step 2: Critical Environment Variables to Configure
-```bash
-# Database Configuration
-POSTGRES_PASSWORD_PRODUCTION=YOUR_SECURE_DATABASE_PASSWORD_HERE
-POSTGRES_DB_PRODUCTION=factory_telemetry
-POSTGRES_USER_PRODUCTION=ms5_user_production
+# Switch to application user
+su - ms5app
+cd /opt/ms5
 
-# Redis Configuration
-REDIS_PASSWORD_PRODUCTION=YOUR_SECURE_REDIS_PASSWORD_HERE
+# Clone the MS5_App repository
+git clone https://github.com/Dashboard4-0/MS5_App.git .
 
-# Application Security
-SECRET_KEY_PRODUCTION=YOUR_VERY_LONG_RANDOM_SECRET_KEY_HERE
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
+# Verify clone
+ls -la
+\`\`\`
 
-# Domain Configuration
-ALLOWED_ORIGINS_PRODUCTION=https://yourdomain.com,https://www.yourdomain.com
-ALLOWED_HOSTS_PRODUCTION=yourdomain.com,www.yourdomain.com,api.yourdomain.com
-CORS_ORIGINS_PRODUCTION=https://yourdomain.com,https://www.yourdomain.com
+**Expected files:**
+- backend/
+- frontend/
+- *.sql (database migration files 001-009)
+- CODE_REVIEW_REPORT.md
+- IMPLEMENTATION_PLAN_TO_READY.md
+- README.md
 
-# Monitoring Configuration
-GRAFANA_ADMIN_PASSWORD_PRODUCTION=YOUR_GRAFANA_ADMIN_PASSWORD_HERE
-GRAFANA_DOMAIN_PRODUCTION=monitoring.yourdomain.com
+### Step 2: Verify SQL Migration Files
 
-# MinIO Configuration
-MINIO_USER_PRODUCTION=production_minio_user
-MINIO_PASSWORD_PRODUCTION=YOUR_MINIO_PASSWORD_HERE
+\`\`\`bash
+# List SQL files in order
+ls -1 *.sql
 
-# Flower Configuration
-FLOWER_USER_PRODUCTION=flower_admin
-FLOWER_PASSWORD_PRODUCTION=YOUR_FLOWER_PASSWORD_HERE
+# Expected output:
+# 001_init_telemetry.sql
+# 002_plc_equipment_management.sql
+# 003_production_management.sql
+# 004_advanced_production_features.sql
+# 005_andon_escalation_system.sql
+# 006_report_system.sql
+# 007_plc_integration_phase1.sql
+# 008_fix_critical_schema_issues.sql
+# 009_database_optimization.sql
+\`\`\`
 
-# Performance Configuration
-WORKERS_PRODUCTION=4
-MAX_CONNECTIONS_PRODUCTION=1000
-```
+---
 
-**⚠️ GOTCHA:** Generate strong passwords! Use a password manager or:
-```bash
-# Generate secure passwords
-openssl rand -base64 32  # For SECRET_KEY_PRODUCTION
-openssl rand -base64 16  # For database passwords
-```
+## Environment Configuration
+
+### Step 1: Create Production Environment File
+
+\`\`\`bash
+cd /opt/ms5/backend
+cp env.example .env.production
+nano .env.production
+\`\`\`
+
+### Step 2: Configure Critical Variables
+
+Generate secure passwords first:
+
+\`\`\`bash
+# Generate SECRET_KEY (64+ characters)
+openssl rand -base64 64
+
+# Generate database password
+openssl rand -base64 32
+
+# Generate Redis password
+openssl rand -base64 32
+\`\`\`
+
+**Edit .env.production with these values:**
+
+\`\`\`bash
+# SECURITY SETTINGS
+SECRET_KEY="<paste-64-char-key-here>"
+
+# DATABASE
+DATABASE_URL="postgresql://ms5_user:<DB_PASSWORD>@postgres:5432/factory_telemetry"
+
+# REDIS
+REDIS_URL="redis://:<REDIS_PASSWORD>@redis:6379/0"
+REDIS_PASSWORD="<REDIS_PASSWORD>"
+
+# CORS (update with your server IP or domain)
+ALLOWED_ORIGINS="http://localhost:3000,http://192.168.1.100,https://yourdomain.com"
+ALLOWED_HOSTS="localhost,127.0.0.1,192.168.1.100,yourdomain.com"
+
+# PLC SETTINGS
+PLC_POLL_INTERVAL=1
+PLC_TIMEOUT=5
+PLC_RETRY_ATTEMPTS=3
+
+# ENVIRONMENT
+ENVIRONMENT="production"
+DEBUG="False"
+LOG_LEVEL="INFO"
+\`\`\`
 
 ### Step 3: Create Required Directories
-```bash
-# Create application directories
-mkdir -p logs reports uploads temp ssl/production backups
 
-# Set proper permissions
-chmod 755 logs reports uploads temp ssl/production backups
-```
+\`\`\`bash
+cd /opt/ms5/backend
+mkdir -p logs reports uploads temp backups ssl/production
+chmod 755 logs reports uploads temp backups ssl/production
+\`\`\`
 
 ---
 
 ## Database Setup
 
-### Step 1: Prepare Database
-```bash
-# Start only the database services first
+### Step 1: Start PostgreSQL
+
+\`\`\`bash
+cd /opt/ms5/backend
+
+# Start only database services first
 docker compose -f docker-compose.production.yml up -d postgres redis
 
-# Wait for services to be ready
+# Watch logs
 docker compose -f docker-compose.production.yml logs -f postgres
-# Press Ctrl+C when you see "database system is ready to accept connections"
-```
+# Wait for: "database system is ready to accept connections"
+# Press Ctrl+C to exit
+\`\`\`
 
-### Step 2: Run Database Migrations
-```bash
-# Connect to PostgreSQL container
-docker exec -it ms5_postgres_production psql -U ms5_user_production -d factory_telemetry
+### Step 2: Verify Database
 
-# Run migrations (you'll need to copy SQL files to the container or run them externally)
-# Exit psql
+\`\`\`bash
+# Test connection
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c "SELECT version();"
+\`\`\`
+
+### Step 3: Enable TimescaleDB
+
+\`\`\`bash
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry
+# Inside psql:
+CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+\dx
 \q
-```
+\`\`\`
 
-**Alternative: Run migrations from host**
-```bash
-# Install PostgreSQL client
-sudo apt install -y postgresql-client
+### Step 4: Run Database Migrations
+
+**Navigate to repository root:**
+\`\`\`bash
+cd /opt/ms5
+\`\`\`
+
+**Run each migration in order:**
+
+\`\`\`bash
+# Set password variable
+export PGPASSWORD="YOUR_DATABASE_PASSWORD"
 
 # Run migrations
-PGPASSWORD=YOUR_DATABASE_PASSWORD psql -h localhost -p 5432 -U ms5_user_production -d factory_telemetry -f /path/to/001_init_telemetry.sql
-PGPASSWORD=YOUR_DATABASE_PASSWORD psql -h localhost -p 5432 -U ms5_user_production -d factory_telemetry -f /path/to/002_plc_equipment_management.sql
-# ... continue with all migration files
-```
+for sql_file in 00*.sql; do
+  echo "Running \$sql_file..."
+  docker exec -i ms5_postgres_production psql -U ms5_user -d factory_telemetry < "\$sql_file"
+done
 
-**⚠️ GOTCHA:** Database migrations must be run in order! Check the migration files in the parent directory.
+echo "All migrations completed!"
+
+# Clear password
+unset PGPASSWORD
+\`\`\`
+
+### Step 5: Verify Schema
+
+\`\`\`bash
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry
+
+# List tables
+\dt factory_telemetry.*
+
+# Check hypertables
+SELECT * FROM timescaledb_information.hypertables;
+
+\q
+\`\`\`
+
+---
+
+## PLC Integration Configuration
+
+**This is the CRITICAL section for getting data from your PLCs.**
+
+### Step 1: Test PLC Connectivity
+
+\`\`\`bash
+# Test ping
+ping -c 4 <PLC-IP>
+
+# Test EtherNet/IP port
+nc -zv <PLC-IP> 44818
+\`\`\`
+
+### Step 2: Insert PLC Configurations
+
+\`\`\`bash
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry
+\`\`\`
+
+**Insert your PLC (adjust values):**
+
+\`\`\`sql
+INSERT INTO factory_telemetry.plc_config (
+    name, 
+    ip_address, 
+    plc_type, 
+    port, 
+    enabled, 
+    poll_interval_s
+) VALUES (
+    'Line 1 PLC',
+    '192.168.1.10',
+    'LOGIX',
+    44818,
+    TRUE,
+    1.0
+) ON CONFLICT (ip_address, port) DO NOTHING;
+
+-- Verify
+SELECT id, name, ip_address, plc_type, enabled 
+FROM factory_telemetry.plc_config;
+\`\`\`
+
+### Step 3: Insert Equipment
+
+\`\`\`sql
+INSERT INTO factory_telemetry.equipment_config (
+    equipment_code,
+    name,
+    description,
+    plc_id,
+    enabled
+) VALUES (
+    'LINE1_FILLER',
+    'Line 1 Filler Station',
+    'Primary filling station',
+    (SELECT id FROM factory_telemetry.plc_config WHERE ip_address = '192.168.1.10'),
+    TRUE
+) ON CONFLICT (equipment_code) DO NOTHING;
+
+-- Verify
+SELECT equipment_code, name, enabled 
+FROM factory_telemetry.equipment_config;
+\`\`\`
+
+### Step 4: Define Metrics (PLC Tags)
+
+\`\`\`sql
+-- Machine running status
+INSERT INTO factory_telemetry.metric_def (
+    equipment_code,
+    metric_key,
+    value_type,
+    unit,
+    description,
+    enabled
+) VALUES (
+    'LINE1_FILLER',
+    'MachineRunning',
+    'BOOL',
+    NULL,
+    'Machine running status',
+    TRUE
+) ON CONFLICT (equipment_code, metric_key) DO NOTHING;
+
+-- Current speed
+INSERT INTO factory_telemetry.metric_def (
+    equipment_code,
+    metric_key,
+    value_type,
+    unit,
+    description,
+    enabled
+) VALUES (
+    'LINE1_FILLER',
+    'CurrentSpeed',
+    'REAL',
+    'BPM',
+    'Line speed in bottles per minute',
+    TRUE
+) ON CONFLICT (equipment_code, metric_key) DO NOTHING;
+
+-- Product counter
+INSERT INTO factory_telemetry.metric_def (
+    equipment_code,
+    metric_key,
+    value_type,
+    unit,
+    description,
+    enabled
+) VALUES (
+    'LINE1_FILLER',
+    'ProductCount',
+    'INT',
+    'units',
+    'Product counter',
+    TRUE
+) ON CONFLICT (equipment_code, metric_key) DO NOTHING;
+\`\`\`
+
+### Step 5: Bind Metrics to PLC Tags
+
+**Map each metric to actual PLC tag address:**
+
+\`\`\`sql
+-- Bind MachineRunning
+INSERT INTO factory_telemetry.metric_binding (
+    metric_def_id,
+    plc_kind,
+    address
+) VALUES (
+    (SELECT id FROM factory_telemetry.metric_def 
+     WHERE equipment_code = 'LINE1_FILLER' AND metric_key = 'MachineRunning'),
+    'LOGIX',
+    'Program:MainProgram.Status.Running'
+);
+
+-- Bind CurrentSpeed
+INSERT INTO factory_telemetry.metric_binding (
+    metric_def_id,
+    plc_kind,
+    address
+) VALUES (
+    (SELECT id FROM factory_telemetry.metric_def 
+     WHERE equipment_code = 'LINE1_FILLER' AND metric_key = 'CurrentSpeed'),
+    'LOGIX',
+    'Program:MainProgram.Production.Speed'
+);
+
+-- Bind ProductCount
+INSERT INTO factory_telemetry.metric_binding (
+    metric_def_id,
+    plc_kind,
+    address
+) VALUES (
+    (SELECT id FROM factory_telemetry.metric_def 
+     WHERE equipment_code = 'LINE1_FILLER' AND metric_key = 'ProductCount'),
+    'LOGIX',
+    'Program:MainProgram.Production.Counter'
+);
+
+-- Verify bindings
+SELECT 
+    md.equipment_code,
+    md.metric_key,
+    mb.plc_kind,
+    mb.address
+FROM factory_telemetry.metric_binding mb
+JOIN factory_telemetry.metric_def md ON mb.metric_def_id = md.id;
+
+\q
+\`\`\`
+
+**⚠️ CRITICAL:** Replace tag addresses with your actual PLC tag names!
 
 ---
 
 ## SSL Certificate Setup
 
 ### Option 1: Let's Encrypt (Recommended)
-```bash
+
+\`\`\`bash
 # Install Certbot
 sudo apt install -y certbot
 
-# Stop nginx temporarily
-docker compose -f docker-compose.production.yml stop nginx
-
 # Generate certificate
-sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com -d api.yourdomain.com -d monitoring.yourdomain.com
+sudo certbot certonly --standalone \
+  -d yourdomain.com \
+  -d www.yourdomain.com \
+  --email your-email@example.com \
+  --agree-tos
 
-# Copy certificates to application directory
-sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem ssl/production/production.crt
-sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem ssl/production/production.key
+# Copy certificates
+sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem /opt/ms5/backend/ssl/production/production.crt
+sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem /opt/ms5/backend/ssl/production/production.key
 
-# Set proper permissions
-sudo chown ms5app:ms5app ssl/production/*
-sudo chmod 600 ssl/production/production.key
-sudo chmod 644 ssl/production/production.crt
+# Set permissions
+sudo chown ms5app:ms5app /opt/ms5/backend/ssl/production/*
+sudo chmod 600 /opt/ms5/backend/ssl/production/production.key
+sudo chmod 644 /opt/ms5/backend/ssl/production/production.crt
+\`\`\`
 
-# Set up auto-renewal
-sudo crontab -e
-# Add this line:
-# 0 12 * * * /usr/bin/certbot renew --quiet && docker compose -f /opt/ms5-backend/docker-compose.production.yml restart nginx
-```
+### Option 2: Self-Signed (Development)
 
-### Option 2: Self-Signed Certificate (Development Only)
-```bash
-# Generate self-signed certificate
+\`\`\`bash
+cd /opt/ms5/backend
+
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout ssl/production/production.key \
-    -out ssl/production/production.crt \
-    -subj "/C=US/ST=State/L=City/O=Organization/CN=yourdomain.com"
+  -keyout ssl/production/production.key \
+  -out ssl/production/production.crt \
+  -subj "/C=US/ST=State/L=City/O=Company/CN=ms5.local"
 
-# Set proper permissions
 chmod 600 ssl/production/production.key
 chmod 644 ssl/production/production.crt
-```
-
-**⚠️ GOTCHA:** Self-signed certificates will show security warnings in browsers. Only use for development!
+\`\`\`
 
 ---
 
-## Deployment
+## Service Deployment
 
-### Step 1: Start All Services
-```bash
+### Step 1: Build and Start Services
+
+\`\`\`bash
+cd /opt/ms5/backend
+
+# Build images
+docker compose -f docker-compose.production.yml build backend
+
 # Start all services
 docker compose -f docker-compose.production.yml up -d
 
-# Check service status
-docker compose -f docker-compose.production.yml ps
-```
-
-### Step 2: Monitor Startup
-```bash
-# Watch logs during startup
+# Watch startup logs
 docker compose -f docker-compose.production.yml logs -f
+\`\`\`
 
-# Check specific service logs
-docker compose -f docker-compose.production.yml logs -f backend
-docker compose -f docker-compose.production.yml logs -f postgres
-docker compose -f docker-compose.production.yml logs -f nginx
-```
+**Wait for:** "Application startup complete"
 
-### Step 3: Verify Services
-```bash
-# Check if all containers are running
-docker ps
+### Step 2: Verify Services
 
-# Check service health
-curl -f http://localhost/health
-curl -f https://yourdomain.com/health
-```
+\`\`\`bash
+# Check all services running
+docker compose -f docker-compose.production.yml ps
+
+# All should show "Up" or "Up (healthy)"
+\`\`\`
 
 ---
 
-## Verification
+## Frontend Tablet Deployment
 
-### Step 1: Basic Health Checks
-```bash
-# Backend API health
+### Option 1: PWA (Recommended)
+
+**On tablet browser:**
+1. Navigate to: `https://<server-ip>` or `https://yourdomain.com`
+2. Login with admin credentials
+3. Click "Add to Home Screen"
+4. App installs as PWA with offline support
+
+**Configure tablet:**
+- Screen timeout: Never
+- Auto-rotate: Off (Lock landscape)
+- Allow notifications: On
+
+### Option 2: Native Android App
+
+**Build on dev machine:**
+\`\`\`bash
+cd frontend
+npm install
+cd android
+./gradlew assembleRelease
+\`\`\`
+
+**Install on tablet:**
+\`\`\`bash
+adb install app/build/outputs/apk/release/app-release.apk
+\`\`\`
+
+---
+
+## Verification & Testing
+
+### Step 1: Backend Health Check
+
+\`\`\`bash
+# Test health
 curl -f http://localhost:8000/health
-curl -f https://yourdomain.com/health
 
-# Detailed health check
-curl -f https://yourdomain.com/health/detailed
+# Expected: {"status":"healthy",...}
+\`\`\`
 
-# Metrics endpoint
-curl -f https://yourdomain.com/metrics
-```
+### Step 2: Verify PLC Data
 
-### Step 2: Database Connectivity
-```bash
-# Test database connection
-docker exec -it ms5_postgres_production psql -U ms5_user_production -d factory_telemetry -c "SELECT version();"
+\`\`\`bash
+# Check PLC connection
+docker compose -f docker-compose.production.yml logs backend | grep "PLC"
 
-# Check database tables
-docker exec -it ms5_postgres_production psql -U ms5_user_production -d factory_telemetry -c "\dt factory_telemetry.*"
-```
+# Check data in database
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c \
+  "SELECT md.equipment_code, md.metric_key, ml.ts 
+   FROM factory_telemetry.metric_latest ml 
+   JOIN factory_telemetry.metric_def md ON ml.metric_def_id = md.id 
+   ORDER BY ml.ts DESC LIMIT 5;"
+\`\`\`
 
-### Step 3: WebSocket Connection
-```bash
-# Test WebSocket connection (requires websocat)
-sudo apt install -y websocat
-echo '{"type": "ping"}' | websocat ws://localhost:8000/ws/
-```
+### Step 3: Frontend Test
 
-### Step 4: Monitoring Dashboards
-```bash
-# Access Grafana (if monitoring subdomain is configured)
-curl -f https://monitoring.yourdomain.com
-
-# Check Prometheus metrics
-curl -f http://localhost:9090
-```
-
----
-
-## Common Gotchas & Troubleshooting
-
-### 1. Docker Permission Issues
-**Problem:** `permission denied while trying to connect to Docker daemon`
-```bash
-# Solution: Add user to docker group and restart session
-sudo usermod -aG docker $USER
-# Log out and back in, or run:
-newgrp docker
-```
-
-### 2. Port Already in Use
-**Problem:** `bind: address already in use`
-```bash
-# Check what's using the port
-sudo netstat -tlnp | grep :80
-sudo netstat -tlnp | grep :443
-
-# Kill the process or change port in docker-compose.yml
-sudo kill -9 <PID>
-```
-
-### 3. Database Connection Failed
-**Problem:** `connection refused` or `authentication failed`
-```bash
-# Check database container status
-docker compose -f docker-compose.production.yml logs postgres
-
-# Verify environment variables
-docker compose -f docker-compose.production.yml config
-
-# Reset database password
-docker compose -f docker-compose.production.yml down
-docker volume rm ms5-backend_postgres_data_production
-docker compose -f docker-compose.production.yml up -d postgres
-```
-
-### 4. SSL Certificate Issues
-**Problem:** `SSL certificate verify failed`
-```bash
-# Check certificate files exist and have correct permissions
-ls -la ssl/production/
-sudo chown ms5app:ms5app ssl/production/*
-sudo chmod 600 ssl/production/production.key
-sudo chmod 644 ssl/production/production.crt
-
-# Test certificate
-openssl x509 -in ssl/production/production.crt -text -noout
-```
-
-### 5. Memory Issues
-**Problem:** Containers getting killed due to OOM
-```bash
-# Check system memory
-free -h
-docker stats
-
-# Increase swap space
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-```
-
-### 6. Disk Space Issues
-**Problem:** `no space left on device`
-```bash
-# Check disk usage
-df -h
-docker system df
-
-# Clean up Docker
-docker system prune -a
-docker volume prune
-```
-
-### 7. Firewall Blocking Connections
-**Problem:** Can't access services from outside
-```bash
-# Check firewall status
-sudo ufw status
-
-# Allow required ports
-sudo ufw allow 80
-sudo ufw allow 443
-sudo ufw allow 8000  # If accessing backend directly
-
-# Check if services are binding to correct interfaces
-netstat -tlnp | grep :80
-```
-
-### 8. Environment Variable Issues
-**Problem:** Services not starting with correct configuration
-```bash
-# Check environment variables in container
-docker exec -it ms5_backend_production env | grep -E "(DATABASE|REDIS|SECRET)"
-
-# Validate docker-compose configuration
-docker compose -f docker-compose.production.yml config
-```
-
----
-
-## Maintenance & Updates
-
-### Regular Maintenance Tasks
-```bash
-# Update system packages
-sudo apt update && sudo apt upgrade -y
-
-# Update Docker images
-docker compose -f docker-compose.production.yml pull
-
-# Restart services with new images
-docker compose -f docker-compose.production.yml up -d
-
-# Clean up old Docker resources
-docker system prune -f
-```
-
-### Application Updates
-```bash
-# Pull latest code
-git pull origin main
-
-# Rebuild and restart services
-docker compose -f docker-compose.production.yml build
-docker compose -f docker-compose.production.yml up -d
-```
-
-### Log Management
-```bash
-# Rotate logs to prevent disk space issues
-sudo logrotate -f /etc/logrotate.conf
-
-# Clean application logs
-find logs/ -name "*.log" -mtime +7 -delete
-```
-
----
-
-## Security Hardening
-
-### 1. System Security
-```bash
-# Disable root login
-sudo nano /etc/ssh/sshd_config
-# Set: PermitRootLogin no
-sudo systemctl restart ssh
-
-# Install fail2ban
-sudo apt install -y fail2ban
-sudo systemctl enable fail2ban
-sudo systemctl start fail2ban
-```
-
-### 2. Docker Security
-```bash
-# Run containers as non-root user (already configured in Dockerfile)
-# Use read-only root filesystem where possible
-# Scan images for vulnerabilities
-docker scan ms5-backend_backend
-```
-
-### 3. Network Security
-```bash
-# Configure fail2ban for Docker containers
-sudo nano /etc/fail2ban/jail.local
-# Add Docker-specific rules
-```
-
-### 4. Application Security
-```bash
-# Regular security updates
-sudo apt update && sudo apt upgrade -y
-
-# Monitor for security advisories
-# Set up intrusion detection
-sudo apt install -y aide
-sudo aideinit
-sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-```
+**From browser:**
+1. Navigate to server IP/domain
+2. Login as admin
+3. Verify dashboard loads
+4. Check real-time data updating
 
 ---
 
 ## Monitoring Setup
 
-### 1. System Monitoring
-```bash
-# Install monitoring tools
-sudo apt install -y htop iotop nethogs
+### Step 1: Access Grafana
 
-# Set up log monitoring
-sudo apt install -y logwatch
-```
+**Navigate to:** `http://<server-ip>:3000`
 
-### 2. Application Monitoring
-```bash
-# Access Grafana dashboard
-# URL: https://monitoring.yourdomain.com
-# Default login: admin / YOUR_GRAFANA_ADMIN_PASSWORD
+**Login:**
+- Username: admin
+- Password: (from .env.production)
 
-# Check Prometheus metrics
-# URL: http://localhost:9090
-```
+### Step 2: Verify Dashboards
 
-### 3. Alerting Setup
-```bash
-# Configure email alerts in AlertManager
-# Edit alertmanager.yml with your SMTP settings
-# Test alerting
-curl -X POST http://localhost:9093/api/v1/alerts
-```
+Go to Dashboards → Browse
+
+Should see:
+- MS5 System Overview
+- MS5 Production Dashboard
+- MS5 Andon Dashboard
+- MS5 TimescaleDB Monitoring
 
 ---
 
-## Backup & Recovery
+## Backup Configuration
 
-### 1. Database Backup
-```bash
-# Create backup script
-cat > backup-db.sh << 'EOF'
+### Create Backup Script
+
+\`\`\`bash
+cat > /opt/ms5/backup.sh << 'EOF'
 #!/bin/bash
-BACKUP_DIR="/opt/ms5-backend/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p $BACKUP_DIR
+BACKUP_DIR="/opt/ms5/backups"
+DATE=\$(date +%Y%m%d_%H%M%S)
+mkdir -p \$BACKUP_DIR
 
-# Backup database
-docker exec ms5_postgres_production pg_dump -U ms5_user_production factory_telemetry > $BACKUP_DIR/db_backup_$DATE.sql
+# Database backup
+docker exec ms5_postgres_production pg_dump -U ms5_user factory_telemetry | \
+  gzip > \$BACKUP_DIR/db_backup_\$DATE.sql.gz
 
-# Compress backup
-gzip $BACKUP_DIR/db_backup_$DATE.sql
+# Config backup
+tar -czf \$BACKUP_DIR/config_backup_\$DATE.tar.gz \
+  /opt/ms5/backend/.env.production \
+  /opt/ms5/backend/ssl/production
 
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "db_backup_*.sql.gz" -mtime +7 -delete
+# Remove old backups (30+ days)
+find \$BACKUP_DIR -name "*.gz" -mtime +30 -delete
+
+echo "Backup completed: \$DATE"
 EOF
 
-chmod +x backup-db.sh
+chmod +x /opt/ms5/backup.sh
+\`\`\`
 
-# Schedule daily backups
+### Schedule Daily Backups
+
+\`\`\`bash
 crontab -e
-# Add: 0 2 * * * /opt/ms5-backend/backup-db.sh
-```
-
-### 2. Application Backup
-```bash
-# Backup application data
-tar -czf /opt/ms5-backend/backups/app_backup_$(date +%Y%m%d_%H%M%S).tar.gz \
-    logs/ reports/ uploads/ .env ssl/
-```
-
-### 3. Recovery Procedures
-```bash
-# Database recovery
-gunzip backups/db_backup_YYYYMMDD_HHMMSS.sql.gz
-docker exec -i ms5_postgres_production psql -U ms5_user_production -d factory_telemetry < backups/db_backup_YYYYMMDD_HHMMSS.sql
-
-# Application recovery
-tar -xzf backups/app_backup_YYYYMMDD_HHMMSS.tar.gz
-```
+# Add:
+0 2 * * * /opt/ms5/backup.sh >> /opt/ms5/logs/backup.log 2>&1
+\`\`\`
 
 ---
 
-## Quick Reference Commands
+## Security Hardening
+
+### Disable Root Login
+
+\`\`\`bash
+sudo nano /etc/ssh/sshd_config
+# Set: PermitRootLogin no
+sudo systemctl restart sshd
+\`\`\`
+
+### Install Fail2Ban
+
+\`\`\`bash
+sudo apt install -y fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+\`\`\`
+
+---
+
+## Troubleshooting Guide
+
+### Issue: Cannot Connect to PLC
+
+**Solutions:**
+
+\`\`\`bash
+# Test connectivity
+ping <PLC-IP>
+nc -zv <PLC-IP> 44818
+
+# Check PLC config
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c \
+  "SELECT * FROM factory_telemetry.plc_config WHERE enabled = TRUE;"
+
+# Check backend logs
+docker compose -f docker-compose.production.yml logs backend | grep -i "plc"
+\`\`\`
+
+### Issue: Database Connection Failed
+
+\`\`\`bash
+# Check PostgreSQL running
+docker compose -f docker-compose.production.yml ps postgres
+
+# Check logs
+docker compose -f docker-compose.production.yml logs postgres
+
+# Test connection
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c "SELECT 1;"
+\`\`\`
+
+### Issue: Out of Disk Space
+
+\`\`\`bash
+# Check usage
+df -h
+docker system df
+
+# Clean up
+docker system prune -a
+docker volume prune
+
+# Clean old logs
+find /opt/ms5/backend/logs -name "*.log" -mtime +7 -delete
+\`\`\`
+
+---
+
+## Maintenance Procedures
+
+### Daily Checks
+
+\`\`\`bash
+# Service health
+docker compose -f docker-compose.production.yml ps
+
+# Disk space
+df -h
+
+# Recent errors
+docker compose -f docker-compose.production.yml logs --tail=100 | grep -i error
+
+# PLC data flowing
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c \
+  "SELECT COUNT(*) FROM factory_telemetry.metric_latest WHERE ts > NOW() - INTERVAL '5 minutes';"
+\`\`\`
+
+### Weekly Tasks
+
+\`\`\`bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Clean Docker
+docker system prune -f
+
+# Review logs
+cd /opt/ms5/backend/logs
+tail -100 backend.log | grep -i error
+\`\`\`
+
+### Monthly Tasks
+
+\`\`\`bash
+# Update Docker images
+cd /opt/ms5/backend
+docker compose -f docker-compose.production.yml pull
+docker compose -f docker-compose.production.yml up -d
+
+# Optimize database
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry -c "VACUUM ANALYZE;"
+
+# Review certificates
+openssl x509 -in ssl/production/production.crt -noout -dates
+\`\`\`
+
+---
+
+## Quick Reference
 
 ### Essential Commands
-```bash
-# Check service status
-docker compose -f docker-compose.production.yml ps
+
+\`\`\`bash
+# Navigate to app
+cd /opt/ms5/backend
+
+# Start services
+docker compose -f docker-compose.production.yml up -d
+
+# Stop services
+docker compose -f docker-compose.production.yml down
+
+# Restart
+docker compose -f docker-compose.production.yml restart
 
 # View logs
 docker compose -f docker-compose.production.yml logs -f
 
-# Restart services
-docker compose -f docker-compose.production.yml restart
+# Service status
+docker compose -f docker-compose.production.yml ps
 
-# Stop all services
-docker compose -f docker-compose.production.yml down
+# Database access
+docker exec -it ms5_postgres_production psql -U ms5_user -d factory_telemetry
 
-# Start all services
-docker compose -f docker-compose.production.yml up -d
+# Health check
+curl http://localhost:8000/health
+\`\`\`
 
-# Check system resources
-htop
-df -h
-free -h
+### Service URLs
 
-# Check network connectivity
-curl -f https://yourdomain.com/health
+```
+Backend API:    http://<server-ip>:8000
+API Docs:       http://<server-ip>:8000/docs
+Grafana:        http://<server-ip>:3000
+Prometheus:     http://<server-ip>:9090
+Frontend:       https://<server-ip>
+```
+
+### Important Paths
+
+```
+Application:    /opt/ms5/
+Backend:        /opt/ms5/backend/
+Environment:    /opt/ms5/backend/.env.production
+Docker Compose: /opt/ms5/backend/docker-compose.production.yml
+Logs:           /opt/ms5/backend/logs/
+Backups:        /opt/ms5/backups/
+SSL Certs:      /opt/ms5/backend/ssl/production/
 ```
 
 ### Emergency Procedures
-```bash
-# Emergency stop
+
+**Stop Everything:**
+\`\`\`bash
+cd /opt/ms5/backend
 docker compose -f docker-compose.production.yml down
+\`\`\`
 
-# Emergency restart
+**Restart Everything:**
+\`\`\`bash
+docker compose -f docker-compose.production.yml down
 docker compose -f docker-compose.production.yml up -d
+\`\`\`
 
-# Check what's wrong
-docker compose -f docker-compose.production.yml logs --tail=100
-
-# Reset everything (DANGER: This will delete all data!)
-docker compose -f docker-compose.production.yml down -v
-docker system prune -a
-```
+**Emergency Backup:**
+\`\`\`bash
+docker exec ms5_postgres_production pg_dump -U ms5_user factory_telemetry > /tmp/emergency_backup.sql
+\`\`\`
 
 ---
 
-## Support & Documentation
+## Support & Resources
 
-### Useful Resources
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+### Documentation
+- **Code Review:** CODE_REVIEW_REPORT.md
+- **Implementation Plan:** IMPLEMENTATION_PLAN_TO_READY.md
+- **System Spec:** MS5.0_System.md
+- **API Docs:** http://\<server-ip\>:8000/docs
 
-### Getting Help
-1. Check application logs: `docker compose -f docker-compose.production.yml logs -f`
-2. Check system logs: `journalctl -u docker`
-3. Verify configuration: `docker compose -f docker-compose.production.yml config`
-4. Test connectivity: `curl -f https://yourdomain.com/health`
-
-### Contact Information
-- Repository: https://github.com/Dashboard4-0/ms5-backend
-- Documentation: See README.md in the repository
-- Issues: Use GitHub Issues for bug reports
+### Repository
+- **GitHub:** https://github.com/Dashboard4-0/MS5_App.git
+- **Issues:** https://github.com/Dashboard4-0/MS5_App/issues
 
 ---
 
-**⚠️ IMPORTANT REMINDERS:**
-1. Always backup before making changes
-2. Test in staging environment first
-3. Monitor logs during deployment
-4. Keep SSL certificates updated
-5. Regular security updates are critical
-6. Document any custom configurations
+## Post-Deployment Checklist
 
-This guide should help you successfully deploy the MS5.0 Floor Dashboard backend on Ubuntu Linux. Follow each step carefully and refer to the troubleshooting section if you encounter issues.
+- [ ] All Docker containers running
+- [ ] Backend health check returns 200
+- [ ] Database migrations complete
+- [ ] All PLCs configured
+- [ ] PLC connectivity tested
+- [ ] Data flowing (metric_latest updated)
+- [ ] Frontend accessible from tablets
+- [ ] WebSocket connection working
+- [ ] Grafana dashboards showing data
+- [ ] Backups scheduled and tested
+- [ ] Firewall configured
+- [ ] SSL certificates installed
+- [ ] Default passwords changed
+- [ ] Users trained
+
+---
+
+## System Limitations
+
+**Current Version Includes:**
+- ✅ Allen-Bradley CompactLogix/MicroLogix support
+- ✅ Basic OEE calculation
+- ✅ Andon system
+- ✅ Production monitoring
+- ✅ Quality tracking
+
+**NOT Included (See IMPLEMENTATION_PLAN_TO_READY.md):**
+- ❌ Event streaming (Kafka)
+- ❌ Workflow orchestration (Temporal)
+- ❌ Full IWS/TPM workflows
+- ❌ OPC UA support
+- ❌ Microservices architecture
+
+---
+
+**Deployment Guide Version:** 2.0  
+**Last Updated:** October 1, 2025  
+**Repository:** https://github.com/Dashboard4-0/MS5_App.git
+
+**This guide successfully deploys a production-ready MS5.0 system on Ubuntu edge devices.**
