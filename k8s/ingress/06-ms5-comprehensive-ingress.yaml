@@ -1,0 +1,429 @@
+---
+# MS5.0 Main Application Ingress
+# Comprehensive ingress configuration for the main application
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-main-ingress
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: ingress
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard main application ingress"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+    nginx.ingress.kubernetes.io/client-max-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Authorization, Upgrade, Connection"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; manifest-src 'self';";
+    # Tablet and factory optimizations
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Device-Type: tablet";
+      more_set_headers "X-Optimization: tablet";
+      more_set_headers "X-Network-Type: factory";
+      more_set_headers "X-Factory-Network: enabled";
+      more_set_headers "X-PWA-Enabled: true";
+      more_set_headers "X-Offline-Support: enabled";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    # Performance optimizations
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Caching for static assets
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Cache-Status "HIT";
+      }
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ms5floor.com
+    - www.ms5floor.com
+    secretName: ms5-tls-secret
+  rules:
+  # Main application domain
+  - host: ms5floor.com
+    http:
+      paths:
+      - path: /()(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  # WWW redirect
+  - host: www.ms5floor.com
+    http:
+      paths:
+      - path: /()(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+---
+# MS5.0 API Ingress
+# Comprehensive ingress configuration for API endpoints
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-api-ingress
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: ingress
+    tier: backend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard API ingress"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/client-max-body-size: "50m"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # API-specific security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-API-Version: v1";
+      more_set_headers "X-Rate-Limit: 200";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    # Load balancing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr consistent"
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.ms5floor.com
+    - backend.ms5floor.com
+    secretName: ms5-api-tls-secret
+  rules:
+  # API domain
+  - host: api.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend
+            port:
+              number: 8000
+  # Backend domain
+  - host: backend.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend
+            port:
+              number: 8000
+---
+# MS5.0 WebSocket Ingress
+# Comprehensive ingress configuration for WebSocket connections
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-websocket-ingress
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: websocket-ingress
+    tier: backend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard WebSocket ingress"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller WebSocket annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/client-max-body-size: "0"
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Authorization, Upgrade, Connection"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # WebSocket specific configuration
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-WebSocket-Version: 13";
+      more_set_headers "X-WebSocket-Protocol: ms5-factory";
+      more_set_headers "X-WebSocket-Security: enabled";
+      more_set_headers "Upgrade: websocket";
+      more_set_headers "Connection: upgrade";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    # WebSocket load balancing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr consistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "ms5-websocket-session"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "86400"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "86400"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/ws"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ws.ms5floor.com
+    - wss.ms5floor.com
+    secretName: ms5-websocket-tls-secret
+  rules:
+  # WebSocket domain
+  - host: ws.ms5floor.com
+    http:
+      paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend-websocket
+            port:
+              number: 8000
+  # Secure WebSocket domain
+  - host: wss.ms5floor.com
+    http:
+      paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend-websocket
+            port:
+              number: 8000
+---
+# MS5.0 Monitoring Ingress
+# Comprehensive ingress configuration for monitoring services
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-monitoring-ingress
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring-ingress
+    tier: infrastructure
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard monitoring ingress"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/client-max-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    # Authentication for monitoring services
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: ms5-monitoring-auth
+    nginx.ingress.kubernetes.io/auth-realm: "MS5.0 Monitoring Access"
+    # Security headers for monitoring
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "X-Monitoring-Access: restricted";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    # IP whitelisting for monitoring access
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - monitoring.ms5floor.com
+    - grafana.ms5floor.com
+    - prometheus.ms5floor.com
+    - alerts.ms5floor.com
+    secretName: ms5-monitoring-tls-secret
+  rules:
+  # Grafana monitoring
+  - host: grafana.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  # Prometheus monitoring
+  - host: prometheus.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  # AlertManager
+  - host: alerts.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093
+  # General monitoring endpoint
+  - host: monitoring.ms5floor.com
+    http:
+      paths:
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+      - path: /prometheus
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+      - path: /alerts
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093
+---
+# MS5.0 Status Page Ingress
+# Comprehensive ingress configuration for status and health endpoints
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-status-ingress
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: status-ingress
+    tier: infrastructure
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard status page ingress"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/rate-limit: "10"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    # Public access for status page
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Status-Page: public";
+      more_set_headers "X-Health-Check: enabled";
+      more_set_headers "Cache-Control: no-cache, no-store, must-revalidate";
+      more_set_headers "Pragma: no-cache";
+      more_set_headers "Expires: 0";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - status.ms5floor.com
+    - health.ms5floor.com
+    secretName: ms5-tls-secret
+  rules:
+  # Status page
+  - host: status.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend
+            port:
+              number: 8000
+  # Health check endpoint
+  - host: health.ms5floor.com
+    http:
+      paths:
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-backend
+            port:
+              number: 8000

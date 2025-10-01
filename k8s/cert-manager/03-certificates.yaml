@@ -1,0 +1,247 @@
+---
+# MS5.0 Main Domain Certificate
+# SSL/TLS certificate for primary domain and subdomains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-tls-certificate
+  namespace: ms5-production
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: cert-manager
+    app: ms5-dashboard
+    component: tls
+  annotations:
+    description: "SSL/TLS certificate for MS5.0 Floor Dashboard main domains"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    cert-manager.io/revision-history-limit: "3"
+spec:
+  # Secret name where the certificate will be stored
+  secretName: ms5-tls-secret
+  # Certificate issuer reference
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Common name for the certificate
+  commonName: ms5floor.com
+  # Subject Alternative Names (SANs)
+  dnsNames:
+  - ms5floor.com
+  - www.ms5floor.com
+  - api.ms5floor.com
+  - cdn.ms5floor.com
+  - status.ms5floor.com
+  # Certificate duration and renewal
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  # Private key configuration
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+    rotationPolicy: Always
+  # Certificate usage
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  # Certificate subject
+  subject:
+    organizations:
+    - "MS5.0 Floor Dashboard"
+    countries:
+    - "GB"
+    localities:
+    - "London"
+    provinces:
+    - "England"
+    organizationalUnits:
+    - "Manufacturing Systems"
+---
+# MS5.0 WebSocket Certificate
+# SSL/TLS certificate for WebSocket endpoints
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-websocket-tls-certificate
+  namespace: ms5-production
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: cert-manager
+    app: ms5-dashboard
+    component: websocket-tls
+  annotations:
+    description: "SSL/TLS certificate for MS5.0 Floor Dashboard WebSocket endpoints"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    cert-manager.io/revision-history-limit: "3"
+spec:
+  # Secret name where the certificate will be stored
+  secretName: ms5-websocket-tls-secret
+  # Certificate issuer reference
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Common name for the certificate
+  commonName: ws.ms5floor.com
+  # Subject Alternative Names (SANs)
+  dnsNames:
+  - ws.ms5floor.com
+  - wss.ms5floor.com
+  # Certificate duration and renewal
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  # Private key configuration
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+    rotationPolicy: Always
+  # Certificate usage
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  # Certificate subject
+  subject:
+    organizations:
+    - "MS5.0 Floor Dashboard"
+    countries:
+    - "GB"
+    localities:
+    - "London"
+    provinces:
+    - "England"
+    organizationalUnits:
+    - "Manufacturing Systems"
+---
+# MS5.0 API Certificate
+# SSL/TLS certificate for API endpoints
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-api-tls-certificate
+  namespace: ms5-production
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: cert-manager
+    app: ms5-dashboard
+    component: api-tls
+  annotations:
+    description: "SSL/TLS certificate for MS5.0 Floor Dashboard API endpoints"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    cert-manager.io/revision-history-limit: "3"
+spec:
+  # Secret name where the certificate will be stored
+  secretName: ms5-api-tls-secret
+  # Certificate issuer reference
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Common name for the certificate
+  commonName: api.ms5floor.com
+  # Subject Alternative Names (SANs)
+  dnsNames:
+  - api.ms5floor.com
+  - backend.ms5floor.com
+  - rest.ms5floor.com
+  # Certificate duration and renewal
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  # Private key configuration
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+    rotationPolicy: Always
+  # Certificate usage
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  # Certificate subject
+  subject:
+    organizations:
+    - "MS5.0 Floor Dashboard"
+    countries:
+    - "GB"
+    localities:
+    - "London"
+    provinces:
+    - "England"
+    organizationalUnits:
+    - "Manufacturing Systems"
+---
+# MS5.0 Monitoring Certificate
+# SSL/TLS certificate for monitoring endpoints
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-monitoring-tls-certificate
+  namespace: ms5-production
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: cert-manager
+    app: ms5-dashboard
+    component: monitoring-tls
+  annotations:
+    description: "SSL/TLS certificate for MS5.0 Floor Dashboard monitoring endpoints"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    cert-manager.io/revision-history-limit: "3"
+spec:
+  # Secret name where the certificate will be stored
+  secretName: ms5-monitoring-tls-secret
+  # Certificate issuer reference
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Common name for the certificate
+  commonName: monitoring.ms5floor.com
+  # Subject Alternative Names (SANs)
+  dnsNames:
+  - monitoring.ms5floor.com
+  - grafana.ms5floor.com
+  - prometheus.ms5floor.com
+  - alerts.ms5floor.com
+  - metrics.ms5floor.com
+  # Certificate duration and renewal
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  # Private key configuration
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+    rotationPolicy: Always
+  # Certificate usage
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  # Certificate subject
+  subject:
+    organizations:
+    - "MS5.0 Floor Dashboard"
+    countries:
+    - "GB"
+    localities:
+    - "London"
+    provinces:
+    - "England"
+    organizationalUnits:
+    - "Manufacturing Systems"

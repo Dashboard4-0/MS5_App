@@ -1,0 +1,753 @@
+---
+# MS5.0 Floor Dashboard - Security Automation
+# Phase 7B: Advanced Security & Compliance
+#
+# This manifest implements comprehensive security automation
+# with automated security scanning, policy enforcement, and
+# incident response automation.
+#
+# Security Automation Architecture:
+# - Automated Security Scanning: Continuous vulnerability scanning
+# - Policy Enforcement Automation: Automated policy compliance
+# - Incident Response Automation: Automated security incident response
+# - Security SLI/SLO: Security Level Indicators and Objectives
+
+# Automated Security Scanning Pipeline
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-automation-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  security-automation.yaml: |
+    # Security Automation Configuration
+    # Comprehensive security automation and policy enforcement
+    
+    apiVersion: security.azure.com/v1
+    kind: SecurityAutomationPolicy
+    metadata:
+      name: ms5-security-automation
+      namespace: ms5-production
+    spec:
+      # Automated security scanning
+      securityScanning:
+        enabled: true
+        scanSchedule: "0 */6 * * *"  # Every 6 hours
+        autoRemediate: true
+        policyViolationThreshold: "medium"
+        notificationChannels:
+          - "slack"
+          - "email"
+          - "webhook"
+        
+        # Scanning targets
+        scanTargets:
+          - "container-images"
+          - "kubernetes-manifests"
+          - "network-policies"
+          - "rbac-policies"
+          - "secrets"
+          - "certificates"
+      
+      # Policy enforcement automation
+      policyEnforcement:
+        enabled: true
+        enforcementMode: "enforce"
+        autoRemediation: true
+        remediationTimeout: "300s"
+        
+        # Policy categories
+        policyCategories:
+          - "pod-security"
+          - "network-security"
+          - "rbac-security"
+          - "secret-security"
+          - "certificate-security"
+      
+      # Incident response automation
+      incidentResponse:
+        enabled: true
+        autoContainment: true
+        escalationThreshold: "critical"
+        notificationChannels:
+          - "security-team"
+          - "incident-response-team"
+          - "management"
+        
+        # Response procedures
+        responseProcedures:
+          - "auto-isolation"
+          - "auto-quarantine"
+          - "auto-notification"
+          - "auto-escalation"
+---
+# Security Policy Automation
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: security-policy-automation
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: security-automation
+          containers:
+          - name: policy-automation
+            image: security-automation:latest
+            env:
+            - name: AUTOMATION_MODE
+              value: "enforce"
+            - name: REMEDIATION_TIMEOUT
+              value: "300s"
+            - name: NOTIFICATION_CHANNELS
+              value: "slack,email,webhook"
+            - name: POLICY_CATEGORIES
+              value: "pod-security,network-security,rbac-security,secret-security,certificate-security"
+            volumeMounts:
+            - name: policy-config
+              mountPath: /etc/security/policies
+            - name: remediation-scripts
+              mountPath: /etc/security/remediation
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: policy-config
+            configMap:
+              name: security-policy-config
+          - name: remediation-scripts
+            configMap:
+              name: security-remediation-scripts
+          restartPolicy: OnFailure
+---
+# Security Policy Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-policy-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  policy-config.yaml: |
+    # Security Policy Configuration
+    # Automated policy enforcement configuration
+    
+    policies:
+      # Pod Security Policies
+      podSecurity:
+        enabled: true
+        enforcement: "enforce"
+        autoRemediation: true
+        rules:
+          - name: "non-root-user"
+            description: "Ensure containers run as non-root user"
+            severity: "high"
+            remediation: "update-security-context"
+          - name: "readonly-filesystem"
+            description: "Ensure containers use read-only root filesystem"
+            severity: "medium"
+            remediation: "update-security-context"
+          - name: "privilege-escalation"
+            description: "Disable privilege escalation"
+            severity: "high"
+            remediation: "update-security-context"
+          - name: "capabilities"
+            description: "Drop all capabilities"
+            severity: "medium"
+            remediation: "update-security-context"
+      
+      # Network Security Policies
+      networkSecurity:
+        enabled: true
+        enforcement: "enforce"
+        autoRemediation: true
+        rules:
+          - name: "default-deny"
+            description: "Ensure default deny network policy"
+            severity: "high"
+            remediation: "create-network-policy"
+          - name: "explicit-allow"
+            description: "Ensure explicit allow rules"
+            severity: "medium"
+            remediation: "update-network-policy"
+          - name: "dns-resolution"
+            description: "Ensure DNS resolution policy"
+            severity: "low"
+            remediation: "create-dns-policy"
+      
+      # RBAC Security Policies
+      rbacSecurity:
+        enabled: true
+        enforcement: "enforce"
+        autoRemediation: true
+        rules:
+          - name: "least-privilege"
+            description: "Ensure least privilege access"
+            severity: "high"
+            remediation: "update-rbac"
+          - name: "service-account"
+            description: "Ensure service account usage"
+            severity: "medium"
+            remediation: "create-service-account"
+          - name: "role-binding"
+            description: "Ensure proper role binding"
+            severity: "medium"
+            remediation: "update-role-binding"
+      
+      # Secret Security Policies
+      secretSecurity:
+        enabled: true
+        enforcement: "enforce"
+        autoRemediation: true
+        rules:
+          - name: "secret-encryption"
+            description: "Ensure secrets are encrypted"
+            severity: "high"
+            remediation: "enable-secret-encryption"
+          - name: "secret-rotation"
+            description: "Ensure secret rotation"
+            severity: "medium"
+            remediation: "enable-secret-rotation"
+          - name: "secret-access"
+            description: "Ensure proper secret access"
+            severity: "high"
+            remediation: "update-secret-access"
+      
+      # Certificate Security Policies
+      certificateSecurity:
+        enabled: true
+        enforcement: "enforce"
+        autoRemediation: true
+        rules:
+          - name: "certificate-expiry"
+            description: "Ensure certificates are not expired"
+            severity: "critical"
+            remediation: "renew-certificate"
+          - name: "certificate-rotation"
+            description: "Ensure certificate rotation"
+            severity: "medium"
+            remediation: "enable-certificate-rotation"
+          - name: "certificate-validation"
+            description: "Ensure certificate validation"
+            severity: "high"
+            remediation: "validate-certificate"
+---
+# Security Remediation Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-remediation-scripts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  remediation-scripts.yaml: |
+    # Security Remediation Scripts
+    # Automated remediation procedures for security violations
+    
+    scripts:
+      # Pod Security Remediation
+      update-security-context: |
+        #!/bin/bash
+        # Update pod security context to enforce non-root user
+        
+        NAMESPACE=$1
+        POD_NAME=$2
+        
+        # Update security context
+        kubectl patch pod $POD_NAME -n $NAMESPACE -p '{
+          "spec": {
+            "securityContext": {
+              "runAsNonRoot": true,
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "fsGroup": 1000
+            },
+            "containers": [{
+              "name": "'$CONTAINER_NAME'",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "readOnlyRootFilesystem": true,
+                "runAsNonRoot": true,
+                "runAsUser": 1000,
+                "runAsGroup": 1000,
+                "capabilities": {
+                  "drop": ["ALL"]
+                }
+              }
+            }]
+          }
+        }'
+      
+      # Network Policy Remediation
+      create-network-policy: |
+        #!/bin/bash
+        # Create default deny network policy
+        
+        NAMESPACE=$1
+        
+        # Create default deny policy
+        kubectl apply -f - <<EOF
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: default-deny-all
+          namespace: $NAMESPACE
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          - Egress
+        EOF
+      
+      # RBAC Remediation
+      update-rbac: |
+        #!/bin/bash
+        # Update RBAC to enforce least privilege
+        
+        NAMESPACE=$1
+        USER_NAME=$2
+        
+        # Create least privilege role
+        kubectl apply -f - <<EOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: least-privilege-role
+          namespace: $NAMESPACE
+        rules:
+        - apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list", "watch"]
+        EOF
+        
+        # Create role binding
+        kubectl apply -f - <<EOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: least-privilege-binding
+          namespace: $NAMESPACE
+        subjects:
+        - kind: User
+          name: $USER_NAME
+          apiGroup: rbac.authorization.k8s.io
+        roleRef:
+          kind: Role
+          name: least-privilege-role
+          apiGroup: rbac.authorization.k8s.io
+        EOF
+      
+      # Secret Security Remediation
+      enable-secret-encryption: |
+        #!/bin/bash
+        # Enable secret encryption at rest
+        
+        # Enable encryption at rest
+        kubectl patch apiserver cluster -p '{
+          "spec": {
+            "encryption": {
+              "type": "AESCBC",
+              "aescbc": {
+                "keys": [{
+                  "name": "key1",
+                  "secret": "'$(openssl rand -base64 32)'"
+                }]
+              }
+            }
+          }
+        }'
+      
+      # Certificate Remediation
+      renew-certificate: |
+        #!/bin/bash
+        # Renew expired certificate
+        
+        CERT_NAME=$1
+        NAMESPACE=$2
+        
+        # Delete expired certificate
+        kubectl delete certificate $CERT_NAME -n $NAMESPACE
+        
+        # Recreate certificate
+        kubectl apply -f - <<EOF
+        apiVersion: cert-manager.io/v1
+        kind: Certificate
+        metadata:
+          name: $CERT_NAME
+          namespace: $NAMESPACE
+        spec:
+          secretName: $CERT_NAME-tls
+          issuerRef:
+            name: letsencrypt-prod
+            kind: ClusterIssuer
+          dnsNames:
+          - $CERT_NAME.$NAMESPACE.svc.cluster.local
+        EOF
+---
+# Automated Incident Response
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-response-automation
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  incident-response.yaml: |
+    # Incident Response Automation Configuration
+    # Automated security incident response procedures
+    
+    apiVersion: security.azure.com/v1
+    kind: IncidentResponsePolicy
+    metadata:
+      name: ms5-incident-response
+      namespace: ms5-production
+    spec:
+      # Incident detection
+      incidentDetection:
+        enabled: true
+        detectionRules:
+          - name: "suspicious-login-attempts"
+            condition: "failed_logins > 5 in 5min"
+            severity: "high"
+            action: "auto-block-ip"
+            escalation:
+              - "notify-security-team"
+              - "create-incident-ticket"
+          
+          - name: "privilege-escalation-attempt"
+            condition: "privilege_change_detected"
+            severity: "critical"
+            action: "immediate-isolation"
+            escalation:
+              - "notify-security-team"
+              - "create-critical-incident"
+              - "activate-incident-response"
+          
+          - name: "malware-detection"
+            condition: "malware_signature_detected"
+            severity: "critical"
+            action: "quarantine-container"
+            escalation:
+              - "notify-security-team"
+              - "create-incident-ticket"
+              - "initiate-forensic-analysis"
+          
+          - name: "data-exfiltration-attempt"
+            condition: "unusual_data_transfer > 1GB in 1min"
+            severity: "critical"
+            action: "block-network-traffic"
+            escalation:
+              - "notify-security-team"
+              - "create-critical-incident"
+              - "activate-incident-response"
+      
+      # Automated response procedures
+      responseProcedures:
+        autoIsolation:
+          enabled: true
+          isolationMethods:
+            - "network-isolation"
+            - "container-quarantine"
+            - "user-account-lockout"
+        
+        autoNotification:
+          enabled: true
+          notificationChannels:
+            - "slack"
+            - "email"
+            - "webhook"
+            - "sms"
+        
+        autoEscalation:
+          enabled: true
+          escalationLevels:
+            - "security-team"
+            - "incident-response-team"
+            - "management"
+            - "executive-team"
+      
+      # Incident response playbooks
+      playbooks:
+        - name: "privilege-escalation-response"
+          triggers:
+            - "privilege-escalation-attempt"
+          steps:
+            - "isolate-affected-systems"
+            - "notify-security-team"
+            - "create-incident-ticket"
+            - "initiate-forensic-analysis"
+            - "update-security-policies"
+        
+        - name: "malware-detection-response"
+          triggers:
+            - "malware-detection"
+          steps:
+            - "quarantine-infected-containers"
+            - "notify-security-team"
+            - "create-incident-ticket"
+            - "initiate-forensic-analysis"
+            - "update-antimalware-policies"
+        
+        - name: "data-exfiltration-response"
+          triggers:
+            - "data-exfiltration-attempt"
+          steps:
+            - "block-network-traffic"
+            - "notify-security-team"
+            - "create-critical-incident"
+            - "activate-incident-response"
+            - "initiate-forensic-analysis"
+---
+# Security SLI/SLO Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-sli-slo-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  security-sli-slo.yaml: |
+    # Security SLI/SLO Configuration
+    # Security Level Indicators and Objectives
+    
+    apiVersion: monitoring.k8s.io/v1
+    kind: SLISLOConfiguration
+    metadata:
+      name: ms5-security-sli-slo
+      namespace: ms5-production
+    spec:
+      # Security SLIs (Service Level Indicators)
+      securitySLIs:
+        # Vulnerability Response Time
+        vulnerabilityResponseTime:
+          description: "Time to respond to critical vulnerabilities"
+          target: "< 4 hours"
+          measurement: "time_to_remediation"
+          threshold: "4h"
+        
+        # Policy Compliance Rate
+        policyComplianceRate:
+          description: "Percentage of policies in compliance"
+          target: "> 99%"
+          measurement: "compliance_percentage"
+          threshold: "99%"
+        
+        # Security Incident MTTR
+        securityIncidentMTTR:
+          description: "Mean Time To Resolution for security incidents"
+          target: "< 15 minutes"
+          measurement: "mean_time_to_resolution"
+          threshold: "15m"
+        
+        # Threat Detection Accuracy
+        threatDetectionAccuracy:
+          description: "Accuracy of threat detection systems"
+          target: "> 95%"
+          measurement: "detection_accuracy_percentage"
+          threshold: "95%"
+        
+        # Security Scan Coverage
+        securityScanCoverage:
+          description: "Percentage of systems covered by security scans"
+          target: "> 99%"
+          measurement: "scan_coverage_percentage"
+          threshold: "99%"
+        
+        # Certificate Expiry Monitoring
+        certificateExpiryMonitoring:
+          description: "Percentage of certificates monitored for expiry"
+          target: "> 99%"
+          measurement: "certificate_monitoring_percentage"
+          threshold: "99%"
+      
+      # Security SLOs (Service Level Objectives)
+      securitySLOs:
+        # Overall Security Posture
+        overallSecurityPosture:
+          description: "Overall security posture score"
+          target: "> 95%"
+          measurement: "security_posture_score"
+          threshold: "95%"
+        
+        # Compliance Score
+        complianceScore:
+          description: "Overall compliance score across all frameworks"
+          target: "> 90%"
+          measurement: "compliance_score"
+          threshold: "90%"
+        
+        # Security Automation Coverage
+        securityAutomationCoverage:
+          description: "Percentage of security processes automated"
+          target: "> 95%"
+          measurement: "automation_coverage_percentage"
+          threshold: "95%"
+        
+        # Incident Response Time
+        incidentResponseTime:
+          description: "Time to respond to security incidents"
+          target: "< 5 minutes"
+          measurement: "incident_response_time"
+          threshold: "5m"
+---
+# Security Automation Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: security-automation
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+---
+# Security Automation RBAC
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: security-automation
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "secrets", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificates", "issuers", "clusterissuers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["security.azure.com"]
+  resources: ["securitypolicies", "securityautomationpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: security-automation
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+subjects:
+- kind: ServiceAccount
+  name: security-automation
+  namespace: ms5-production
+roleRef:
+  kind: ClusterRole
+  name: security-automation
+  apiGroup: rbac.authorization.k8s.io
+---
+# Security Automation Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-automation-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  security-automation-alerts.yaml: |
+    # Security Automation Monitoring Alerts
+    # Comprehensive monitoring of security automation processes
+    
+    groups:
+    - name: security-automation-monitoring
+      rules:
+      - alert: SecurityAutomationFailure
+        expr: security_automation_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Security automation failure"
+          description: "Security automation process {{ $labels.process_name }} failed: {{ $labels.error_message }}"
+      
+      - alert: PolicyEnforcementFailure
+        expr: policy_enforcement_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Policy enforcement failure"
+          description: "Policy enforcement failed for {{ $labels.policy_name }}: {{ $labels.error_message }}"
+      
+      - alert: IncidentResponseFailure
+        expr: incident_response_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Incident response failure"
+          description: "Incident response failed for {{ $labels.incident_type }}: {{ $labels.error_message }}"
+      
+      - alert: SecuritySLIViolation
+        expr: security_sli_score < security_sli_threshold
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Security SLI violation"
+          description: "Security SLI {{ $labels.sli_name }} is {{ $value }}%, below threshold {{ $labels.threshold }}%"
+      
+      - alert: SecuritySLOViolation
+        expr: security_slo_score < security_slo_threshold
+        for: 10m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Security SLO violation"
+          description: "Security SLO {{ $labels.slo_name }} is {{ $value }}%, below threshold {{ $labels.threshold }}%"
+      
+      - alert: SecurityAutomationCoverageLow
+        expr: security_automation_coverage < 95
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Security automation coverage low"
+          description: "Security automation coverage is {{ $value }}%, below 95% threshold"

@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-business-continuity
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Business Continuity Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Business Continuity configuration
+  cdn-business-continuity.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-business-continuity
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Business Continuity Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      business-continuity-config.json: |
+        {
+          "businessContinuity": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "businessContinuityTypes": [
+              {
+                "name": "Business Continuity Technology",
+                "description": "Business continuity technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Business Continuity Process",
+                "description": "Business continuity process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Business Continuity Automation",
+                "description": "Business continuity automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Business Continuity Monitoring",
+                "description": "Business continuity monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Business Continuity monitoring
+  cdn-business-continuity-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-business-continuity-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Business Continuity Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      business-continuity-monitoring.json: |
+        {
+          "monitoring": {
+            "businessContinuity": "ms5-cdn-business-continuity",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "BusinessContinuityTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average business continuity technology performance"
+              },
+              {
+                "name": "BusinessContinuityProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average business continuity process performance"
+              },
+              {
+                "name": "BusinessContinuityAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average business continuity automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowBusinessContinuityTechnologyPerformance",
+                "condition": "business_continuity_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Business continuity technology performance is below 80%"
+              },
+              {
+                "name": "LowBusinessContinuityProcessPerformance",
+                "condition": "business_continuity_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Business continuity process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Business Continuity script
+  cdn-business-continuity.py: |
+    #!/usr/bin/env python3
+    """
+    CDN business continuity script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_business_continuity():
+        """Get CDN business continuity from Azure"""
+        try:
+            # Azure CDN business continuity endpoint
+            business_continuity_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/business-continuity"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(business_continuity_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                business_continuity = response.json()
+                
+                return {
+                    "request_count": business_continuity.get("RequestCount", 0),
+                    "bytes_sent": business_continuity.get("BytesSent", 0),
+                    "cache_hit_ratio": business_continuity.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN business continuity: {e}")
+            return None
+    
+    def send_business_continuity_to_prometheus(business_continuity):
+        """Send CDN business continuity to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_business_continuity",
+                "value": business_continuity["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN business continuity sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN business continuity to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN business continuity to Prometheus: {e}")
+    
+    def main():
+        """Main business continuity loop"""
+        while True:
+            business_continuity = get_cdn_business_continuity()
+            if business_continuity:
+                print(json.dumps(business_continuity, indent=2))
+                send_business_continuity_to_prometheus(business_continuity)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Business Continuity deployment
+  cdn-business-continuity-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-business-continuity
+      namespace: ms5-frontend
+      labels:
+        app: cdn-business-continuity
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-business-continuity
+      template:
+        metadata:
+          labels:
+            app: cdn-business-continuity
+        spec:
+          containers:
+          - name: cdn-business-continuity
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-business-continuity.py"]
+            volumeMounts:
+            - name: business-continuity-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: business-continuity-script
+            configMap:
+              name: cdn-business-continuity-config
+              defaultMode: 0755

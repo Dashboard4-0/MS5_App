@@ -1,0 +1,383 @@
+---
+# Azure Load Balancer Configuration
+# Provides advanced load balancing capabilities for MS5.0 Floor Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-loadbalancer-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: loadbalancer
+    tier: infrastructure
+    environment: production
+  annotations:
+    description: "Azure Load Balancer configuration for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Standard Load Balancer Configuration
+  loadbalancer-config.json: |
+    {
+      "properties": {
+        "sku": {
+          "name": "Standard",
+          "tier": "Regional"
+        },
+        "frontendIPConfigurations": [
+          {
+            "name": "ms5-public-frontend-ip",
+            "properties": {
+              "publicIPAddress": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/publicIPAddresses/ms5-loadbalancer-public-ip"
+              },
+              "privateIPAllocationMethod": "Dynamic"
+            }
+          },
+          {
+            "name": "ms5-internal-frontend-ip",
+            "properties": {
+              "subnet": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+              },
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "10.0.1.100"
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "ms5-backend-pool",
+            "properties": {
+              "loadBalancerBackendAddresses": [
+                {
+                  "ipAddress": "${AKS_NODE_IP_1}",
+                  "virtualNetwork": {
+                    "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}"
+                  }
+                },
+                {
+                  "ipAddress": "${AKS_NODE_IP_2}",
+                  "virtualNetwork": {
+                    "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}"
+                  }
+                },
+                {
+                  "ipAddress": "${AKS_NODE_IP_3}",
+                  "virtualNetwork": {
+                    "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "ms5-http-rule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/frontendIPConfigurations/ms5-public-frontend-ip"
+              },
+              "backendAddressPool": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/backendAddressPools/ms5-backend-pool"
+              },
+              "probe": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/probes/ms5-http-probe"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "enableFloatingIP": false,
+              "idleTimeoutInMinutes": 4,
+              "loadDistribution": "Default"
+            }
+          },
+          {
+            "name": "ms5-https-rule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/frontendIPConfigurations/ms5-public-frontend-ip"
+              },
+              "backendAddressPool": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/backendAddressPools/ms5-backend-pool"
+              },
+              "probe": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/probes/ms5-https-probe"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 443,
+              "backendPort": 443,
+              "enableFloatingIP": false,
+              "idleTimeoutInMinutes": 4,
+              "loadDistribution": "Default"
+            }
+          },
+          {
+            "name": "ms5-websocket-rule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/frontendIPConfigurations/ms5-public-frontend-ip"
+              },
+              "backendAddressPool": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/backendAddressPools/ms5-backend-pool"
+              },
+              "probe": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/probes/ms5-websocket-probe"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 8080,
+              "backendPort": 8080,
+              "enableFloatingIP": false,
+              "idleTimeoutInMinutes": 30,
+              "loadDistribution": "SourceIP"
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "ms5-http-probe",
+            "properties": {
+              "protocol": "Http",
+              "port": 80,
+              "intervalInSeconds": 15,
+              "numberOfProbes": 2,
+              "requestPath": "/healthz"
+            }
+          },
+          {
+            "name": "ms5-https-probe",
+            "properties": {
+              "protocol": "Https",
+              "port": 443,
+              "intervalInSeconds": 15,
+              "numberOfProbes": 2,
+              "requestPath": "/healthz"
+            }
+          },
+          {
+            "name": "ms5-websocket-probe",
+            "properties": {
+              "protocol": "Http",
+              "port": 8080,
+              "intervalInSeconds": 30,
+              "numberOfProbes": 3,
+              "requestPath": "/ws/health"
+            }
+          }
+        ],
+        "outboundRules": [
+          {
+            "name": "ms5-outbound-rule",
+            "properties": {
+              "allocatedOutboundPorts": 1024,
+              "frontendIPConfigurations": [
+                {
+                  "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/frontendIPConfigurations/ms5-public-frontend-ip"
+                }
+              ],
+              "backendAddressPool": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/loadBalancers/ms5-loadbalancer/backendAddressPools/ms5-backend-pool"
+              },
+              "protocol": "All",
+              "enableTcpReset": true,
+              "idleTimeoutInMinutes": 4
+            }
+          }
+        ]
+      },
+      "location": "${AZURE_LOCATION}",
+      "tags": {
+        "Environment": "Production",
+        "Application": "MS5.0 Floor Dashboard",
+        "Owner": "Manufacturing Systems Team",
+        "CostCenter": "Manufacturing Operations"
+      }
+    }
+  
+  # Public IP Configuration
+  public-ip-config.json: |
+    {
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "publicIPAddressVersion": "IPv4",
+        "dnsSettings": {
+          "domainNameLabel": "ms5floor-lb",
+          "reverseFqdn": "ms5floor.com"
+        },
+        "idleTimeoutInMinutes": 4
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "location": "${AZURE_LOCATION}",
+      "tags": {
+        "Environment": "Production",
+        "Application": "MS5.0 Floor Dashboard",
+        "Owner": "Manufacturing Systems Team",
+        "CostCenter": "Manufacturing Operations"
+      }
+    }
+  
+  # Load Balancer Monitoring Configuration
+  monitoring-config.json: |
+    {
+      "monitoring": {
+        "enabled": true,
+        "metrics": {
+          "dataPathAvailability": true,
+          "healthProbeStatus": true,
+          "snatConnectionCount": true,
+          "usedSnatPorts": true,
+          "packetsCount": true,
+          "byteCount": true
+        },
+        "alerts": {
+          "backendUnhealthy": {
+            "threshold": 1,
+            "window": "5m",
+            "severity": "critical"
+          },
+          "highSnatPortUsage": {
+            "threshold": 80,
+            "window": "5m",
+            "severity": "warning"
+          },
+          "dataPathUnavailable": {
+            "threshold": 1,
+            "window": "1m",
+            "severity": "critical"
+          }
+        }
+      }
+    }
+---
+# Load Balancer Service Configuration
+# Kubernetes service configuration for Azure Load Balancer integration
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-loadbalancer-service
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: loadbalancer
+    tier: infrastructure
+    environment: production
+  annotations:
+    description: "Azure Load Balancer service for MS5.0 Floor Dashboard"
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "${AZURE_SUBNET_NAME}"
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "${AZURE_RESOURCE_GROUP}"
+    service.beta.kubernetes.io/azure-load-balancer-name: "ms5-loadbalancer"
+    service.beta.kubernetes.io/azure-dns-label-name: "ms5floor-lb"
+    service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout: "4"
+    service.beta.kubernetes.io/azure-load-balancer-tcp-reset: "true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+  - IPv4
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+    appProtocol: http
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+    appProtocol: https
+  - name: websocket
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+    appProtocol: http
+  selector:
+    app: ms5-dashboard
+    component: backend
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0
+---
+# Load Balancer Health Check Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loadbalancer-health-check-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: loadbalancer-health
+    tier: infrastructure
+  annotations:
+    description: "Load balancer health check configuration"
+data:
+  health-check-script.sh: |
+    #!/bin/bash
+    # Load Balancer Health Check Script for MS5.0 Floor Dashboard
+    
+    set -euo pipefail
+    
+    ENDPOINTS=(
+      "http://ms5-backend.ms5-production.svc.cluster.local:8000/health"
+      "http://ms5-frontend-service.ms5-frontend.svc.cluster.local:80/"
+      "http://grafana.ms5-production.svc.cluster.local:3000/api/health"
+      "http://prometheus.ms5-production.svc.cluster.local:9090/-/healthy"
+    )
+    
+    log_info() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] INFO: $1"
+    }
+    
+    log_error() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >&2
+    }
+    
+    check_endpoint() {
+        local endpoint=$1
+        local name=$2
+        
+        log_info "Checking health of $name at $endpoint"
+        
+        local response_code
+        response_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$endpoint" || echo "000")
+        
+        if [[ "$response_code" =~ ^[2-3][0-9][0-9]$ ]]; then
+            log_info "Health check passed for $name (status: $response_code)"
+            return 0
+        else
+            log_error "Health check failed for $name (status: $response_code)"
+            return 1
+        fi
+    }
+    
+    main() {
+        log_info "Starting load balancer health check for MS5.0 Floor Dashboard"
+        
+        local failed_checks=0
+        local total_checks=${#ENDPOINTS[@]}
+        
+        for endpoint in "${ENDPOINTS[@]}"; do
+            local name
+            name=$(echo "$endpoint" | cut -d'/' -f3 | cut -d'.' -f1)
+            
+            if ! check_endpoint "$endpoint" "$name"; then
+                ((failed_checks++))
+            fi
+        done
+        
+        log_info "Load balancer health check completed: $((total_checks - failed_checks))/$total_checks checks passed"
+        
+        if [[ $failed_checks -gt 0 ]]; then
+            log_error "Load balancer health check failed with $failed_checks errors"
+            exit 1
+        else
+            log_info "All load balancer health checks passed"
+            exit 0
+        fi
+    }
+    
+    main "$@"

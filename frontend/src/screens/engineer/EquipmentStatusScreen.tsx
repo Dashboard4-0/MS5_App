@@ -13,12 +13,20 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '../../store';
+import { fetchEquipmentList, updateEquipmentStatus } from '../../store/slices/equipmentSlice';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import { CircularGauge, MetricCard } from '../../components/common/DataVisualization';
+import { StatusIndicator, LiveDataIndicator, RealTimeBadge } from '../../components/common/RealTimeIndicators';
+import { OfflineIndicator } from '../../components/common/OfflineSupport';
 import usePermissions from '../../hooks/usePermissions';
+import useRealTimeData from '../../hooks/useRealTimeData';
+import { formatDateTime } from '../../utils/formatters';
 import { Permission } from '../../config/constants';
 
 const EquipmentStatusScreen: React.FC = () => {

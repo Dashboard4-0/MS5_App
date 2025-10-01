@@ -1,0 +1,264 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-alerts
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Alerts Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Alerts configuration
+  cdn-alerts.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-alerts
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Alerts Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      alerts-config.json: |
+        {
+          "alerts": [
+            {
+              "name": "HighErrorRate",
+              "condition": "error_rate > 5%",
+              "severity": "High",
+              "action": "NotifyTeam",
+              "description": "CDN error rate is above 5%"
+            },
+            {
+              "name": "LowCacheHitRatio",
+              "condition": "cache_hit_ratio < 80%",
+              "severity": "Medium",
+              "action": "NotifyTeam",
+              "description": "CDN cache hit ratio is below 80%"
+            },
+            {
+              "name": "HighOriginLatency",
+              "condition": "origin_latency > 1000ms",
+              "severity": "High",
+              "action": "NotifyTeam",
+              "description": "CDN origin latency is above 1000ms"
+            }
+          ]
+        }
+  
+  # Azure CDN Alerts monitoring
+  cdn-alerts-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-alerts-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Alerts Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      alerts-monitoring.json: |
+        {
+          "monitoring": {
+            "alerts": "ms5-cdn-alerts",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "AlertTriggered",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of alerts triggered"
+              },
+              {
+                "name": "AlertResolved",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of alerts resolved"
+              },
+              {
+                "name": "AlertLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average latency for alert processing"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighAlertLatency",
+                "condition": "alert_latency > 1000ms",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Alert processing latency is above 1000ms"
+              },
+              {
+                "name": "HighAlertErrorRate",
+                "condition": "alert_error_rate > 5%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Alert processing error rate is above 5%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Alerts script
+  cdn-alerts.py: |
+    #!/usr/bin/env python3
+    """
+    CDN alerts script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_alerts():
+        """Get CDN alerts from Azure"""
+        try:
+            # Azure CDN alerts endpoint
+            alerts_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/alerts"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(alerts_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                alerts = response.json()
+                
+                return {
+                    "request_count": alerts.get("RequestCount", 0),
+                    "bytes_sent": alerts.get("BytesSent", 0),
+                    "cache_hit_ratio": alerts.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN alerts: {e}")
+            return None
+    
+    def send_alerts_to_prometheus(alerts):
+        """Send CDN alerts to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_alerts",
+                "value": alerts["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN alerts sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN alerts to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN alerts to Prometheus: {e}")
+    
+    def main():
+        """Main alerts loop"""
+        while True:
+            alerts = get_cdn_alerts()
+            if alerts:
+                print(json.dumps(alerts, indent=2))
+                send_alerts_to_prometheus(alerts)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Alerts deployment
+  cdn-alerts-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-alerts
+      namespace: ms5-frontend
+      labels:
+        app: cdn-alerts
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-alerts
+      template:
+        metadata:
+          labels:
+            app: cdn-alerts
+        spec:
+          containers:
+          - name: cdn-alerts
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-alerts.py"]
+            volumeMounts:
+            - name: alerts-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: alerts-script
+            configMap:
+              name: cdn-alerts-config
+              defaultMode: 0755

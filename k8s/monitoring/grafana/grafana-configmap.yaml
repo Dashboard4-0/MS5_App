@@ -1,0 +1,286 @@
+---
+# MS5.0 Floor Dashboard - Enhanced Grafana Configuration
+# Production-grade configuration with Azure AD integration and comprehensive datasources
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    version: "10.0.0"
+  annotations:
+    description: "Enhanced Grafana configuration with Azure AD integration and comprehensive datasources"
+    managed-by: "ms5-devops-team"
+data:
+  grafana.ini: |
+    [server]
+    root_url = https://grafana.ms5floor.com
+    serve_from_sub_path = false
+    enable_gzip = false
+    cert_file = /etc/ssl/certs/grafana.crt
+    cert_key = /etc/ssl/private/grafana.key
+    
+    [database]
+    type = sqlite3
+    path = /var/lib/grafana/grafana.db
+    max_idle_conn = 2
+    max_open_conn = 0
+    conn_max_lifetime = 14400
+    
+    [session]
+    provider = memory
+    provider_config = ""
+    cookie_secure = true
+    cookie_samesite = strict
+    
+    [security]
+    admin_user = admin
+    admin_password = ${GF_SECURITY_ADMIN_PASSWORD}
+    secret_key = ${GF_SECURITY_SECRET_KEY}
+    disable_gravatar = true
+    cookie_remember_name = grafana_remember
+    cookie_username = grafana_user
+    cookie_secure = true
+    cookie_samesite = strict
+    strict_transport_security = true
+    strict_transport_security_max_age_seconds = 86400
+    strict_transport_security_preload = true
+    strict_transport_security_subdomains = true
+    x_content_type_options = true
+    x_xss_protection = true
+    
+    [users]
+    allow_sign_up = false
+    allow_org_create = false
+    auto_assign_org = true
+    auto_assign_org_role = Viewer
+    default_theme = dark
+    verify_email_enabled = false
+    
+    [auth.azuread]
+    name = Azure AD
+    enabled = true
+    allow_sign_up = true
+    client_id = ${AZURE_AD_CLIENT_ID}
+    client_secret = ${AZURE_AD_CLIENT_SECRET}
+    scopes = openid email profile
+    auth_url = https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}/oauth2/v2.0/authorize
+    token_url = https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}/oauth2/v2.0/token
+    api_url = https://graph.microsoft.com/v1.0/me
+    allowed_domains = company.com
+    allowed_groups = MS5.0-Users,MS5.0-Admins,MS5.0-Operators
+    
+    [auth.basic]
+    enabled = true
+    
+    [auth.anonymous]
+    enabled = false
+    
+    [log]
+    mode = console
+    level = info
+    format = json
+    
+    [metrics]
+    enabled = true
+    interval_seconds = 10
+    disable_total_stats = false
+    
+    [snapshots]
+    external_enabled = true
+    external_snapshot_url = https://snapshots-origin.raintank.io
+    external_snapshot_name = Publish to snapshot.raintank.io
+    public_mode = false
+    
+    [dashboards]
+    default_home_dashboard_path = /var/lib/grafana/dashboards/home.json
+    
+    [alerting]
+    enabled = true
+    execute_alerts = true
+    error_or_timeout = alerting
+    nodata_or_nullvalues = no_data
+    concurrent_render_limit = 5
+    evaluation_timeout_seconds = 30
+    notification_timeout_seconds = 30
+    max_attempts = 3
+    min_interval_seconds = 10
+    
+    [unified_alerting]
+    enabled = true
+    execute_alerts = true
+    evaluation_timeout = 30s
+    max_attempts = 3
+    min_interval = 10s
+    
+    [feature_toggles]
+    enable = ngalert, panelTitleSearch, correlation, cloudWatchDynamicLabels, trimDefaults, enableDatasourceProxy, database_metrics, serviceAccount, alertingBacktesting, showDashboardValidationWarnings
+    
+    [explore]
+    enabled = true
+    
+    [help]
+    enabled = true
+    
+    [profile]
+    enabled = true
+    
+    [query_history]
+    enabled = true
+    
+    [annotations]
+    enabled = true
+    created_dashboard = true
+    created_by = true
+    tags = []
+    
+    [plugins]
+    allow_loading_unsigned_plugins = grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel
+    
+    [enterprise]
+    license_path = /etc/grafana/license/license.jwt
+  
+  datasources.yml: |
+    apiVersion: 1
+    
+    datasources:
+      # Prometheus - Primary metrics source
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: "5s"
+          queryTimeout: "60s"
+          httpMethod: "POST"
+          manageAlerts: true
+          alertmanagerUid: "alertmanager"
+          disableMetricsLookup: false
+          incrementalQueryOverlapWindow: "10m"
+        uid: prometheus
+        version: 1
+        
+      # AlertManager - For alerting
+      - name: AlertManager
+        type: alertmanager
+        access: proxy
+        url: http://alertmanager.monitoring.svc.cluster.local:9093
+        uid: alertmanager
+        jsonData:
+          implementation: prometheus
+          handleGrafanaManagedAlerts: true
+        version: 1
+        
+      # Azure Monitor - Infrastructure metrics
+      - name: Azure Monitor
+        type: grafana-azure-monitor-datasource
+        access: proxy
+        url: https://management.azure.com/
+        uid: azure-monitor
+        jsonData:
+          subscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+          cloudName: "azuremonitor"
+          azureAuthType: "msi"
+          tenantId: "${AZURE_AD_TENANT_ID}"
+          clientId: "${AZURE_AD_CLIENT_ID}"
+          clientSecret: "${AZURE_AD_CLIENT_SECRET}"
+          defaultSubscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+          defaultResourceGroup: "ms5-production-rg"
+          defaultWorkspace: "${AZURE_LOG_ANALYTICS_WORKSPACE_ID}"
+        secureJsonData:
+          clientSecret: "${AZURE_AD_CLIENT_SECRET}"
+        version: 1
+        
+      # PostgreSQL - Business metrics
+      - name: PostgreSQL
+        type: postgres
+        access: proxy
+        url: postgres-primary.ms5-production.svc.cluster.local:5432
+        database: factory_telemetry
+        user: ms5_monitoring_user
+        uid: postgres
+        jsonData:
+          sslmode: "disable"
+          maxOpenConns: 10
+          maxIdleConns: 5
+          connMaxLifetime: 14400
+          timescaledb: true
+          version: 15
+        secureJsonData:
+          password: "${POSTGRES_MONITORING_PASSWORD}"
+        version: 1
+        
+      # Redis - Cache metrics
+      - name: Redis
+        type: redis
+        access: proxy
+        url: redis-primary.ms5-production.svc.cluster.local:6379
+        uid: redis
+        jsonData:
+          client: "node"
+          poolSize: 5
+          timeout: 5
+          pingInterval: 0
+          database: 0
+        version: 1
+        
+      # Jaeger - Distributed tracing
+      - name: Jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger.monitoring.svc.cluster.local:16686
+        uid: jaeger
+        jsonData:
+          tracesToLogs:
+            datasourceUid: "loki"
+            tags: ["job", "instance", "pod", "namespace"]
+            mappedTags: [
+              {key: "service.name", value: "service"},
+              {key: "service.namespace", value: "namespace"}
+            ]
+            mapTagNamesEnabled: false
+            spanStartTimeShift: "1h"
+            spanEndTimeShift: "1h"
+            filterByTraceID: false
+            filterBySpanID: false
+        version: 1
+        
+      # Loki - Log aggregation
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        uid: loki
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            - datasourceUid: "jaeger"
+              matcherRegex: "trace_id=(\\w+)"
+              name: "TraceID"
+              url: "$${__value.raw}"
+        version: 1
+        
+      # Azure Log Analytics - Log aggregation
+      - name: Azure Log Analytics
+        type: grafana-azure-log-analytics-datasource
+        access: proxy
+        url: https://api.loganalytics.io/
+        uid: azure-log-analytics
+        jsonData:
+          subscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+          cloudName: "azuremonitor"
+          azureAuthType: "msi"
+          tenantId: "${AZURE_AD_TENANT_ID}"
+          clientId: "${AZURE_AD_CLIENT_ID}"
+          clientSecret: "${AZURE_AD_CLIENT_SECRET}"
+          defaultSubscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+          defaultResourceGroup: "ms5-production-rg"
+          defaultWorkspace: "${AZURE_LOG_ANALYTICS_WORKSPACE_ID}"
+        secureJsonData:
+          clientSecret: "${AZURE_AD_CLIENT_SECRET}"
+        version: 1

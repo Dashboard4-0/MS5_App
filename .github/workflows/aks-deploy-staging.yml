@@ -1,0 +1,262 @@
+name: MS5.0 AKS Staging Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        default: 'latest'
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [ develop ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'k8s/**'
+
+env:
+  # Azure Container Registry Configuration
+  AZURE_CONTAINER_REGISTRY_STAGING: ms5acrstaging.azurecr.io
+  
+  # AKS Cluster Configuration
+  AKS_CLUSTER_NAME_STAGING: ms5-aks-cluster-staging
+  AKS_RESOURCE_GROUP_STAGING: ms5-rg-staging
+  
+  # Deployment Configuration
+  NAMESPACE: ms5-staging
+  TIMEOUT: 300s
+
+jobs:
+  # Pre-deployment Validation
+  pre-deployment-validation:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.get-image-tag.outputs.tag }}
+      should_deploy: ${{ steps.validation.outputs.should_deploy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get image tag
+        id: get-image-tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate deployment
+        id: validation
+        run: |
+          # Check if image exists in ACR
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az acr login --name ms5acrstaging
+          
+          # Check if backend image exists
+          if ! docker manifest inspect ${{ env.AZURE_CONTAINER_REGISTRY_STAGING }}/ms5-backend:${{ steps.get-image-tag.outputs.tag }}-staging > /dev/null 2>&1; then
+            echo "Backend image not found in ACR"
+            if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+              echo "should_deploy=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_deploy=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          fi
+
+  # Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: pre-deployment-validation
+    if: needs.pre-deployment-validation.outputs.should_deploy == 'true'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Azure CLI
+        uses: azure/setup-azcli@v1
+        with:
+          azcliversion: '2.50.0'
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP_STAGING }} --name ${{ env.AKS_CLUSTER_NAME_STAGING }} --overwrite-existing
+          kubectl version --client
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy base configuration
+        run: |
+          # Apply base configuration
+          kubectl apply -f k8s/01-namespace.yaml
+          kubectl apply -f k8s/02-configmap.yaml
+          kubectl apply -f k8s/03-secrets.yaml
+          kubectl apply -f k8s/04-keyvault-csi.yaml
+          kubectl apply -f k8s/05-rbac.yaml
+
+      - name: Deploy database services
+        run: |
+          # Deploy PostgreSQL
+          kubectl apply -f k8s/08-postgres-config.yaml
+          kubectl apply -f k8s/06-postgres-statefulset.yaml
+          kubectl apply -f k8s/07-postgres-services.yaml
+          
+          # Wait for PostgreSQL to be ready
+          kubectl wait --for=condition=ready pod -l app=ms5-dashboard,component=database,role=primary -n ${{ env.NAMESPACE }} --timeout=${{ env.TIMEOUT }}
+
+      - name: Deploy cache services
+        run: |
+          # Deploy Redis
+          kubectl apply -f k8s/11-redis-config.yaml
+          kubectl apply -f k8s/09-redis-statefulset.yaml
+          kubectl apply -f k8s/10-redis-services.yaml
+          
+          # Wait for Redis to be ready
+          kubectl wait --for=condition=ready pod -l app=ms5-dashboard,component=redis,role=primary -n ${{ env.NAMESPACE }} --timeout=${{ env.TIMEOUT }}
+
+      - name: Deploy backend services
+        run: |
+          # Update image tags
+          sed -i "s|ms5acrstaging.azurecr.io/ms5-backend:.*|ms5acrstaging.azurecr.io/ms5-backend:${{ needs.pre-deployment-validation.outputs.image_tag }}-staging|g" k8s/12-backend-deployment.yaml
+          
+          # Deploy backend
+          kubectl apply -f k8s/12-backend-deployment.yaml
+          kubectl apply -f k8s/13-backend-services.yaml
+          kubectl apply -f k8s/14-backend-hpa.yaml
+          kubectl apply -f k8s/15-celery-worker-deployment.yaml
+          kubectl apply -f k8s/16-celery-beat-deployment.yaml
+          kubectl apply -f k8s/17-flower-deployment.yaml
+          
+          # Wait for backend to be ready
+          kubectl rollout status deployment/ms5-backend -n ${{ env.NAMESPACE }} --timeout=${{ env.TIMEOUT }}
+
+      - name: Deploy frontend services
+        run: |
+          # Update image tags
+          sed -i "s|ms5acrstaging.azurecr.io/ms5-frontend:.*|ms5acrstaging.azurecr.io/ms5-frontend:${{ needs.pre-deployment-validation.outputs.image_tag }}-staging|g" k8s/frontend-deployment.yaml
+          
+          # Deploy frontend
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/frontend-services.yaml
+          
+          # Wait for frontend to be ready
+          kubectl rollout status deployment/ms5-frontend -n ${{ env.NAMESPACE }} --timeout=${{ env.TIMEOUT }}
+
+      - name: Deploy monitoring services
+        run: |
+          # Deploy monitoring stack
+          kubectl apply -f k8s/23-prometheus-config.yaml
+          kubectl apply -f k8s/21-prometheus-statefulset.yaml
+          kubectl apply -f k8s/22-prometheus-services.yaml
+          kubectl apply -f k8s/24-grafana-statefulset.yaml
+          kubectl apply -f k8s/25-grafana-services.yaml
+          kubectl apply -f k8s/26-grafana-config.yaml
+          kubectl apply -f k8s/27-alertmanager-deployment.yaml
+          kubectl apply -f k8s/28-alertmanager-services.yaml
+          kubectl apply -f k8s/29-alertmanager-config.yaml
+
+      - name: Deploy storage services
+        run: |
+          # Deploy MinIO
+          kubectl apply -f k8s/20-minio-config.yaml
+          kubectl apply -f k8s/18-minio-statefulset.yaml
+          kubectl apply -f k8s/19-minio-services.yaml
+
+      - name: Deploy network policies
+        run: |
+          # Deploy network policies
+          kubectl apply -f k8s/30-network-policies.yaml
+
+      - name: Verify deployment
+        run: |
+          # Check all pods are running
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          
+          # Check services are ready
+          kubectl get services -n ${{ env.NAMESPACE }}
+          
+          # Check ingress is ready
+          kubectl get ingress -n ${{ env.NAMESPACE }}
+
+      - name: Run health checks
+        run: |
+          # Wait for all pods to be ready
+          kubectl wait --for=condition=ready pod -l app=ms5-dashboard -n ${{ env.NAMESPACE }} --timeout=${{ env.TIMEOUT }}
+          
+          # Run health check script
+          chmod +x ./scripts/test_smoke.sh
+          ./scripts/test_smoke.sh staging
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          text: 'MS5.0 Floor Dashboard successfully deployed to staging AKS!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+
+      - name: Notify deployment failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: failure
+          text: 'MS5.0 Floor Dashboard deployment to staging AKS failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+
+  # Post-deployment Tests
+  post-deployment-tests:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: always() && needs.deploy-staging.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP_STAGING }} --name ${{ env.AKS_CLUSTER_NAME_STAGING }} --overwrite-existing
+
+      - name: Run integration tests
+        run: |
+          # Set up Python
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+          
+          # Run integration tests against staging
+          pytest tests/integration/ --base-url=https://staging.ms5floor.com -v
+
+      - name: Run performance tests
+        run: |
+          # Install performance testing tools
+          pip install locust
+          
+          # Run performance tests
+          locust --headless --users 10 --spawn-rate 2 --run-time 60s --host https://staging.ms5floor.com
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: staging-test-results
+          path: test_results/

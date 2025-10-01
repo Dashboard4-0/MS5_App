@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-websocket-config
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: websocket
+    tier: frontend
+    environment: production
+    deployment: aks
+data:
+  websocket.conf: |
+    upstream websocket_backend {
+        least_conn;
+        server ms5-backend-service.ms5-backend.svc.cluster.local:8000;
+        keepalive 32;
+    }
+    
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    
+    # WebSocket server block
+    server {
+        listen 80;
+        server_name _;
+        
+        # WebSocket endpoint for real-time factory data
+        location /ws {
+            # Rate limiting for WebSocket connections
+            limit_req zone=websocket burst=10 nodelay;
+            
+            proxy_pass http://websocket_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # WebSocket-specific timeouts for factory environments
+            proxy_read_timeout 86400;  # 24 hours
+            proxy_send_timeout 86400;
+            proxy_connect_timeout 60s;
+            
+            # Disable buffering for real-time data
+            proxy_buffering off;
+            proxy_request_buffering off;
+            
+            # WebSocket health checks
+            proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+            proxy_next_upstream_tries 3;
+            proxy_next_upstream_timeout 10s;
+            
+            # Add WebSocket headers
+            add_header X-WebSocket-Version "13" always;
+            add_header X-WebSocket-Protocol "ms5-factory" always;
+        }
+        
+        # WebSocket authentication endpoint
+        location /ws/auth {
+            proxy_pass http://websocket_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Authentication timeout
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 10s;
+            proxy_read_timeout 10s;
+        }
+        
+        # WebSocket status endpoint
+        location /ws/status {
+            access_log off;
+            return 200 '{"status":"ok","connections":0,"uptime":0}';
+            add_header Content-Type application/json;
+        }
+    }
+  
+  # WebSocket rate limiting configuration
+  rate-limit.conf: |
+    # WebSocket rate limiting zones
+    limit_req_zone $binary_remote_addr zone=websocket:10m rate=5r/s;
+    limit_req_zone $binary_remote_addr zone=websocket_auth:10m rate=10r/s;
+    
+    # Connection limiting for WebSockets
+    limit_conn_zone $binary_remote_addr zone=websocket_conn:10m;
+    limit_conn websocket_conn 10;
+  
+  # WebSocket load balancing configuration
+  load-balance.conf: |
+    # WebSocket load balancing with session affinity
+    upstream websocket_backend {
+        ip_hash;  # Ensure WebSocket session affinity
+        server ms5-backend-service.ms5-backend.svc.cluster.local:8000 weight=1 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    # WebSocket health check configuration
+    upstream websocket_health {
+        server ms5-backend-service.ms5-backend.svc.cluster.local:8000;
+        keepalive 16;
+    }
+  
+  # WebSocket security configuration
+  security.conf: |
+    # WebSocket security headers
+    add_header X-WebSocket-Security "enabled" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    
+    # WebSocket CORS configuration
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization, Upgrade, Connection" always;
+    
+    # WebSocket rate limiting
+    limit_req_zone $binary_remote_addr zone=websocket:10m rate=5r/s;
+    limit_req_zone $http_authorization zone=websocket_auth:10m rate=10r/s;
+  
+  # WebSocket monitoring configuration
+  monitoring.conf: |
+    # WebSocket metrics endpoint
+    location /ws/metrics {
+        access_log off;
+        return 200 '# HELP websocket_connections_total Total number of WebSocket connections\n# TYPE websocket_connections_total counter\nwebsocket_connections_total 0\n# HELP websocket_messages_total Total number of WebSocket messages\n# TYPE websocket_messages_total counter\nwebsocket_messages_total 0\n';
+        add_header Content-Type text/plain;
+    }
+    
+    # WebSocket health check
+    location /ws/health {
+        access_log off;
+        return 200 '{"status":"healthy","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}';
+        add_header Content-Type application/json;
+    }

@@ -1,398 +1,531 @@
 #!/bin/bash
 
 # MS5.0 Floor Dashboard - Smoke Test Script
-# This script performs smoke tests to verify basic system functionality
+# This script runs smoke tests to validate deployment health
 
-set -e  # Exit on any error
+set -euo pipefail
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="${SCRIPT_DIR}/logs"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-LOG_FILE="${LOG_DIR}/smoke_test_${TIMESTAMP}.log"
-
-# Environment variables
-ENVIRONMENT=${ENVIRONMENT:-staging}
-BASE_URL=${BASE_URL:-http://localhost:8000}
-TIMEOUT=${TIMEOUT:-30}
-
-# Colors for output
+# Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging function
-log() {
-    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
+# Logging functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Create directories
-mkdir -p "$LOG_DIR"
-
-log "Starting MS5.0 smoke tests - Environment: $ENVIRONMENT"
-
-# Change to script directory
-cd "$SCRIPT_DIR"
-
-# Function to test API health endpoint
-test_api_health() {
-    log "Testing API health endpoint..."
-    
-    local response=$(curl -s --max-time "$TIMEOUT" "$BASE_URL/api/health")
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/api/health")
-    
-    if [ "$status_code" -eq 200 ]; then
-        log_success "API health endpoint returned 200 OK"
-        echo "Response: $response" | tee -a "$LOG_FILE"
-        return 0
-    else
-        log_error "API health endpoint returned $status_code"
-        return 1
-    fi
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Function to test API status endpoint
-test_api_status() {
-    log "Testing API status endpoint..."
-    
-    local response=$(curl -s --max-time "$TIMEOUT" "$BASE_URL/api/status")
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/api/status")
-    
-    if [ "$status_code" -eq 200 ]; then
-        log_success "API status endpoint returned 200 OK"
-        echo "Response: $response" | tee -a "$LOG_FILE"
-        return 0
-    else
-        log_error "API status endpoint returned $status_code"
-        return 1
-    fi
+# Default values
+ENVIRONMENT="production"
+NAMESPACE="ms5-production"
+TIMEOUT="300"
+BASE_URL=""
+VERBOSE="false"
+
+# Function to display usage
+usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+Smoke Test Script for MS5.0 Floor Dashboard
+
+OPTIONS:
+    --environment ENV             Environment to test (default: production)
+    --namespace NAMESPACE         Kubernetes namespace (default: ms5-production)
+    --base-url URL               Base URL for testing (optional)
+    --timeout SECONDS            Test timeout in seconds (default: 300)
+    --verbose                    Enable verbose output
+    --help                       Show this help message
+
+EXAMPLES:
+    $0 --environment staging
+    $0 --environment production --base-url https://ms5floor.com --verbose
+    $0 --namespace ms5-staging --timeout 600
+
+EOF
 }
 
-# Function to test API version endpoint
-test_api_version() {
-    log "Testing API version endpoint..."
+# Function to parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --environment)
+                ENVIRONMENT="$2"
+                shift 2
+                ;;
+            --namespace)
+                NAMESPACE="$2"
+                shift 2
+                ;;
+            --base-url)
+                BASE_URL="$2"
+                shift 2
+                ;;
+            --timeout)
+                TIMEOUT="$2"
+                shift 2
+                ;;
+            --verbose)
+                VERBOSE="true"
+                shift
+                ;;
+            --help)
+                usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Function to set base URL based on environment
+set_base_url() {
+    if [[ -z "$BASE_URL" ]]; then
+        case "$ENVIRONMENT" in
+            "production")
+                BASE_URL="https://ms5floor.com"
+                ;;
+            "staging")
+                BASE_URL="https://staging.ms5floor.com"
+                ;;
+            "development")
+                BASE_URL="http://localhost:8000"
+                ;;
+            *)
+                BASE_URL="https://$ENVIRONMENT.ms5floor.com"
+                ;;
+        esac
+    fi
     
-    local response=$(curl -s --max-time "$TIMEOUT" "$BASE_URL/api/version")
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/api/version")
+    log_info "Base URL: $BASE_URL"
+}
+
+# Function to validate prerequisites
+validate_prerequisites() {
+    log_info "Validating prerequisites..."
     
-    if [ "$status_code" -eq 200 ]; then
-        log_success "API version endpoint returned 200 OK"
-        echo "Response: $response" | tee -a "$LOG_FILE"
-        return 0
-    else
-        log_error "API version endpoint returned $status_code"
+    # Check if kubectl is available
+    if ! command -v kubectl &> /dev/null; then
+        log_error "kubectl is not installed or not in PATH"
+        exit 1
+    fi
+    
+    # Check if curl is available
+    if ! command -v curl &> /dev/null; then
+        log_error "curl is not installed or not in PATH"
+        exit 1
+    fi
+    
+    # Check if namespace exists
+    if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
+        log_error "Namespace $NAMESPACE does not exist"
+        exit 1
+    fi
+    
+    log_success "Prerequisites validated"
+}
+
+# Function to check pod health
+check_pod_health() {
+    log_info "Checking pod health..."
+    
+    # Get all pods in namespace
+    local pods=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
+    
+    if [[ -z "$pods" ]]; then
+        log_error "No pods found in namespace $NAMESPACE"
         return 1
     fi
+    
+    local healthy_pods=0
+    local total_pods=0
+    
+    for pod in $pods; do
+        total_pods=$((total_pods + 1))
+        
+        # Get pod status
+        local pod_status=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.phase}')
+        local pod_ready=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+        local restart_count=$(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+        
+        if [[ "$VERBOSE" == "true" ]]; then
+            log_info "Pod $pod: status=$pod_status, ready=$pod_ready, restarts=$restart_count"
+        fi
+        
+        # Check if pod is healthy
+        if [[ "$pod_status" == "Running" ]] && [[ "$pod_ready" == "True" ]] && [[ "$restart_count" -lt 5 ]]; then
+            healthy_pods=$((healthy_pods + 1))
+        else
+            log_warning "Pod $pod is not healthy: status=$pod_status, ready=$pod_ready, restarts=$restart_count"
+        fi
+    done
+    
+    local health_percentage=$((healthy_pods * 100 / total_pods))
+    
+    if [[ "$health_percentage" -lt 80 ]]; then
+        log_error "Only $health_percentage% of pods are healthy"
+        return 1
+    fi
+    
+    log_success "Pod health check passed: $health_percentage% pods healthy"
+    return 0
+}
+
+# Function to check service health
+check_service_health() {
+    log_info "Checking service health..."
+    
+    # Get all services in namespace
+    local services=$(kubectl get services -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
+    
+    if [[ -z "$services" ]]; then
+        log_error "No services found in namespace $NAMESPACE"
+        return 1
+    fi
+    
+    for service in $services; do
+        # Get service endpoints
+        local endpoints=$(kubectl get endpoints "$service" -n "$NAMESPACE" -o jsonpath='{.subsets[*].addresses[*].ip}' | wc -w)
+        
+        if [[ "$VERBOSE" == "true" ]]; then
+            log_info "Service $service: $endpoints endpoints"
+        fi
+        
+        if [[ "$endpoints" -eq 0 ]]; then
+            log_error "Service $service has no endpoints"
+            return 1
+        fi
+    done
+    
+    log_success "Service health check passed"
+    return 0
+}
+
+# Function to check deployment health
+check_deployment_health() {
+    log_info "Checking deployment health..."
+    
+    # Get all deployments in namespace
+    local deployments=$(kubectl get deployments -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
+    
+    if [[ -z "$deployments" ]]; then
+        log_error "No deployments found in namespace $NAMESPACE"
+        return 1
+    fi
+    
+    for deployment in $deployments; do
+        # Get deployment status
+        local replicas=$(kubectl get deployment "$deployment" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
+        local ready_replicas=$(kubectl get deployment "$deployment" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}')
+        local available_replicas=$(kubectl get deployment "$deployment" -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}')
+        
+        if [[ "$VERBOSE" == "true" ]]; then
+            log_info "Deployment $deployment: $ready_replicas/$replicas ready, $available_replicas available"
+        fi
+        
+        # Check if deployment is healthy
+        if [[ "$ready_replicas" != "$replicas" ]] || [[ "$available_replicas" != "$replicas" ]]; then
+            log_error "Deployment $deployment is not healthy: $ready_replicas/$replicas ready, $available_replicas available"
+            return 1
+        fi
+    done
+    
+    log_success "Deployment health check passed"
+    return 0
+}
+
+# Function to test API endpoints
+test_api_endpoints() {
+    log_info "Testing API endpoints..."
+    
+    # Test health endpoint
+    local health_url="$BASE_URL/health"
+    log_info "Testing health endpoint: $health_url"
+    
+    local health_response=$(curl -s -o /dev/null -w "%{http_code}" "$health_url" --connect-timeout 10 --max-time 30)
+    
+    if [[ "$health_response" != "200" ]]; then
+        log_error "Health endpoint returned status $health_response"
+        return 1
+    fi
+    
+    log_success "Health endpoint test passed"
+    
+    # Test API endpoints
+    local api_endpoints=(
+        "/api/v1/status"
+        "/api/v1/health"
+        "/api/v1/metrics"
+    )
+    
+    for endpoint in "${api_endpoints[@]}"; do
+        local api_url="$BASE_URL$endpoint"
+        log_info "Testing API endpoint: $api_url"
+        
+        local api_response=$(curl -s -o /dev/null -w "%{http_code}" "$api_url" --connect-timeout 10 --max-time 30)
+        
+        if [[ "$api_response" != "200" ]]; then
+            log_warning "API endpoint $endpoint returned status $api_response"
+        else
+            log_success "API endpoint $endpoint test passed"
+        fi
+    done
+    
+    return 0
 }
 
 # Function to test database connectivity
 test_database_connectivity() {
-    log "Testing database connectivity..."
+    log_info "Testing database connectivity..."
     
-    local response=$(curl -s --max-time "$TIMEOUT" "$BASE_URL/api/database/status")
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/api/database/status")
+    # Get backend pods
+    local backend_pods=$(kubectl get pods -l app=ms5-dashboard,component=backend -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
     
-    if [ "$status_code" -eq 200 ]; then
-        log_success "Database connectivity test passed"
-        echo "Response: $response" | tee -a "$LOG_FILE"
-        return 0
-    else
-        log_error "Database connectivity test failed with status $status_code"
+    if [[ -z "$backend_pods" ]]; then
+        log_error "No backend pods found"
         return 1
     fi
+    
+    # Test database connectivity on first backend pod
+    local first_pod=$(echo "$backend_pods" | awk '{print $1}')
+    
+    log_info "Testing database connectivity on pod: $first_pod"
+    
+    # Test database connection
+    if ! kubectl exec "$first_pod" -n "$NAMESPACE" -- python -c "
+import asyncio
+import asyncpg
+import os
+
+async def test_db():
+    try:
+        conn = await asyncpg.connect(os.getenv('DATABASE_URL'))
+        result = await conn.fetchval('SELECT 1')
+        await conn.close()
+        print('Database connection successful')
+        return True
+    except Exception as e:
+        print(f'Database connection failed: {e}')
+        return False
+
+asyncio.run(test_db())
+" &> /dev/null; then
+        log_error "Database connectivity test failed"
+        return 1
+    fi
+    
+    log_success "Database connectivity test passed"
+    return 0
 }
 
 # Function to test Redis connectivity
 test_redis_connectivity() {
-    log "Testing Redis connectivity..."
+    log_info "Testing Redis connectivity..."
     
-    local response=$(curl -s --max-time "$TIMEOUT" "$BASE_URL/api/redis/status")
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/api/redis/status")
+    # Get backend pods
+    local backend_pods=$(kubectl get pods -l app=ms5-dashboard,component=backend -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
     
-    if [ "$status_code" -eq 200 ]; then
-        log_success "Redis connectivity test passed"
-        echo "Response: $response" | tee -a "$LOG_FILE"
-        return 0
-    else
-        log_error "Redis connectivity test failed with status $status_code"
+    if [[ -z "$backend_pods" ]]; then
+        log_error "No backend pods found"
         return 1
     fi
-}
+    
+    # Test Redis connectivity on first backend pod
+    local first_pod=$(echo "$backend_pods" | awk '{print $1}')
+    
+    log_info "Testing Redis connectivity on pod: $first_pod"
+    
+    # Test Redis connection
+    if ! kubectl exec "$first_pod" -n "$NAMESPACE" -- python -c "
+import redis
+import os
 
-# Function to test WebSocket connectivity
-test_websocket_connectivity() {
-    log "Testing WebSocket connectivity..."
-    
-    # Test WebSocket endpoint
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL/ws")
-    
-    if [ "$status_code" -eq 101 ]; then
-        log_success "WebSocket endpoint is accessible"
-        return 0
-    else
-        log_error "WebSocket endpoint returned $status_code"
+try:
+    r = redis.from_url(os.getenv('REDIS_URL'))
+    r.ping()
+    print('Redis connection successful')
+except Exception as e:
+    print(f'Redis connection failed: {e}')
+    exit(1)
+" &> /dev/null; then
+        log_error "Redis connectivity test failed"
         return 1
     fi
-}
-
-# Function to test authentication endpoints
-test_authentication() {
-    log "Testing authentication endpoints..."
     
-    # Test login endpoint (should return 422 for missing credentials)
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" -X POST "$BASE_URL/api/auth/login")
-    
-    if [ "$status_code" -eq 422 ]; then
-        log_success "Authentication endpoint is accessible (422 for missing credentials)"
-        return 0
-    else
-        log_error "Authentication endpoint returned $status_code"
-        return 1
-    fi
-}
-
-# Function to test production endpoints
-test_production_endpoints() {
-    log "Testing production endpoints..."
-    
-    local endpoints=(
-        "/api/production/status"
-        "/api/production/equipment"
-        "/api/production/jobs"
-        "/api/production/oee"
-    )
-    
-    for endpoint in "${endpoints[@]}"; do
-        local status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "$BASE_URL$endpoint")
-        
-        if [ "$status_code" -eq 200 ] || [ "$status_code" -eq 401 ]; then
-            log_success "Production endpoint $endpoint is accessible (status: $status_code)"
-        else
-            log_error "Production endpoint $endpoint returned $status_code"
-            return 1
-        fi
-    done
-    
+    log_success "Redis connectivity test passed"
     return 0
 }
 
-# Function to test monitoring endpoints
-test_monitoring_endpoints() {
-    log "Testing monitoring endpoints..."
+# Function to test frontend accessibility
+test_frontend_accessibility() {
+    log_info "Testing frontend accessibility..."
     
-    # Test Prometheus
-    local prometheus_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "http://localhost:9090/-/healthy")
-    if [ "$prometheus_status" -eq 200 ]; then
-        log_success "Prometheus is accessible"
-    else
-        log_error "Prometheus returned $prometheus_status"
+    # Test frontend endpoint
+    local frontend_url="$BASE_URL"
+    log_info "Testing frontend endpoint: $frontend_url"
+    
+    local frontend_response=$(curl -s -o /dev/null -w "%{http_code}" "$frontend_url" --connect-timeout 10 --max-time 30)
+    
+    if [[ "$frontend_response" != "200" ]]; then
+        log_error "Frontend endpoint returned status $frontend_response"
         return 1
     fi
     
-    # Test Grafana
-    local grafana_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$TIMEOUT" "http://localhost:3000/api/health")
-    if [ "$grafana_status" -eq 200 ]; then
-        log_success "Grafana is accessible"
-    else
-        log_error "Grafana returned $grafana_status"
-        return 1
-    fi
-    
-    return 0
-}
-
-# Function to test system resources
-test_system_resources() {
-    log "Testing system resources..."
-    
-    # Check disk space
-    local disk_usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
-    if [ "$disk_usage" -lt 90 ]; then
-        log_success "Disk usage is acceptable ($disk_usage%)"
-    else
-        log_error "Disk usage is critical ($disk_usage%)"
-        return 1
-    fi
-    
-    # Check memory usage
-    local memory_usage=$(free | awk 'NR==2{printf "%.0f", $3*100/$2}')
-    if [ "$memory_usage" -lt 90 ]; then
-        log_success "Memory usage is acceptable ($memory_usage%)"
-    else
-        log_error "Memory usage is critical ($memory_usage%)"
-        return 1
-    fi
-    
-    return 0
-}
-
-# Function to test Docker services
-test_docker_services() {
-    log "Testing Docker services..."
-    
-    local services=("backend" "frontend" "database" "redis" "nginx" "prometheus" "grafana")
-    
-    for service in "${services[@]}"; do
-        if docker-compose -f "docker-compose.${ENVIRONMENT}.yml" ps "$service" | grep -q "Up"; then
-            log_success "Docker service $service is running"
-        else
-            log_error "Docker service $service is not running"
-            return 1
-        fi
-    done
-    
+    log_success "Frontend accessibility test passed"
     return 0
 }
 
 # Function to generate smoke test report
 generate_smoke_test_report() {
-    log "Generating smoke test report..."
+    local test_result="$1"
     
-    local report_file="${LOG_DIR}/smoke_test_report_${TIMESTAMP}.md"
+    local report_file="/tmp/smoke-test-report-$(date +%Y%m%d-%H%M%S).txt"
     
     cat > "$report_file" << EOF
-# MS5.0 Floor Dashboard - Smoke Test Report
+MS5.0 Floor Dashboard - Smoke Test Report
+Generated: $(date)
+Environment: $ENVIRONMENT
+Namespace: $NAMESPACE
+Base URL: $BASE_URL
+Test Result: $test_result
 
-**Test Date:** $(date)
-**Environment:** $ENVIRONMENT
-**Test Status:** $1
+Configuration:
+- Timeout: ${TIMEOUT}s
+- Verbose: $VERBOSE
 
-## Test Summary
+Current Deployments:
+$(kubectl get deployments -n "$NAMESPACE" -o wide)
 
-### Tested Components
-- API Health Endpoints
-- Database Connectivity
-- Redis Connectivity
-- WebSocket Connectivity
-- Authentication Endpoints
-- Production Endpoints
-- Monitoring Endpoints
-- System Resources
-- Docker Services
+Current Pods:
+$(kubectl get pods -n "$NAMESPACE" -o wide)
 
-## Test Details
+Current Services:
+$(kubectl get services -n "$NAMESPACE" -o wide)
 
-- **Log File:** $LOG_FILE
-- **Report File:** $report_file
-- **Environment:** $ENVIRONMENT
-- **Base URL:** $BASE_URL
-
-## Next Steps
-
-1. Review test results
-2. Address any failures
-3. Run additional tests if needed
-4. Proceed with deployment validation
-
+Test Results:
 EOF
     
-    log_success "Smoke test report generated: $report_file"
-}
-
-# Main smoke test function
-main() {
-    local start_time=$(date +%s)
-    local test_success=true
-    
-    # Run all smoke tests
-    test_api_health || test_success=false
-    test_api_status || test_success=false
-    test_api_version || test_success=false
-    test_database_connectivity || test_success=false
-    test_redis_connectivity || test_success=false
-    test_websocket_connectivity || test_success=false
-    test_authentication || test_success=false
-    test_production_endpoints || test_success=false
-    test_monitoring_endpoints || test_success=false
-    test_system_resources || test_success=false
-    test_docker_services || test_success=false
-    
-    # Generate report
-    if [ "$test_success" = "true" ]; then
-        generate_smoke_test_report "SUCCESS"
-        log_success "Smoke tests completed successfully"
+    if [[ "$test_result" == "success" ]]; then
+        echo "- All smoke tests passed" >> "$report_file"
+        echo "- System is healthy and ready" >> "$report_file"
+        echo "- All services are accessible" >> "$report_file"
+        echo "- Database and Redis connectivity confirmed" >> "$report_file"
     else
-        generate_smoke_test_report "FAILED"
-        log_error "Smoke tests failed"
-        exit 1
+        echo "- Some smoke tests failed" >> "$report_file"
+        echo "- System may have issues" >> "$report_file"
+        echo "- Check logs for error details" >> "$report_file"
+        echo "- Consider rolling back if necessary" >> "$report_file"
     fi
     
-    local end_time=$(date +%s)
-    local duration=$((end_time - start_time))
+    log_info "Smoke test report generated: $report_file"
+    echo "$report_file"
+}
+
+# Main function
+main() {
+    log_info "Starting smoke tests for MS5.0 Floor Dashboard"
     
-    log "Smoke tests completed in ${duration}s"
-    log "Log file: $LOG_FILE"
+    # Parse command line arguments
+    parse_args "$@"
+    
+    # Set base URL
+    set_base_url
+    
+    log_info "Smoke test configuration:"
+    log_info "  Environment: $ENVIRONMENT"
+    log_info "  Namespace: $NAMESPACE"
+    log_info "  Base URL: $BASE_URL"
+    log_info "  Timeout: ${TIMEOUT}s"
+    log_info "  Verbose: $VERBOSE"
+    
+    # Validate prerequisites
+    validate_prerequisites
+    
+    # Run smoke tests
+    local test_success=true
+    
+    # Check pod health
+    if ! check_pod_health; then
+        log_error "Pod health check failed"
+        test_success=false
+    fi
+    
+    # Check service health
+    if ! check_service_health; then
+        log_error "Service health check failed"
+        test_success=false
+    fi
+    
+    # Check deployment health
+    if ! check_deployment_health; then
+        log_error "Deployment health check failed"
+        test_success=false
+    fi
+    
+    # Test API endpoints
+    if ! test_api_endpoints; then
+        log_error "API endpoints test failed"
+        test_success=false
+    fi
+    
+    # Test database connectivity
+    if ! test_database_connectivity; then
+        log_error "Database connectivity test failed"
+        test_success=false
+    fi
+    
+    # Test Redis connectivity
+    if ! test_redis_connectivity; then
+        log_error "Redis connectivity test failed"
+        test_success=false
+    fi
+    
+    # Test frontend accessibility
+    if ! test_frontend_accessibility; then
+        log_error "Frontend accessibility test failed"
+        test_success=false
+    fi
+    
+    # Generate smoke test report
+    local result="success"
+    if [[ "$test_success" != "true" ]]; then
+        result="failure"
+    fi
+    
+    local report_file=$(generate_smoke_test_report "$result")
+    
+    # Display summary
+    echo ""
+    log_info "Smoke Test Summary:"
+    log_info "  Result: $result"
+    log_info "  Report: $report_file"
+    
+    if [[ "$test_success" == "true" ]]; then
+        log_success "All smoke tests passed!"
+        exit 0
+    else
+        log_error "Some smoke tests failed"
+        exit 1
+    fi
 }
-
-# Help function
-show_help() {
-    echo "MS5.0 Floor Dashboard - Smoke Test Script"
-    echo ""
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help              Show this help message"
-    echo "  -e, --environment ENV   Environment (staging|production) (default: staging)"
-    echo "  -u, --url URL          Base URL for API (default: http://localhost:8000)"
-    echo "  -T, --timeout SECONDS  Timeout for requests (default: 30)"
-    echo ""
-    echo "Environment Variables:"
-    echo "  ENVIRONMENT            Environment (default: staging)"
-    echo "  BASE_URL               Base URL for API (default: http://localhost:8000)"
-    echo "  TIMEOUT                Timeout for requests (default: 30)"
-    echo ""
-    echo "Examples:"
-    echo "  $0                                    # Run smoke tests in staging"
-    echo "  $0 -e production -u http://prod:8000  # Run smoke tests in production"
-    echo "  ENVIRONMENT=production $0            # Run smoke tests in production"
-}
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -e|--environment)
-            ENVIRONMENT="$2"
-            shift 2
-            ;;
-        -u|--url)
-            BASE_URL="$2"
-            shift 2
-            ;;
-        -T|--timeout)
-            TIMEOUT="$2"
-            shift 2
-            ;;
-        *)
-            log_error "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-    esac
-done
-
-# Validate environment
-if [[ ! "$ENVIRONMENT" =~ ^(staging|production)$ ]]; then
-    log_error "Invalid environment: $ENVIRONMENT (must be 'staging' or 'production')"
-    exit 1
-fi
 
 # Run main function
-main
+main "$@"

@@ -1,0 +1,315 @@
+---
+# Azure DNS Zone Configuration
+# Provides DNS management for MS5.0 Floor Dashboard domains
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-dns-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: dns
+    tier: infrastructure
+    environment: production
+  annotations:
+    description: "Azure DNS zone configuration for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # DNS Zone Configuration
+  dns-zone-config.json: |
+    {
+      "properties": {
+        "zoneType": "Public",
+        "resolutionVirtualNetworks": [],
+        "registrationVirtualNetworks": [],
+        "dnssecConfig": {
+          "state": "Disabled"
+        }
+      },
+      "location": "global",
+      "tags": {
+        "Environment": "Production",
+        "Application": "MS5.0 Floor Dashboard",
+        "Owner": "Manufacturing Systems Team",
+        "CostCenter": "Manufacturing Operations"
+      }
+    }
+  
+  # DNS Records Configuration
+  dns-records-config.json: |
+    {
+      "records": [
+        {
+          "name": "@",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Root domain A record"
+        },
+        {
+          "name": "www",
+          "type": "A", 
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "WWW subdomain A record"
+        },
+        {
+          "name": "api",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "API subdomain A record"
+        },
+        {
+          "name": "backend",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Backend subdomain A record"
+        },
+        {
+          "name": "ws",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "WebSocket subdomain A record"
+        },
+        {
+          "name": "wss",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Secure WebSocket subdomain A record"
+        },
+        {
+          "name": "monitoring",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Monitoring subdomain A record"
+        },
+        {
+          "name": "grafana",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Grafana subdomain A record"
+        },
+        {
+          "name": "prometheus",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Prometheus subdomain A record"
+        },
+        {
+          "name": "alerts",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "AlertManager subdomain A record"
+        },
+        {
+          "name": "status",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Status page subdomain A record"
+        },
+        {
+          "name": "health",
+          "type": "A",
+          "ttl": 300,
+          "target": "${NGINX_EXTERNAL_IP}",
+          "description": "Health check subdomain A record"
+        },
+        {
+          "name": "@",
+          "type": "MX",
+          "ttl": 3600,
+          "target": "10 mail.ms5floor.com",
+          "description": "Mail exchange record"
+        },
+        {
+          "name": "@",
+          "type": "TXT",
+          "ttl": 3600,
+          "target": "v=spf1 include:_spf.google.com ~all",
+          "description": "SPF record for email authentication"
+        },
+        {
+          "name": "_dmarc",
+          "type": "TXT",
+          "ttl": 3600,
+          "target": "v=DMARC1; p=quarantine; rua=mailto:dmarc@ms5floor.com",
+          "description": "DMARC record for email security"
+        },
+        {
+          "name": "@",
+          "type": "CNAME",
+          "ttl": 300,
+          "target": "ms5floor.com",
+          "description": "CNAME for www redirect"
+        }
+      ]
+    }
+  
+  # DNS Monitoring Configuration
+  dns-monitoring-config.json: |
+    {
+      "monitoring": {
+        "enabled": true,
+        "metrics": {
+          "dnsQueries": true,
+          "dnsResponseTime": true,
+          "dnsErrors": true,
+          "dnsCacheHitRate": true
+        },
+        "alerts": {
+          "highQueryVolume": {
+            "threshold": 1000,
+            "window": "5m",
+            "severity": "warning"
+          },
+          "highResponseTime": {
+            "threshold": 1000,
+            "window": "5m", 
+            "severity": "warning"
+          },
+          "dnsErrors": {
+            "threshold": 10,
+            "window": "5m",
+            "severity": "critical"
+          }
+        }
+      }
+    }
+---
+# DNS Health Check Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-health-check-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: dns-health
+    tier: infrastructure
+  annotations:
+    description: "DNS health check configuration for monitoring"
+data:
+  health-check-script.sh: |
+    #!/bin/bash
+    # DNS Health Check Script for MS5.0 Floor Dashboard
+    
+    set -euo pipefail
+    
+    DOMAINS=(
+      "ms5floor.com"
+      "www.ms5floor.com"
+      "api.ms5floor.com"
+      "ws.ms5floor.com"
+      "monitoring.ms5floor.com"
+      "grafana.ms5floor.com"
+      "prometheus.ms5floor.com"
+      "status.ms5floor.com"
+    )
+    
+    log_info() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] INFO: $1"
+    }
+    
+    log_error() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >&2
+    }
+    
+    check_dns_resolution() {
+        local domain=$1
+        local record_type=${2:-A}
+        
+        log_info "Checking DNS resolution for $domain ($record_type)"
+        
+        if dig +short "$domain" "$record_type" | grep -q .; then
+            log_info "DNS resolution successful for $domain"
+            return 0
+        else
+            log_error "DNS resolution failed for $domain"
+            return 1
+        fi
+    }
+    
+    check_ssl_certificate() {
+        local domain=$1
+        
+        log_info "Checking SSL certificate for $domain"
+        
+        if echo | openssl s_client -servername "$domain" -connect "$domain:443" 2>/dev/null | openssl x509 -noout -dates 2>/dev/null; then
+            log_info "SSL certificate valid for $domain"
+            return 0
+        else
+            log_error "SSL certificate invalid for $domain"
+            return 1
+        fi
+    }
+    
+    check_http_response() {
+        local domain=$1
+        local expected_status=${2:-200}
+        
+        log_info "Checking HTTP response for $domain"
+        
+        local status_code
+        status_code=$(curl -s -o /dev/null -w "%{http_code}" "https://$domain" || echo "000")
+        
+        if [[ "$status_code" == "$expected_status" ]]; then
+            log_info "HTTP response successful for $domain (status: $status_code)"
+            return 0
+        else
+            log_error "HTTP response failed for $domain (status: $status_code)"
+            return 1
+        fi
+    }
+    
+    main() {
+        log_info "Starting DNS health check for MS5.0 Floor Dashboard"
+        
+        local failed_checks=0
+        local total_checks=0
+        
+        for domain in "${DOMAINS[@]}"; do
+            ((total_checks++))
+            
+            # Check DNS resolution
+            if ! check_dns_resolution "$domain"; then
+                ((failed_checks++))
+                continue
+            fi
+            
+            # Check SSL certificate (skip for non-HTTPS domains)
+            if [[ "$domain" != "ws.ms5floor.com" ]]; then
+                if ! check_ssl_certificate "$domain"; then
+                    ((failed_checks++))
+                fi
+            fi
+            
+            # Check HTTP response (skip for WebSocket domains)
+            if [[ "$domain" != "ws.ms5floor.com" ]]; then
+                if ! check_http_response "$domain"; then
+                    ((failed_checks++))
+                fi
+            fi
+        done
+        
+        log_info "DNS health check completed: $((total_checks - failed_checks))/$total_checks checks passed"
+        
+        if [[ $failed_checks -gt 0 ]]; then
+            log_error "DNS health check failed with $failed_checks errors"
+            exit 1
+        else
+            log_info "All DNS health checks passed"
+            exit 0
+        fi
+    }
+    
+    main "$@"

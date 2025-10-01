@@ -1,0 +1,271 @@
+# MS5.0 Floor Dashboard - Frontend Horizontal Pod Autoscaler
+# 
+# This HPA provides:
+# - Automatic scaling based on CPU and memory usage
+# - Custom metrics scaling
+# - Tablet-specific scaling behavior
+# - Factory environment optimization
+# - Cost-effective resource utilization
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ms5-frontend-hpa
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Horizontal Pod Autoscaler"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Scale target reference
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ms5-frontend-deployment
+  
+  # Scaling configuration
+  minReplicas: 2
+  maxReplicas: 10
+  
+  # Metrics for scaling decisions
+  metrics:
+  # CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Custom metrics for tablet usage
+  - type: Pods
+    pods:
+      metric:
+        name: tablet_active_sessions
+      target:
+        type: AverageValue
+        averageValue: "10"
+  
+  # Custom metrics for factory environment
+  - type: Pods
+    pods:
+      metric:
+        name: factory_network_requests
+      target:
+        type: AverageValue
+        averageValue: "100"
+  
+  # Custom metrics for WebSocket connections
+  - type: Pods
+    pods:
+      metric:
+        name: websocket_connections
+      target:
+        type: AverageValue
+        averageValue: "50"
+  
+  # Custom metrics for API requests
+  - type: Pods
+    pods:
+      metric:
+        name: api_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  
+  # Behavior configuration
+  behavior:
+    # Scale up behavior
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 2
+        periodSeconds: 15
+      selectPolicy: Max
+    
+    # Scale down behavior
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+---
+# Vertical Pod Autoscaler for resource optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: ms5-frontend-vpa
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Vertical Pod Autoscaler"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Target reference
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ms5-frontend-deployment
+  
+  # Update policy
+  updatePolicy:
+    updateMode: "Auto"
+  
+  # Resource policy
+  resourcePolicy:
+    containerPolicies:
+    - containerName: ms5-frontend
+      minAllowed:
+        cpu: 50m
+        memory: 64Mi
+      maxAllowed:
+        cpu: 1
+        memory: 1Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+---
+# Pod Disruption Budget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ms5-frontend-pdb
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Pod Disruption Budget"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Minimum available pods
+  minAvailable: 1
+  
+  # Selector
+  selector:
+    matchLabels:
+      app: ms5-frontend
+      component: frontend
+      environment: production
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-netpol
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Network Policy"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Pod selector
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+      component: frontend
+      environment: production
+  
+  # Policy types
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  # Ingress rules
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow ingress from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9113
+  
+  # Allow ingress from internal services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-floor-dashboard
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Egress rules
+  egress:
+  # Allow egress to backend services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-floor-dashboard
+    ports:
+    - protocol: TCP
+      port: 8000
+  
+  # Allow egress to monitoring
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  
+  # Allow egress to DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  
+  # Allow egress to external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

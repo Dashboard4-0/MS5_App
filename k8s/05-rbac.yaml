@@ -1,0 +1,109 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ms5-backend-sa
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ms5-database-sa
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ms5-monitoring-sa
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ms5-backend-role
+  namespace: ms5-production
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ms5-monitoring-role
+  namespace: ms5-production
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ms5-backend-rolebinding
+  namespace: ms5-production
+subjects:
+- kind: ServiceAccount
+  name: ms5-backend-sa
+  namespace: ms5-production
+roleRef:
+  kind: Role
+  name: ms5-backend-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ms5-monitoring-rolebinding
+  namespace: ms5-production
+subjects:
+- kind: ServiceAccount
+  name: ms5-monitoring-sa
+  namespace: ms5-production
+roleRef:
+  kind: Role
+  name: ms5-monitoring-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ms5-monitoring-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "nodes/metrics"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ms5-monitoring-clusterrolebinding
+subjects:
+- kind: ServiceAccount
+  name: ms5-monitoring-sa
+  namespace: ms5-production
+roleRef:
+  kind: ClusterRole
+  name: ms5-monitoring-clusterrole
+  apiGroup: rbac.authorization.k8s.io

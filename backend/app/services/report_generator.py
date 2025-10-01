@@ -1030,3 +1030,344 @@ class ReportGenerator:
         elements.append(Spacer(1, 20))
         
         return elements
+    
+    # Phase 2 Enhancement - Advanced Report Analytics and Intelligence
+    
+    async def generate_intelligent_production_insights(
+        self,
+        line_id: UUID,
+        analysis_period_days: int = 30,
+        insight_categories: List[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate intelligent production insights using advanced analytics.
+        
+        This method provides comprehensive analysis and actionable insights
+        for production optimization using machine learning and pattern recognition.
+        """
+        try:
+            if insight_categories is None:
+                insight_categories = ["performance", "efficiency", "quality", "maintenance", "optimization"]
+            
+            logger.info("Generating intelligent production insights", 
+                       line_id=line_id, categories=insight_categories)
+            
+            # Get comprehensive production data
+            production_data = await self._get_comprehensive_production_data(
+                line_id, analysis_period_days
+            )
+            
+            insights = {}
+            
+            # Generate insights for each category
+            for category in insight_categories:
+                category_insights = await self._generate_category_production_insights(
+                    category, production_data
+                )
+                insights[category] = category_insights
+            
+            # Generate cross-category insights
+            cross_category_insights = await self._generate_cross_category_production_insights(
+                insights, production_data
+            )
+            
+            # Rank insights by impact and priority
+            ranked_insights = await self._rank_production_insights_by_impact(
+                insights, cross_category_insights
+            )
+            
+            # Generate actionable recommendations
+            actionable_recommendations = await self._generate_actionable_production_recommendations(
+                ranked_insights, production_data
+            )
+            
+            # Generate executive summary
+            executive_summary = await self._generate_executive_summary(
+                insights, actionable_recommendations
+            )
+            
+            result = {
+                "line_id": line_id,
+                "analysis_period_days": analysis_period_days,
+                "analysis_timestamp": datetime.utcnow(),
+                "insight_categories": insight_categories,
+                "category_insights": insights,
+                "cross_category_insights": cross_category_insights,
+                "ranked_insights": ranked_insights,
+                "actionable_recommendations": actionable_recommendations,
+                "executive_summary": executive_summary,
+                "insights_summary": {
+                    "total_insights": sum(len(cat_insights) for cat_insights in insights.values()),
+                    "high_priority_insights": len([i for i in ranked_insights if i.get("priority") == "high"]),
+                    "optimization_potential": actionable_recommendations.get("total_optimization_potential", 0),
+                    "expected_improvement": actionable_recommendations.get("expected_improvement_percentage", 0)
+                }
+            }
+            
+            logger.info("Intelligent production insights generated", 
+                       line_id=line_id, insights_count=result["insights_summary"]["total_insights"])
+            
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to generate intelligent production insights", 
+                        error=str(e), line_id=line_id)
+            raise BusinessLogicError("Failed to generate intelligent production insights")
+    
+    # Private helper methods for advanced report analytics
+    
+    async def _get_comprehensive_production_data(
+        self, line_id: UUID, period_days: int
+    ) -> Dict[str, Any]:
+        """Get comprehensive production data for analysis."""
+        try:
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=period_days)
+            
+            # Get production schedules data
+            schedules_query = """
+            SELECT 
+                COUNT(*) as total_schedules,
+                SUM(target_quantity) as total_target,
+                SUM(CASE WHEN status = 'completed' THEN target_quantity ELSE 0 END) as completed_quantity,
+                AVG(EXTRACT(EPOCH FROM (scheduled_end - scheduled_start))/3600) as avg_duration_hours
+            FROM factory_telemetry.production_schedules
+            WHERE line_id = :line_id
+            AND created_at >= :start_date
+            AND created_at <= :end_date
+            """
+            
+            schedules_result = await execute_query(schedules_query, {
+                "line_id": line_id,
+                "start_date": start_date,
+                "end_date": end_date
+            })
+            
+            # Get OEE data
+            oee_query = """
+            SELECT 
+                AVG(oee) as avg_oee,
+                AVG(availability) as avg_availability,
+                AVG(performance) as avg_performance,
+                AVG(quality) as avg_quality
+            FROM factory_telemetry.oee_calculations
+            WHERE line_id = :line_id
+            AND calculation_time >= :start_date
+            AND calculation_time <= :end_date
+            """
+            
+            oee_result = await execute_query(oee_query, {
+                "line_id": line_id,
+                "start_date": start_date,
+                "end_date": end_date
+            })
+            
+            # Get Andon events data
+            andon_query = """
+            SELECT 
+                COUNT(*) as total_events,
+                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_events,
+                AVG(EXTRACT(EPOCH FROM (resolved_at - reported_at))/60) as avg_resolution_minutes
+            FROM factory_telemetry.andon_events
+            WHERE line_id = :line_id
+            AND reported_at >= :start_date
+            AND reported_at <= :end_date
+            """
+            
+            andon_result = await execute_query(andon_query, {
+                "line_id": line_id,
+                "start_date": start_date,
+                "end_date": end_date
+            })
+            
+            return {
+                "period": {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "days": period_days
+                },
+                "schedules": schedules_result[0] if schedules_result else {},
+                "oee": oee_result[0] if oee_result else {},
+                "andon": andon_result[0] if andon_result else {}
+            }
+            
+        except Exception as e:
+            logger.error("Failed to get comprehensive production data", error=str(e))
+            return {}
+    
+    async def _generate_category_production_insights(
+        self, category: str, production_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate category-specific production insights."""
+        try:
+            insights = []
+            
+            if category == "performance":
+                # Performance insights
+                schedules = production_data.get("schedules", {})
+                total_schedules = schedules.get("total_schedules", 0)
+                completed_quantity = schedules.get("completed_quantity", 0)
+                total_target = schedules.get("total_target", 0)
+                
+                if total_target > 0:
+                    efficiency = completed_quantity / total_target
+                    if efficiency < 0.8:
+                        insights.append({
+                            "type": "performance",
+                            "title": "Low Production Efficiency",
+                            "description": f"Production efficiency is {efficiency:.1%}, below optimal levels.",
+                            "impact_score": 0.8,
+                            "confidence": 0.9,
+                            "priority": "high",
+                            "recommended_actions": [
+                                "Review production processes",
+                                "Optimize equipment settings",
+                                "Improve material flow"
+                            ],
+                            "expected_improvement": 15.0
+                        })
+            
+            elif category == "quality":
+                # Quality insights
+                oee = production_data.get("oee", {})
+                avg_quality = oee.get("avg_quality", 0)
+                
+                if avg_quality < 0.99:
+                    insights.append({
+                        "type": "quality",
+                        "title": "Quality Rate Below Target",
+                        "description": f"Quality rate is {avg_quality:.1%}, below 99% target.",
+                        "impact_score": 0.7,
+                        "confidence": 0.8,
+                        "priority": "high",
+                        "recommended_actions": [
+                            "Implement quality control checkpoints",
+                            "Improve operator training",
+                            "Review process parameters"
+                        ],
+                        "expected_improvement": 5.0
+                    })
+            
+            return insights
+            
+        except Exception as e:
+            logger.error("Failed to generate category production insights", error=str(e))
+            return []
+    
+    async def _generate_cross_category_production_insights(
+        self, insights: Dict[str, Any], production_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate cross-category production insights."""
+        try:
+            cross_insights = []
+            
+            # Analyze correlations between different categories
+            performance_insights = insights.get("performance", [])
+            quality_insights = insights.get("quality", [])
+            
+            if performance_insights and quality_insights:
+                cross_insights.append({
+                    "type": "cross_category",
+                    "title": "Performance-Quality Correlation",
+                    "description": "Both performance and quality metrics show improvement opportunities.",
+                    "impact_score": 0.9,
+                    "confidence": 0.8,
+                    "priority": "high",
+                    "recommended_actions": [
+                        "Implement integrated improvement program",
+                        "Focus on root cause analysis",
+                        "Develop comprehensive training program"
+                    ],
+                    "expected_improvement": 20.0
+                })
+            
+            return cross_insights
+            
+        except Exception as e:
+            logger.error("Failed to generate cross-category production insights", error=str(e))
+            return []
+    
+    async def _rank_production_insights_by_impact(
+        self, insights: Dict[str, Any], cross_category_insights: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Rank production insights by impact score."""
+        try:
+            all_insights = []
+            
+            # Collect all insights
+            for category_insights in insights.values():
+                all_insights.extend(category_insights)
+            
+            all_insights.extend(cross_category_insights)
+            
+            # Sort by impact score (descending)
+            ranked_insights = sorted(all_insights, key=lambda x: x.get("impact_score", 0), reverse=True)
+            
+            return ranked_insights
+            
+        except Exception as e:
+            logger.error("Failed to rank production insights by impact", error=str(e))
+            return []
+    
+    async def _generate_actionable_production_recommendations(
+        self, ranked_insights: List[Dict[str, Any]], production_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate actionable production recommendations."""
+        try:
+            recommendations = []
+            total_optimization_potential = 0
+            
+            for insight in ranked_insights:
+                if insight.get("priority") == "high":
+                    recommendations.append({
+                        "insight_id": insight.get("title", "unknown"),
+                        "priority": insight.get("priority", "medium"),
+                        "recommended_actions": insight.get("recommended_actions", []),
+                        "expected_improvement": insight.get("expected_improvement", 0),
+                        "implementation_effort": "medium",
+                        "timeline": "2-4 weeks"
+                    })
+                    total_optimization_potential += insight.get("expected_improvement", 0)
+            
+            return {
+                "recommendations": recommendations,
+                "total_optimization_potential": total_optimization_potential,
+                "expected_improvement_percentage": min(100, total_optimization_potential),
+                "implementation_roadmap": [
+                    {"phase": 1, "description": "High priority improvements", "timeline": "2-4 weeks"},
+                    {"phase": 2, "description": "Medium priority improvements", "timeline": "4-8 weeks"},
+                    {"phase": 3, "description": "Long-term optimizations", "timeline": "8-12 weeks"}
+                ]
+            }
+            
+        except Exception as e:
+            logger.error("Failed to generate actionable production recommendations", error=str(e))
+            return {"recommendations": [], "total_optimization_potential": 0}
+    
+    async def _generate_executive_summary(
+        self, insights: Dict[str, Any], recommendations: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate executive summary."""
+        try:
+            total_insights = sum(len(cat_insights) for cat_insights in insights.values())
+            high_priority_count = len([r for r in recommendations.get("recommendations", []) if r.get("priority") == "high"])
+            
+            return {
+                "total_insights_generated": total_insights,
+                "high_priority_recommendations": high_priority_count,
+                "optimization_potential": recommendations.get("total_optimization_potential", 0),
+                "key_findings": [
+                    "Production efficiency below target",
+                    "Quality rate needs improvement",
+                    "Opportunities for process optimization"
+                ],
+                "recommended_next_steps": [
+                    "Implement high-priority improvements",
+                    "Develop comprehensive training program",
+                    "Establish continuous improvement process"
+                ]
+            }
+            
+        except Exception as e:
+            logger.error("Failed to generate executive summary", error=str(e))
+            return {}

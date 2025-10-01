@@ -1,0 +1,739 @@
+---
+# MS5.0 Floor Dashboard - Phase 6B: Elasticsearch Log Aggregation
+# Comprehensive log aggregation and analysis implementation for AKS deployment
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    name: logging
+    app: ms5-dashboard
+    component: logging
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+data:
+  elasticsearch.yml: |
+    cluster.name: ms5-cluster
+    node.name: ${HOSTNAME}
+    network.host: 0.0.0.0
+    discovery.type: single-node
+    xpack.security.enabled: false
+    xpack.monitoring.collection.enabled: true
+    xpack.monitoring.exporters.prometheus:
+      enabled: true
+      host: "prometheus.monitoring.svc.cluster.local:9090"
+    path.data: /usr/share/elasticsearch/data
+    path.logs: /usr/share/elasticsearch/logs
+    http.cors.enabled: true
+    http.cors.allow-origin: "*"
+    http.cors.allow-headers: "X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization"
+    http.cors.allow-credentials: true
+    indices.memory.index_buffer_size: 30%
+    indices.queries.cache.size: 10%
+    indices.fielddata.cache.size: 20%
+    cluster.routing.allocation.disk.threshold_enabled: true
+    cluster.routing.allocation.disk.watermark.low: 85%
+    cluster.routing.allocation.disk.watermark.high: 90%
+    cluster.routing.allocation.disk.watermark.flood_stage: 95%
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+data:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+    }
+    
+    filter {
+      if [kubernetes] {
+        mutate {
+          add_field => { "namespace" => "%{[kubernetes][namespace]}" }
+          add_field => { "pod_name" => "%{[kubernetes][pod_name]}" }
+          add_field => { "container_name" => "%{[kubernetes][container_name]}" }
+          add_field => { "node_name" => "%{[kubernetes][node_name]}" }
+        }
+        
+        if [kubernetes][labels][app] {
+          mutate {
+            add_field => { "app" => "%{[kubernetes][labels][app]}" }
+          }
+        }
+        
+        if [kubernetes][labels][component] {
+          mutate {
+            add_field => { "component" => "%{[kubernetes][labels][component]}" }
+          }
+        }
+      }
+      
+      if [message] =~ /^\{.*\}$/ {
+        json {
+          source => "message"
+        }
+      }
+      
+      if [level] {
+        mutate {
+          add_field => { "log_level" => "%{level}" }
+        }
+      }
+      
+      if [timestamp] {
+        date {
+          match => [ "timestamp", "ISO8601" ]
+        }
+      }
+      
+      mutate {
+        add_field => { "environment" => "production" }
+        add_field => { "cluster" => "ms5-aks" }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch.logging.svc.cluster.local:9200"]
+        index => "ms5-logs-%{+YYYY.MM.dd}"
+        template_name => "ms5-logs"
+        template_pattern => "ms5-logs-*"
+        template => {
+          "index_patterns" => ["ms5-logs-*"],
+          "settings" => {
+            "number_of_shards" => 1,
+            "number_of_replicas" => 0,
+            "index.refresh_interval" => "5s"
+          },
+          "mappings" => {
+            "properties" => {
+              "@timestamp" => { "type" => "date" },
+              "message" => { "type" => "text" },
+              "level" => { "type" => "keyword" },
+              "namespace" => { "type" => "keyword" },
+              "pod_name" => { "type" => "keyword" },
+              "container_name" => { "type" => "keyword" },
+              "node_name" => { "type" => "keyword" },
+              "app" => { "type" => "keyword" },
+              "component" => { "type" => "keyword" },
+              "environment" => { "type" => "keyword" },
+              "cluster" => { "type" => "keyword" }
+            }
+          }
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+data:
+  kibana.yml: |
+    server.name: kibana
+    server.host: "0.0.0.0"
+    elasticsearch.hosts: ["http://elasticsearch.logging.svc.cluster.local:9200"]
+    monitoring.ui.container.elasticsearch.enabled: true
+    server.maxPayloadBytes: 1048576
+    elasticsearch.requestTimeout: 300000
+    elasticsearch.shardTimeout: 300000
+    elasticsearch.pingTimeout: 30000
+    server.keepAliveTimeout: 300000
+    server.socketTimeout: 300000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: container
+      paths:
+        - /var/log/containers/*.log
+      processors:
+        - add_kubernetes_metadata:
+            host: ${NODE_NAME}
+            matchers:
+            - logs_path:
+                logs_path: "/var/log/containers/"
+      fields:
+        environment: production
+        cluster: ms5-aks
+      fields_under_root: true
+      multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+      multiline.negate: true
+      multiline.match: after
+    
+    output.logstash:
+      hosts: ["logstash.logging.svc.cluster.local:5044"]
+    
+    processors:
+      - add_host_metadata:
+          when.not.contains.tags: forwarded
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: elasticsearch
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: logging
+      service: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: logging
+        service: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: cluster.name
+          value: ms5-cluster
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: "-Xms1g -Xmx1g"
+        - name: xpack.security.enabled
+          value: "false"
+        - name: xpack.monitoring.collection.enabled
+          value: "true"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        - name: elasticsearch-config
+          mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          subPath: elasticsearch.yml
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: elasticsearch-config
+      - name: elasticsearch-data
+        persistentVolumeClaim:
+          claimName: elasticsearch-data
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "managed-premium"
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: elasticsearch
+spec:
+  ports:
+  - port: 9200
+    targetPort: 9200
+    protocol: TCP
+    name: http
+  - port: 9300
+    targetPort: 9300
+    protocol: TCP
+    name: transport
+  selector:
+    app: ms5-dashboard
+    component: logging
+    service: elasticsearch
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: logstash
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: logging
+      service: logstash
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: logging
+        service: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.8.0
+        ports:
+        - containerPort: 5044
+          name: beats
+        - containerPort: 9600
+          name: http
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "200m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: logstash-config
+          mountPath: /usr/share/logstash/pipeline/logstash.conf
+          subPath: logstash.conf
+        livenessProbe:
+          httpGet:
+            path: /_node/stats
+            port: 9600
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_node/stats
+            port: 9600
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: logstash-config
+        configMap:
+          name: logstash-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-dashboard
+                - key: component
+                  operator: In
+                  values:
+                  - logging
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: logstash
+spec:
+  ports:
+  - port: 5044
+    targetPort: 5044
+    protocol: TCP
+    name: beats
+  - port: 9600
+    targetPort: 9600
+    protocol: TCP
+    name: http
+  selector:
+    app: ms5-dashboard
+    component: logging
+    service: logstash
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: kibana
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: logging
+      service: kibana
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: logging
+        service: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.8.0
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch.logging.svc.cluster.local:9200"
+        - name: SERVER_NAME
+          value: "kibana"
+        - name: SERVER_HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "300m"
+        volumeMounts:
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: kibana-config
+        configMap:
+          name: kibana-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-dashboard
+                - key: component
+                  operator: In
+                  values:
+                  - logging
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: kibana
+spec:
+  ports:
+  - port: 5601
+    targetPort: 5601
+    protocol: TCP
+    name: http
+  selector:
+    app: ms5-dashboard
+    component: logging
+    service: kibana
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    service: filebeat
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: logging
+      service: filebeat
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: logging
+        service: filebeat
+    spec:
+      serviceAccountName: filebeat
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.8.0
+        args:
+          - -c
+          - /etc/filebeat.yml
+          - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: filebeat-config
+          mountPath: /etc/filebeat.yml
+          subPath: filebeat.yml
+        - name: varlogcontainers
+          mountPath: /var/log/containers
+          readOnly: true
+        - name: varlogpods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        securityContext:
+          runAsUser: 0
+      volumes:
+      - name: filebeat-config
+        configMap:
+          name: filebeat-config
+      - name: varlogcontainers
+        hostPath:
+          path: /var/log/containers
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+  labels:
+    app: ms5-dashboard
+    component: logging
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - namespaces
+  - pods
+  - services
+  - endpoints
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - replicasets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources:
+  - replicasets
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+  labels:
+    app: ms5-dashboard
+    component: logging
+roleRef:
+  kind: ClusterRole
+  name: filebeat
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: filebeat
+  namespace: logging
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana-ingress
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - kibana.ms5floor.com
+    secretName: kibana-tls
+  rules:
+  - host: kibana.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: 5601
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: elasticsearch-monitor
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: logging
+      service: elasticsearch
+  endpoints:
+  - port: http
+    path: /_prometheus/metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: elasticsearch-alerts
+  namespace: logging
+  labels:
+    app: ms5-dashboard
+    component: logging
+spec:
+  groups:
+  - name: elasticsearch.rules
+    rules:
+    - alert: ElasticsearchDown
+      expr: up{job="elasticsearch"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch is down"
+        description: "Elasticsearch has been down for more than 5 minutes"
+    
+    - alert: ElasticsearchHighMemoryUsage
+      expr: (elasticsearch_jvm_memory_used_bytes / elasticsearch_jvm_memory_max_bytes) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch high memory usage"
+        description: "Elasticsearch memory usage is above 80%"
+    
+    - alert: ElasticsearchHighCPUUsage
+      expr: rate(elasticsearch_process_cpu_percent[5m]) > 80
+      for: 5m
+      labels:
+        severity: warning
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch high CPU usage"
+        description: "Elasticsearch CPU usage is above 80%"
+    
+    - alert: ElasticsearchDiskSpaceLow
+      expr: (elasticsearch_filesystem_available_bytes / elasticsearch_filesystem_size_bytes) < 0.1
+      for: 5m
+      labels:
+        severity: critical
+        service: elasticsearch
+      annotations:
+        summary: "Elasticsearch disk space low"
+        description: "Elasticsearch disk space is below 10%"

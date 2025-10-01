@@ -1,0 +1,150 @@
+# MS5.0 Floor Dashboard - Frontend ConfigMap
+# 
+# This ConfigMap contains non-sensitive configuration for:
+# - Application settings
+# - API endpoints
+# - Feature flags
+# - Tablet optimizations
+# - Factory environment settings
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-config
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+  annotations:
+    description: "MS5.0 Frontend Configuration"
+    last-updated: "2024-01-01T00:00:00Z"
+data:
+  # Application configuration
+  APP_NAME: "MS5.0 Floor Dashboard"
+  APP_VERSION: "1.0.0"
+  APP_ENVIRONMENT: "production"
+  APP_PLATFORM: "kubernetes"
+  
+  # API configuration
+  API_BASE_URL: "https://api.ms5dashboard.com"
+  API_TIMEOUT: "30000"
+  API_RETRY_ATTEMPTS: "3"
+  API_RETRY_DELAY: "1000"
+  
+  # WebSocket configuration
+  WS_BASE_URL: "wss://api.ms5dashboard.com"
+  WS_TIMEOUT: "30000"
+  WS_RECONNECT_INTERVAL: "5000"
+  WS_MAX_RECONNECT_ATTEMPTS: "10"
+  
+  # Feature flags
+  FEATURE_REAL_TIME_UPDATES: "true"
+  FEATURE_ADVANCED_ANALYTICS: "true"
+  FEATURE_ESCALATION_SYSTEM: "true"
+  FEATURE_OFFLINE_SUPPORT: "true"
+  FEATURE_PWA_ENABLED: "true"
+  FEATURE_TABLET_OPTIMIZED: "true"
+  FEATURE_FACTORY_NETWORK: "true"
+  
+  # Tablet-specific settings
+  TABLET_MIN_TOUCH_TARGET: "44"
+  TABLET_FONT_SIZE: "18"
+  TABLET_SPACING: "12"
+  TABLET_ORIENTATION_LOCK: "landscape"
+  
+  # Factory environment settings
+  FACTORY_AUTO_REFRESH: "30000"
+  FACTORY_HEARTBEAT_INTERVAL: "10000"
+  FACTORY_SYNC_INTERVAL: "60000"
+  FACTORY_MAX_OFFLINE_DURATION: "86400000"
+  FACTORY_CRITICAL_DATA_THRESHOLD: "100"
+  
+  # Performance settings
+  PERFORMANCE_LAZY_LOADING: "true"
+  PERFORMANCE_CODE_SPLITTING: "true"
+  PERFORMANCE_IMAGE_OPTIMIZATION: "true"
+  PERFORMANCE_BUNDLE_COMPRESSION: "true"
+  PERFORMANCE_SERVICE_WORKER: "true"
+  
+  # Monitoring and logging
+  MONITORING_ENABLED: "true"
+  LOGGING_LEVEL: "info"
+  ANALYTICS_ENABLED: "true"
+  ERROR_REPORTING_ENABLED: "true"
+  
+  # Security settings
+  SECURITY_CSP_ENABLED: "true"
+  SECURITY_HSTS_ENABLED: "true"
+  SECURITY_XSS_PROTECTION: "true"
+  SECURITY_CONTENT_TYPE_PROTECTION: "true"
+  
+  # Cache configuration
+  CACHE_API_MAX_AGE: "86400"
+  CACHE_STATIC_MAX_AGE: "604800"
+  CACHE_OFFLINE_MAX_AGE: "2592000"
+  CACHE_MAX_ENTRIES: "10000"
+  
+  # Offline configuration
+  OFFLINE_ENABLED: "true"
+  OFFLINE_CACHE_STRATEGY: "network-first"
+  OFFLINE_SYNC_INTERVAL: "60000"
+  OFFLINE_MAX_STORAGE: "104857600"
+  
+  # PWA configuration
+  PWA_ENABLED: "true"
+  PWA_CACHE_STRATEGY: "network-first"
+  PWA_UPDATE_STRATEGY: "immediate"
+  PWA_BACKGROUND_SYNC: "true"
+  
+  # Health check configuration
+  HEALTH_CHECK_ENABLED: "true"
+  HEALTH_CHECK_INTERVAL: "30000"
+  HEALTH_CHECK_TIMEOUT: "5000"
+  HEALTH_CHECK_RETRIES: "3"
+  
+  # Nginx configuration
+  NGINX_WORKER_PROCESSES: "auto"
+  NGINX_WORKER_CONNECTIONS: "1024"
+  NGINX_KEEPALIVE_TIMEOUT: "65"
+  NGINX_GZIP_ENABLED: "true"
+  NGINX_GZIP_LEVEL: "6"
+  
+  # Container configuration
+  CONTAINER_PLATFORM: "kubernetes"
+  CONTAINER_NAMESPACE: "ms5-floor-dashboard"
+  CONTAINER_VERSION: "1.0.0"
+  CONTAINER_HEALTH_CHECKS: "true"
+  
+  # Build configuration
+  BUILD_TIMESTAMP: "2024-01-01T00:00:00Z"
+  BUILD_ENVIRONMENT: "aks-optimized"
+  BUILD_PLATFORM: "kubernetes"
+  BUILD_TABLET_OPTIMIZED: "true"
+  BUILD_FACTORY_NETWORK: "true"
+  
+  # Deployment configuration
+  DEPLOYMENT_STRATEGY: "rolling"
+  DEPLOYMENT_MAX_SURGE: "25%"
+  DEPLOYMENT_MAX_UNAVAILABLE: "25%"
+  DEPLOYMENT_REVISION_HISTORY_LIMIT: "10"
+  
+  # Scaling configuration
+  SCALING_ENABLED: "true"
+  SCALING_MIN_REPLICAS: "2"
+  SCALING_MAX_REPLICAS: "10"
+  SCALING_TARGET_CPU: "70"
+  SCALING_TARGET_MEMORY: "80"
+  
+  # Resource configuration
+  RESOURCE_CPU_REQUEST: "100m"
+  RESOURCE_CPU_LIMIT: "500m"
+  RESOURCE_MEMORY_REQUEST: "128Mi"
+  RESOURCE_MEMORY_LIMIT: "512Mi"
+  
+  # Security configuration
+  SECURITY_RUN_AS_NON_ROOT: "true"
+  SECURITY_RUN_AS_USER: "1000"
+  SECURITY_READ_ONLY_ROOT_FILESYSTEM: "true"
+  SECURITY_ALLOW_PRIVILEGE_ESCALATION: "false"

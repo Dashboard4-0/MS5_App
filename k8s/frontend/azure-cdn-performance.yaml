@@ -1,0 +1,291 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-performance
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Performance Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Performance configuration
+  cdn-performance.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-performance
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Performance Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      performance-optimization.conf: |
+        # CDN performance optimization for MS5.0 Dashboard
+        
+        # Image optimization
+        location ~* \.(png|jpg|jpeg|gif|svg|webp|avif)$ {
+            # Enable image optimization
+            image_filter on;
+            image_filter_jpeg_quality 85;
+            image_filter_sharpen 0;
+            image_filter_buffer 1M;
+            
+            # Enable WebP conversion
+            location ~* \.(png|jpg|jpeg)$ {
+                add_header Vary "Accept";
+                try_files $uri$webp_suffix $uri =404;
+            }
+            
+            # Enable AVIF conversion
+            location ~* \.(png|jpg|jpeg)$ {
+                add_header Vary "Accept";
+                try_files $uri$avif_suffix $uri =404;
+            }
+        }
+        
+        # JavaScript optimization
+        location ~* \.js$ {
+            # Enable JavaScript minification
+            sub_filter ';' ';';
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types application/javascript;
+        }
+        
+        # CSS optimization
+        location ~* \.css$ {
+            # Enable CSS minification
+            sub_filter ';' ';';
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types text/css;
+        }
+        
+        # Font optimization
+        location ~* \.(woff|woff2|ttf|eot)$ {
+            # Enable font optimization
+            expires 1y;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, OPTIONS";
+            add_header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept";
+        }
+        
+        # HTML optimization
+        location ~* \.html$ {
+            # Enable HTML minification
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types text/html;
+        }
+  
+  # Azure CDN Performance monitoring
+  cdn-performance-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-performance-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Performance Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      performance-monitoring.json: |
+        {
+          "monitoring": {
+            "performance": "ms5-cdn-performance",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "ResponseTime",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average response time for CDN requests"
+              },
+              {
+                "name": "Throughput",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total throughput for CDN requests"
+              },
+              {
+                "name": "ErrorRate",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average error rate for CDN requests"
+              },
+              {
+                "name": "CacheHitRatio",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average cache hit ratio for CDN requests"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighResponseTime",
+                "condition": "response_time > 1000ms",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "CDN response time is above 1000ms"
+              },
+              {
+                "name": "LowThroughput",
+                "condition": "throughput < 100MB/s",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "CDN throughput is below 100MB/s"
+              },
+              {
+                "name": "HighErrorRate",
+                "condition": "error_rate > 5%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "CDN error rate is above 5%"
+              },
+              {
+                "name": "LowCacheHitRatio",
+                "condition": "cache_hit_ratio < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "CDN cache hit ratio is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Performance optimization
+  cdn-performance-optimization.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-performance-optimization
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Performance Optimization Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      performance-optimization.json: |
+        {
+          "optimization": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "optimizationSettings": {
+              "compressionEnabled": true,
+              "compressionTypes": [
+                "gzip",
+                "brotli"
+              ],
+              "imageOptimizationEnabled": true,
+              "imageFormats": [
+                "webp",
+                "avif"
+              ],
+              "minificationEnabled": true,
+              "minificationTypes": [
+                "javascript",
+                "css",
+                "html"
+              ],
+              "cachingEnabled": true,
+              "cacheDuration": "365.00:00:00",
+              "cacheBehavior": "Override"
+            },
+            "performanceRules": [
+              {
+                "name": "StaticAssetsOptimization",
+                "order": 1,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "BeginsWith",
+                      "values": ["/static/", "/assets/", "/images/", "/icons/"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "CacheExpiration",
+                    "parameters": {
+                      "cacheBehavior": "Override",
+                      "cacheDuration": "365.00:00:00"
+                    }
+                  },
+                  {
+                    "name": "CompressContent",
+                    "parameters": {
+                      "compressionEnabled": true,
+                      "contentTypes": [
+                        "application/javascript",
+                        "application/json",
+                        "text/css",
+                        "text/html",
+                        "text/javascript",
+                        "text/plain",
+                        "text/xml"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "APIRequestsOptimization",
+                "order": 2,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "BeginsWith",
+                      "values": ["/api/"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "CacheExpiration",
+                    "parameters": {
+                      "cacheBehavior": "Override",
+                      "cacheDuration": "00:05:00"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }

@@ -1,0 +1,100 @@
+name: MS5.0 AKS Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Target namespace'
+        required: true
+        default: 'ms5-production'
+      rollback_to:
+        description: 'Rollback to specific revision (leave empty for previous)'
+        required: false
+        default: ''
+      timeout:
+        description: 'Rollback timeout in seconds'
+        required: false
+        default: '600'
+      force_rollback:
+        description: 'Force rollback even if current deployment is healthy'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  # Azure Configuration
+  AKS_CLUSTER_NAME: ms5-aks-cluster
+  AKS_RESOURCE_GROUP: ms5-rg
+  DEFAULT_TIMEOUT: 600s
+
+jobs:
+  # Rollback Deployment
+  rollback-deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Azure CLI
+        uses: azure/setup-azcli@v1
+        with:
+          azcliversion: '2.50.0'
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
+          kubectl version --client
+
+      - name: Check Current Deployment Status
+        run: |
+          # Check current deployment status
+          kubectl get deployments -n ${{ github.event.inputs.namespace }}
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+          
+          # Check rollout history
+          kubectl rollout history deployment/ms5-backend -n ${{ github.event.inputs.namespace }}
+          kubectl rollout history deployment/ms5-frontend -n ${{ github.event.inputs.namespace }}
+
+      - name: Execute Rollback
+        run: |
+          # Execute rollback script
+          chmod +x ./scripts/rollback-deploy.sh
+          ./scripts/rollback-deploy.sh \
+            --namespace="${{ github.event.inputs.namespace }}" \
+            --rollback-to="${{ github.event.inputs.rollback_to }}" \
+            --timeout="${{ github.event.inputs.timeout }}" \
+            --force="${{ github.event.inputs.force_rollback }}"
+
+      - name: Verify Rollback
+        run: |
+          # Verify rollback was successful
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+          kubectl get services -n ${{ github.event.inputs.namespace }}
+          
+          # Run health checks
+          chmod +x ./scripts/test_smoke.sh
+          ./scripts/test_smoke.sh production
+
+      - name: Notify Rollback Success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          text: 'MS5.0 Floor Dashboard successfully rolled back in production!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+
+      - name: Notify Rollback Failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: failure
+          text: 'MS5.0 Floor Dashboard rollback in production failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}

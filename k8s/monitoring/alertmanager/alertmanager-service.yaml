@@ -1,0 +1,159 @@
+---
+# MS5.0 Floor Dashboard - AlertManager Services Configuration
+# Service and external access for AlertManager with load balancing
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    version: "v0.25.0"
+  annotations:
+    description: "AlertManager service for internal cluster access"
+    managed-by: "ms5-devops-team"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9093"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  - name: cluster
+    port: 9094
+    targetPort: 9094
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: alertmanager
+  # Session affinity for consistent connections
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600  # 1 hour
+---
+# Headless service for AlertManager cluster communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-headless
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    service-type: headless
+  annotations:
+    description: "Headless service for AlertManager cluster communication"
+    managed-by: "ms5-devops-team"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  - name: cluster
+    port: 9094
+    targetPort: 9094
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: alertmanager
+---
+# External service for AlertManager with load balancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-external
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    service-type: external
+  annotations:
+    description: "External service for AlertManager with load balancer"
+    managed-by: "ms5-devops-team"
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "monitoring-subnet"
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "ms5-production-rg"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: alertmanager
+  # Session affinity for consistent connections
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600  # 1 hour
+---
+# ServiceMonitor for AlertManager monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alertmanager-monitor
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+  annotations:
+    description: "ServiceMonitor for AlertManager monitoring"
+    managed-by: "ms5-devops-team"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: alertmanager
+  endpoints:
+  - port: web
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - monitoring
+---
+# PodMonitor for AlertManager pod monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: alertmanager-pods
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+  annotations:
+    description: "PodMonitor for AlertManager pod monitoring"
+    managed-by: "ms5-devops-team"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: alertmanager
+  podMetricsEndpoints:
+  - port: web
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - monitoring

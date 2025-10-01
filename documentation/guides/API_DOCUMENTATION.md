@@ -887,6 +887,567 @@ event = client.andon.create_event({
 Download the complete Postman collection for API testing:
 [MS5.0 API Collection](https://api.ms5.company.com/docs/postman-collection.json)
 
+## Comprehensive Examples
+
+### Complete Authentication Flow with Error Handling
+
+```javascript
+class MS5APIClient {
+  constructor(baseUrl, token = null) {
+    this.baseUrl = baseUrl;
+    this.token = token;
+    this.refreshToken = null;
+  }
+
+  async login(username, password) {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Login failed: ${error.message}`);
+      }
+
+      const data = await response.json();
+      this.token = data.access_token;
+      this.refreshToken = data.refresh_token;
+      
+      console.log(`Welcome ${data.user.first_name} ${data.user.last_name}!`);
+      return data;
+    } catch (error) {
+      console.error('Login error:', error.message);
+      throw error;
+    }
+  }
+
+  async refreshAccessToken() {
+    if (!this.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refresh_token: this.refreshToken })
+      });
+
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+      this.token = data.access_token;
+      return data;
+    } catch (error) {
+      console.error('Token refresh error:', error.message);
+      throw error;
+    }
+  }
+
+  async apiCall(endpoint, options = {}) {
+    const url = `${this.baseUrl}${endpoint}`;
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+        ...options.headers
+      },
+      ...options
+    };
+
+    try {
+      const response = await fetch(url, config);
+
+      if (response.status === 401) {
+        // Token expired, try to refresh
+        await this.refreshAccessToken();
+        config.headers['Authorization'] = `Bearer ${this.token}`;
+        const retryResponse = await fetch(url, config);
+        
+        if (!retryResponse.ok) {
+          throw new Error('Authentication failed after token refresh');
+        }
+        return await retryResponse.json();
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`API call failed for ${endpoint}:`, error.message);
+      throw error;
+    }
+  }
+}
+
+// Usage example
+const client = new MS5APIClient('https://api.ms5.company.com/api/v1');
+
+async function initializeClient() {
+  try {
+    await client.login('john.doe', 'securePassword123');
+    console.log('Client initialized successfully');
+  } catch (error) {
+    console.error('Client initialization failed:', error.message);
+  }
+}
+```
+
+### Production Line Management with Full CRUD Operations
+
+```javascript
+class ProductionLineManager {
+  constructor(apiClient) {
+    this.client = apiClient;
+  }
+
+  async getAllLines(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.offset) params.append('offset', filters.offset);
+
+      const endpoint = `/production/lines${params.toString() ? `?${params}` : ''}`;
+      const response = await this.client.apiCall(endpoint);
+      
+      console.log(`Retrieved ${response.total_count} production lines`);
+      return response;
+    } catch (error) {
+      console.error('Failed to get production lines:', error.message);
+      throw error;
+    }
+  }
+
+  async createLine(lineData) {
+    try {
+      const response = await this.client.apiCall('/production/lines', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: lineData.name,
+          line_code: lineData.line_code,
+          description: lineData.description || '',
+          capacity: lineData.capacity || 1000,
+          cycle_time: lineData.cycle_time || 2.5,
+          is_active: lineData.is_active !== false
+        })
+      });
+
+      console.log(`Created production line: ${response.name} (${response.line_code})`);
+      return response;
+    } catch (error) {
+      console.error('Failed to create production line:', error.message);
+      throw error;
+    }
+  }
+
+  async updateLine(lineId, updateData) {
+    try {
+      const response = await this.client.apiCall(`/production/lines/${lineId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData)
+      });
+
+      console.log(`Updated production line: ${response.name}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to update production line:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteLine(lineId) {
+    try {
+      await this.client.apiCall(`/production/lines/${lineId}`, {
+        method: 'DELETE'
+      });
+
+      console.log(`Deleted production line: ${lineId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete production line:', error.message);
+      throw error;
+    }
+  }
+
+  async getLineStatus(lineId) {
+    try {
+      const response = await this.client.apiCall(`/production/lines/${lineId}`);
+      console.log(`Line ${response.name} status: ${response.is_active ? 'Active' : 'Inactive'}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to get line status:', error.message);
+      throw error;
+    }
+  }
+}
+
+// Usage example
+const lineManager = new ProductionLineManager(client);
+
+async function manageProductionLines() {
+  try {
+    // Get all lines
+    const lines = await lineManager.getAllLines({ status: 'active' });
+    
+    // Create a new line
+    const newLine = await lineManager.createLine({
+      name: 'Production Line 2',
+      line_code: 'PL002',
+      description: 'Secondary production line for high-volume orders',
+      capacity: 1500,
+      cycle_time: 2.0
+    });
+
+    // Update the line
+    const updatedLine = await lineManager.updateLine(newLine.id, {
+      capacity: 1800,
+      description: 'Updated secondary production line with increased capacity'
+    });
+
+    // Get line status
+    const status = await lineManager.getLineStatus(updatedLine.id);
+    
+    console.log('Production line management completed successfully');
+  } catch (error) {
+    console.error('Production line management failed:', error.message);
+  }
+}
+```
+
+### Advanced OEE Analysis and Monitoring
+
+```javascript
+class OEEManager {
+  constructor(apiClient) {
+    this.client = apiClient;
+  }
+
+  async calculateOEE(lineId, equipmentCode, timePeriodHours = 24) {
+    try {
+      const response = await this.client.apiCall('/oee/calculate', {
+        method: 'POST',
+        body: JSON.stringify({
+          line_id: lineId,
+          equipment_code: equipmentCode,
+          time_period_hours: timePeriodHours
+        })
+      });
+
+      console.log(`OEE Analysis for ${equipmentCode}:`);
+      console.log(`  Overall OEE: ${response.oee.toFixed(2)}%`);
+      console.log(`  Availability: ${response.availability.toFixed(2)}%`);
+      console.log(`  Performance: ${response.performance.toFixed(2)}%`);
+      console.log(`  Quality: ${response.quality.toFixed(2)}%`);
+      console.log(`  Total Pieces: ${response.total_pieces}`);
+      console.log(`  Good Pieces: ${response.good_pieces}`);
+      console.log(`  Defective Pieces: ${response.defective_pieces}`);
+      console.log(`  Downtime: ${response.downtime.toFixed(2)} minutes`);
+
+      return response;
+    } catch (error) {
+      console.error('OEE calculation failed:', error.message);
+      throw error;
+    }
+  }
+
+  async getCurrentOEE(lineId) {
+    try {
+      const response = await this.client.apiCall(`/oee/lines/${lineId}/current`);
+      console.log(`Current OEE for line ${lineId}: ${response.oee.toFixed(2)}%`);
+      return response;
+    } catch (error) {
+      console.error('Failed to get current OEE:', error.message);
+      throw error;
+    }
+  }
+
+  async getOEEHistory(lineId, startDate, endDate, granularity = 'hour') {
+    try {
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        granularity: granularity
+      });
+
+      const response = await this.client.apiCall(`/oee/lines/${lineId}?${params}`);
+      console.log(`Retrieved ${response.data.length} OEE data points`);
+      return response;
+    } catch (error) {
+      console.error('Failed to get OEE history:', error.message);
+      throw error;
+    }
+  }
+
+  async analyzeOEETrends(lineId, days = 7) {
+    try {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - (days * 24 * 60 * 60 * 1000));
+      
+      const history = await this.getOEEHistory(
+        lineId,
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0],
+        'day'
+      );
+
+      // Calculate trends
+      const oeeValues = history.data.map(point => point.oee);
+      const avgOEE = oeeValues.reduce((sum, val) => sum + val, 0) / oeeValues.length;
+      const trend = oeeValues[oeeValues.length - 1] - oeeValues[0];
+      
+      console.log(`OEE Trend Analysis (${days} days):`);
+      console.log(`  Average OEE: ${avgOEE.toFixed(2)}%`);
+      console.log(`  Trend: ${trend > 0 ? '+' : ''}${trend.toFixed(2)}%`);
+      console.log(`  Best Day: ${Math.max(...oeeValues).toFixed(2)}%`);
+      console.log(`  Worst Day: ${Math.min(...oeeValues).toFixed(2)}%`);
+
+      return {
+        average: avgOEE,
+        trend: trend,
+        best: Math.max(...oeeValues),
+        worst: Math.min(...oeeValues),
+        data: history.data
+      };
+    } catch (error) {
+      console.error('OEE trend analysis failed:', error.message);
+      throw error;
+    }
+  }
+}
+
+// Usage example
+const oeeManager = new OEEManager(client);
+
+async function performOEEAnalysis() {
+  try {
+    const lineId = '123e4567-e89b-12d3-a456-426614174000';
+    const equipmentCode = 'EQ001';
+
+    // Calculate current OEE
+    const currentOEE = await oeeManager.calculateOEE(lineId, equipmentCode, 24);
+    
+    // Get current OEE
+    const realtimeOEE = await oeeManager.getCurrentOEE(lineId);
+    
+    // Analyze trends
+    const trends = await oeeManager.analyzeOEETrends(lineId, 7);
+    
+    console.log('OEE analysis completed successfully');
+  } catch (error) {
+    console.error('OEE analysis failed:', error.message);
+  }
+}
+```
+
+### Comprehensive Andon Event Management
+
+```javascript
+class AndonManager {
+  constructor(apiClient) {
+    this.client = apiClient;
+  }
+
+  async createEvent(eventData) {
+    try {
+      const response = await this.client.apiCall('/andon/events', {
+        method: 'POST',
+        body: JSON.stringify({
+          line_id: eventData.line_id,
+          equipment_code: eventData.equipment_code,
+          event_type: eventData.event_type,
+          priority: eventData.priority,
+          description: eventData.description,
+          reported_by: eventData.reported_by
+        })
+      });
+
+      console.log(`Created Andon event: ${response.id}`);
+      console.log(`Priority: ${response.priority}, Status: ${response.status}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to create Andon event:', error.message);
+      throw error;
+    }
+  }
+
+  async getEvents(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.line_id) params.append('line_id', filters.line_id);
+
+      const endpoint = `/andon/events${params.toString() ? `?${params}` : ''}`;
+      const response = await this.client.apiCall(endpoint);
+      
+      console.log(`Retrieved ${response.length} Andon events`);
+      return response;
+    } catch (error) {
+      console.error('Failed to get Andon events:', error.message);
+      throw error;
+    }
+  }
+
+  async acknowledgeEvent(eventId, notes = '') {
+    try {
+      const response = await this.client.apiCall(`/andon/events/${eventId}/acknowledge`, {
+        method: 'PUT',
+        body: JSON.stringify({ notes })
+      });
+
+      console.log(`Event ${eventId} acknowledged at: ${response.acknowledged_at}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to acknowledge event:', error.message);
+      throw error;
+    }
+  }
+
+  async resolveEvent(eventId, resolutionNotes, resolutionTime = null) {
+    try {
+      const response = await this.client.apiCall(`/andon/events/${eventId}/resolve`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          resolution_notes: resolutionNotes,
+          resolution_time: resolutionTime || new Date().toISOString()
+        })
+      });
+
+      console.log(`Event ${eventId} resolved at: ${response.resolved_at}`);
+      console.log(`Resolution: ${response.resolution_notes}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to resolve event:', error.message);
+      throw error;
+    }
+  }
+
+  async getEventMetrics(timeframe = '24h') {
+    try {
+      const events = await this.getEvents();
+      const now = new Date();
+      const cutoffTime = new Date(now.getTime() - this.getTimeframeMs(timeframe));
+      
+      const recentEvents = events.filter(event => 
+        new Date(event.created_at) >= cutoffTime
+      );
+
+      const metrics = {
+        total: recentEvents.length,
+        byPriority: {},
+        byStatus: {},
+        byType: {},
+        avgResolutionTime: 0
+      };
+
+      recentEvents.forEach(event => {
+        // Count by priority
+        metrics.byPriority[event.priority] = (metrics.byPriority[event.priority] || 0) + 1;
+        
+        // Count by status
+        metrics.byStatus[event.status] = (metrics.byStatus[event.status] || 0) + 1;
+        
+        // Count by type
+        metrics.byType[event.event_type] = (metrics.byType[event.event_type] || 0) + 1;
+        
+        // Calculate resolution time for resolved events
+        if (event.status === 'resolved' && event.resolved_at) {
+          const created = new Date(event.created_at);
+          const resolved = new Date(event.resolved_at);
+          const resolutionTime = (resolved - created) / (1000 * 60); // minutes
+          metrics.avgResolutionTime += resolutionTime;
+        }
+      });
+
+      if (metrics.byStatus.resolved > 0) {
+        metrics.avgResolutionTime = metrics.avgResolutionTime / metrics.byStatus.resolved;
+      }
+
+      console.log(`Andon Event Metrics (${timeframe}):`);
+      console.log(`  Total Events: ${metrics.total}`);
+      console.log(`  By Priority:`, metrics.byPriority);
+      console.log(`  By Status:`, metrics.byStatus);
+      console.log(`  By Type:`, metrics.byType);
+      console.log(`  Avg Resolution Time: ${metrics.avgResolutionTime.toFixed(2)} minutes`);
+
+      return metrics;
+    } catch (error) {
+      console.error('Failed to get event metrics:', error.message);
+      throw error;
+    }
+  }
+
+  getTimeframeMs(timeframe) {
+    const timeframes = {
+      '1h': 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
+    };
+    return timeframes[timeframe] || timeframes['24h'];
+  }
+}
+
+// Usage example
+const andonManager = new AndonManager(client);
+
+async function manageAndonEvents() {
+  try {
+    // Create a high-priority event
+    const event = await andonManager.createEvent({
+      line_id: '123e4567-e89b-12d3-a456-426614174000',
+      equipment_code: 'EQ001',
+      event_type: 'equipment_fault',
+      priority: 'high',
+      description: 'Critical sensor failure - immediate attention required',
+      reported_by: '456e7890-e89b-12d3-a456-426614174000'
+    });
+
+    // Get all open events
+    const openEvents = await andonManager.getEvents({ status: 'open' });
+    
+    // Acknowledge the event
+    const acknowledgedEvent = await andonManager.acknowledgeEvent(
+      event.id,
+      'Event acknowledged, maintenance team dispatched'
+    );
+
+    // Resolve the event
+    const resolvedEvent = await andonManager.resolveEvent(
+      event.id,
+      'Issue resolved by replacing faulty sensor. Equipment back online and functioning normally.'
+    );
+
+    // Get metrics
+    const metrics = await andonManager.getEventMetrics('24h');
+    
+    console.log('Andon event management completed successfully');
+  } catch (error) {
+    console.error('Andon event management failed:', error.message);
+  }
+}
+```
+
+## Support
+
+For API support and questions:
+- **Email**: api-support@ms5.company.com
+- **Documentation**: https://docs.ms5.company.com
+- **Status Page**: https://status.ms5.company.com
+
 ---
 
 *This API documentation is updated regularly. For the latest version, please check the API documentation endpoint.*

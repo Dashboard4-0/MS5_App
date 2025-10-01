@@ -1,0 +1,180 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-database-init-scripts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+data:
+  01-init-timescaledb.sql: |
+    -- Phase 3.2: Enhanced TimescaleDB Configuration
+    -- Initialize TimescaleDB extension with optimized settings
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+    
+    -- Configure TimescaleDB parameters for optimal performance
+    ALTER SYSTEM SET timescaledb.max_background_workers = 8;
+    ALTER SYSTEM SET timescaledb.license_key = 'timescale';
+    
+    -- Create replication user for read replicas
+    CREATE USER ms5_replication_user WITH REPLICATION PASSWORD 'ms5_replication_password';
+    GRANT CONNECT ON DATABASE factory_telemetry TO ms5_replication_user;
+    
+    -- Create database user for application
+    CREATE USER IF NOT EXISTS ms5_app_user WITH PASSWORD 'ms5_app_password';
+    GRANT CONNECT ON DATABASE factory_telemetry TO ms5_app_user;
+    GRANT USAGE ON SCHEMA public TO ms5_app_user;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ms5_app_user;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ms5_app_user;
+    
+    -- Create database user for read replicas
+    CREATE USER IF NOT EXISTS ms5_readonly_user WITH PASSWORD 'ms5_readonly_password';
+    GRANT CONNECT ON DATABASE factory_telemetry TO ms5_readonly_user;
+    GRANT USAGE ON SCHEMA public TO ms5_readonly_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO ms5_readonly_user;
+    
+    -- Create database user for monitoring
+    CREATE USER IF NOT EXISTS ms5_monitoring_user WITH PASSWORD 'ms5_monitoring_password';
+    GRANT CONNECT ON DATABASE factory_telemetry TO ms5_monitoring_user;
+    GRANT USAGE ON SCHEMA public TO ms5_monitoring_user;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO ms5_monitoring_user;
+    
+    -- Create hypertables for time-series data (will be populated from migration files)
+    -- metric_hist table will be converted to hypertable
+    -- production_metrics table will be converted to hypertable
+    -- oee_calculations table will be converted to hypertable
+    
+    -- Set up continuous aggregates for OEE calculations
+    CREATE MATERIALIZED VIEW IF NOT EXISTS oee_hourly_aggregate
+    WITH (timescaledb.continuous) AS
+    SELECT 
+        time_bucket('1 hour', calculation_time) AS hour,
+        line_id,
+        equipment_code,
+        AVG(availability) AS avg_availability,
+        AVG(performance) AS avg_performance,
+        AVG(quality) AS avg_quality,
+        AVG(oee) AS avg_oee,
+        SUM(good_parts) AS total_good_parts,
+        SUM(total_parts) AS total_parts
+    FROM factory_telemetry.oee_calculations
+    GROUP BY hour, line_id, equipment_code;
+    
+    -- Set up data retention policies
+    SELECT add_retention_policy('factory_telemetry.metric_hist', INTERVAL '90 days', if_not_exists => TRUE);
+    SELECT add_retention_policy('factory_telemetry.oee_calculations', INTERVAL '1 year', if_not_exists => TRUE);
+    
+    -- Set up compression policies
+    SELECT add_compression_policy('factory_telemetry.metric_hist', INTERVAL '7 days', if_not_exists => TRUE);
+    SELECT add_compression_policy('factory_telemetry.oee_calculations', INTERVAL '30 days', if_not_exists => TRUE);
+    
+    -- Create indexes for better performance
+    CREATE INDEX IF NOT EXISTS idx_metric_hist_timestamp_equipment 
+    ON factory_telemetry.metric_hist (ts DESC, metric_def_id);
+    
+    CREATE INDEX IF NOT EXISTS idx_oee_calculations_timestamp_equipment 
+    ON factory_telemetry.oee_calculations (calculation_time DESC, equipment_code);
+    
+    -- Create additional performance indexes
+    CREATE INDEX IF NOT EXISTS idx_metric_hist_equipment_timestamp 
+    ON factory_telemetry.metric_hist (metric_def_id, ts DESC);
+    
+    CREATE INDEX IF NOT EXISTS idx_oee_calculations_line_timestamp 
+    ON factory_telemetry.oee_calculations (line_id, calculation_time DESC);
+    
+    -- Configure WAL archiving for point-in-time recovery
+    ALTER SYSTEM SET wal_level = replica;
+    ALTER SYSTEM SET max_wal_senders = 10;
+    ALTER SYSTEM SET max_replication_slots = 10;
+    ALTER SYSTEM SET hot_standby = on;
+    ALTER SYSTEM SET archive_mode = on;
+    ALTER SYSTEM SET archive_command = 'test ! -f /wal-archive/%f && cp %p /wal-archive/%f';
+    
+    -- Reload configuration
+    SELECT pg_reload_conf();
+  
+  postgresql.conf: |
+    # PostgreSQL Configuration for MS5.0 Dashboard
+    
+    # Connection Settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    superuser_reserved_connections = 3
+    
+    # Memory Settings
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    work_mem = 4MB
+    
+    # Checkpoint Settings
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    
+    # Query Planner
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_rotation_age = 1d
+    log_rotation_size = 100MB
+    log_min_duration_statement = 1000
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_temp_files = 0
+    
+    # TimescaleDB Settings
+    shared_preload_libraries = 'timescaledb'
+    timescaledb.max_background_workers = 8
+    
+    # Replication Settings (for read replicas)
+    wal_level = replica
+    max_wal_senders = 10
+    max_replication_slots = 10
+    hot_standby = on
+    
+    # Performance Settings
+    synchronous_commit = on
+    fsync = on
+    full_page_writes = on
+    
+    # Autovacuum Settings
+    autovacuum = on
+    autovacuum_max_workers = 3
+    autovacuum_naptime = 1min
+    autovacuum_vacuum_threshold = 50
+    autovacuum_analyze_threshold = 50
+    autovacuum_vacuum_scale_factor = 0.1
+    autovacuum_analyze_scale_factor = 0.05
+    
+    # Background Writer
+    bgwriter_delay = 200ms
+    bgwriter_lru_maxpages = 100
+    bgwriter_lru_multiplier = 2.0
+    
+    # Lock Management
+    deadlock_timeout = 1s
+    lock_timeout = 0
+    
+    # Statement Timeout
+    statement_timeout = 0
+    idle_in_transaction_session_timeout = 0
+    
+    # Locale and Formatting
+    datestyle = 'iso, mdy'
+    timezone = 'UTC'
+    lc_messages = 'en_US.utf8'
+    lc_monetary = 'en_US.utf8'
+    lc_numeric = 'en_US.utf8'
+    lc_time = 'en_US.utf8'
+    default_text_search_config = 'pg_catalog.english'

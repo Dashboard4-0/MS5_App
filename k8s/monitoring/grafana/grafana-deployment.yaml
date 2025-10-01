@@ -1,0 +1,368 @@
+---
+# MS5.0 Floor Dashboard - Enhanced Grafana Deployment
+# Production-grade StatefulSet with persistent storage, high availability, and Azure AD integration
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data-pvc
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    storage-tier: premium
+  annotations:
+    description: "Persistent storage for Grafana data with high availability"
+    managed-by: "ms5-devops-team"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Increased storage for dashboards and data
+  storageClassName: managed-premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    version: "10.0.0"
+  annotations:
+    description: "Enhanced Grafana StatefulSet with Azure AD integration and comprehensive dashboards"
+    managed-by: "ms5-devops-team"
+spec:
+  serviceName: grafana
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: grafana
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: grafana
+        environment: production
+        version: "10.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        fsGroup: 472
+        runAsUser: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: grafana
+          protocol: TCP
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: GF_SECURITY_ADMIN_PASSWORD
+        - name: GF_SECURITY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: GF_SECURITY_SECRET_KEY
+        - name: AZURE_AD_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: AZURE_AD_CLIENT_ID
+              optional: true
+        - name: AZURE_AD_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: AZURE_AD_CLIENT_SECRET
+              optional: true
+        - name: AZURE_AD_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: AZURE_AD_TENANT_ID
+              optional: true
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: AZURE_SUBSCRIPTION_ID
+              optional: true
+        - name: POSTGRES_MONITORING_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: POSTGRES_MONITORING_PASSWORD
+              optional: true
+        - name: AZURE_LOG_ANALYTICS_WORKSPACE_ID
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: AZURE_LOG_ANALYTICS_WORKSPACE_ID
+              optional: true
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        - name: GF_USERS_ALLOW_ORG_CREATE
+          value: "false"
+        - name: GF_USERS_AUTO_ASSIGN_ORG
+          value: "true"
+        - name: GF_USERS_AUTO_ASSIGN_ORG_ROLE
+          value: "Viewer"
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel,grafana-azure-monitor-datasource,grafana-azure-log-analytics-datasource,grafana-azure-data-explorer-datasource,grafana-azure-resource-manager-datasource"
+        - name: GF_SECURITY_DISABLE_GRAVATAR
+          value: "true"
+        - name: GF_ANALYTICS_REPORTING_ENABLED
+          value: "false"
+        - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+          value: "false"
+        - name: GF_LOG_LEVEL
+          value: "info"
+        - name: GF_DATABASE_TYPE
+          value: "sqlite3"
+        - name: GF_DATABASE_PATH
+          value: "/var/lib/grafana/grafana.db"
+        - name: GF_SERVER_ROOT_URL
+          value: "https://grafana.ms5floor.com"
+        - name: GF_SERVER_ENABLE_GZIP
+          value: "true"
+        - name: GF_SERVER_CERT_FILE
+          value: "/etc/ssl/certs/grafana.crt"
+        - name: GF_SERVER_CERT_KEY
+          value: "/etc/ssl/private/grafana.key"
+        - name: GF_SESSION_PROVIDER
+          value: "memory"
+        - name: GF_SESSION_COOKIE_SECURE
+          value: "true"
+        - name: GF_SESSION_COOKIE_SAMESITE
+          value: "strict"
+        - name: GF_SECURITY_COOKIE_SECURE
+          value: "true"
+        - name: GF_SECURITY_COOKIE_SAMESITE
+          value: "strict"
+        - name: GF_SECURITY_STRICT_TRANSPORT_SECURITY
+          value: "true"
+        - name: GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS
+          value: "86400"
+        - name: GF_SECURITY_STRICT_TRANSPORT_SECURITY_PRELOAD
+          value: "true"
+        - name: GF_SECURITY_STRICT_TRANSPORT_SECURITY_SUBDOMAINS
+          value: "true"
+        - name: GF_SECURITY_X_CONTENT_TYPE_OPTIONS
+          value: "true"
+        - name: GF_SECURITY_X_XSS_PROTECTION
+          value: "true"
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "false"
+        - name: GF_AUTH_BASIC_ENABLED
+          value: "true"
+        - name: GF_AUTH_AZUREAD_ENABLED
+          value: "true"
+        - name: GF_AUTH_AZUREAD_ALLOW_SIGN_UP
+          value: "true"
+        - name: GF_AUTH_AZUREAD_ALLOWED_DOMAINS
+          value: "company.com"
+        - name: GF_AUTH_AZUREAD_ALLOWED_GROUPS
+          value: "MS5.0-Users,MS5.0-Admins,MS5.0-Operators"
+        - name: GF_ALERTING_ENABLED
+          value: "true"
+        - name: GF_ALERTING_EXECUTE_ALERTS
+          value: "true"
+        - name: GF_ALERTING_ERROR_OR_TIMEOUT
+          value: "alerting"
+        - name: GF_ALERTING_NODATA_OR_NULLVALUES
+          value: "no_data"
+        - name: GF_ALERTING_CONCURRENT_RENDER_LIMIT
+          value: "5"
+        - name: GF_ALERTING_EVALUATION_TIMEOUT_SECONDS
+          value: "30"
+        - name: GF_ALERTING_NOTIFICATION_TIMEOUT_SECONDS
+          value: "30"
+        - name: GF_ALERTING_MAX_ATTEMPTS
+          value: "3"
+        - name: GF_ALERTING_MIN_INTERVAL_SECONDS
+          value: "10"
+        - name: GF_UNIFIED_ALERTING_ENABLED
+          value: "true"
+        - name: GF_UNIFIED_ALERTING_EXECUTE_ALERTS
+          value: "true"
+        - name: GF_UNIFIED_ALERTING_EVALUATION_TIMEOUT
+          value: "30s"
+        - name: GF_UNIFIED_ALERTING_MAX_ATTEMPTS
+          value: "3"
+        - name: GF_UNIFIED_ALERTING_MIN_INTERVAL
+          value: "10s"
+        - name: GF_EXPLORE_ENABLED
+          value: "true"
+        - name: GF_HELP_ENABLED
+          value: "true"
+        - name: GF_PROFILE_ENABLED
+          value: "true"
+        - name: GF_QUERY_HISTORY_ENABLED
+          value: "true"
+        - name: GF_ANNOTATIONS_ENABLED
+          value: "true"
+        - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+          value: "grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel"
+        - name: GF_FEATURE_TOGGLES_ENABLE
+          value: "ngalert,panelTitleSearch,correlation,cloudWatchDynamicLabels,trimDefaults,enableDatasourceProxy,database_metrics,serviceAccount,alertingBacktesting,showDashboardValidationWarnings"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+            ephemeral-storage: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+            ephemeral-storage: "2Gi"
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        - name: grafana-config
+          mountPath: /etc/grafana/provisioning/datasources
+          readOnly: true
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+          readOnly: true
+        - name: grafana-ssl-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        - name: grafana-ssl-private
+          mountPath: /etc/ssl/private
+          readOnly: true
+        - name: grafana-tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 472
+          runAsGroup: 472
+          capabilities:
+            drop:
+            - ALL
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Gracefully shutting down Grafana..."
+                sleep 5
+      # Init container for data migration and validation
+      initContainers:
+      - name: grafana-init
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Initializing Grafana data directory..."
+          chown -R 472:472 /var/lib/grafana
+          chmod -R 755 /var/lib/grafana
+          echo "Grafana initialization complete"
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: grafana-data-pvc
+      - name: grafana-config
+        configMap:
+          name: grafana-config
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-dashboards
+      - name: grafana-ssl-certs
+        secret:
+          secretName: grafana-ssl-certs
+          optional: true
+      - name: grafana-ssl-private
+        secret:
+          secretName: grafana-ssl-private
+          optional: true
+      - name: grafana-tmp
+        emptyDir: {}
+      # Anti-affinity to ensure pods are distributed across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["ms5-dashboard"]
+                - key: component
+                  operator: In
+                  values: ["grafana"]
+              topologyKey: kubernetes.io/hostname
+      # Tolerations for node scheduling
+      tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      # Node selector for monitoring nodes
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/monitoring: "true"
+  # Volume claim templates for StatefulSet
+  volumeClaimTemplates:
+  - metadata:
+      name: grafana-data
+      labels:
+        app: ms5-dashboard
+        component: grafana
+        environment: production
+      annotations:
+        description: "Persistent storage for Grafana data and dashboards"
+        managed-by: "ms5-devops-team"
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi
+      storageClassName: managed-premium

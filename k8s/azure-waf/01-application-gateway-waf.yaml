@@ -1,0 +1,543 @@
+---
+# Azure Application Gateway WAF Configuration
+# Provides Web Application Firewall protection with OWASP rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-waf-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: waf
+    tier: security
+    environment: production
+  annotations:
+    description: "Azure Application Gateway WAF configuration for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # WAF Policy Configuration
+  waf-policy.json: |
+    {
+      "properties": {
+        "policySettings": {
+          "state": "Enabled",
+          "mode": "Prevention",
+          "requestBodyCheck": true,
+          "maxRequestBodySizeInKb": 128,
+          "fileUploadLimitInMb": 100
+        },
+        "managedRules": {
+          "managedRuleSets": [
+            {
+              "ruleSetType": "OWASP",
+              "ruleSetVersion": "3.2",
+              "ruleGroupOverrides": [
+                {
+                  "ruleGroupName": "REQUEST-920-PROTOCOL-ENFORCEMENT",
+                  "rules": [
+                    {
+                      "ruleId": "920300",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "920330",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-921-PROTOCOL-ATTACK",
+                  "rules": [
+                    {
+                      "ruleId": "921151",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-930-APPLICATION-ATTACK-LFI",
+                  "rules": [
+                    {
+                      "ruleId": "930100",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "930110",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-931-APPLICATION-ATTACK-RFI",
+                  "rules": [
+                    {
+                      "ruleId": "931100",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-932-APPLICATION-ATTACK-RCE",
+                  "rules": [
+                    {
+                      "ruleId": "932100",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "932110",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-933-APPLICATION-ATTACK-PHP",
+                  "rules": [
+                    {
+                      "ruleId": "933100",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-941-APPLICATION-ATTACK-XSS",
+                  "rules": [
+                    {
+                      "ruleId": "941100",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "941110",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "941130",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "941160",
+                      "state": "Enabled"
+                    }
+                  ]
+                },
+                {
+                  "ruleGroupName": "REQUEST-942-APPLICATION-ATTACK-SQLI",
+                  "rules": [
+                    {
+                      "ruleId": "942100",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942110",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942130",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942200",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942260",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942300",
+                      "state": "Enabled"
+                    },
+                    {
+                      "ruleId": "942370",
+                      "state": "Enabled"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "ruleSetType": "Microsoft_BotManagerRuleSet",
+              "ruleSetVersion": "0.1"
+            }
+          ]
+        },
+        "customRules": [
+          {
+            "name": "BlockMaliciousUserAgents",
+            "priority": 100,
+            "ruleType": "MatchRule",
+            "action": "Block",
+            "matchConditions": [
+              {
+                "matchVariables": [
+                  {
+                    "variableName": "RequestHeaders",
+                    "selector": "User-Agent"
+                  }
+                ],
+                "operator": "Contains",
+                "negationCondition": false,
+                "matchValues": [
+                  "sqlmap",
+                  "nikto",
+                  "nmap",
+                  "masscan",
+                  "zap",
+                  "burp"
+                ],
+                "transforms": [
+                  "Lowercase"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "RateLimitPerIP",
+            "priority": 200,
+            "ruleType": "RateLimitRule",
+            "action": "Block",
+            "rateLimitDurationInMinutes": 1,
+            "rateLimitThreshold": 100,
+            "matchConditions": [
+              {
+                "matchVariables": [
+                  {
+                    "variableName": "RemoteAddr"
+                  }
+                ],
+                "operator": "IPMatch",
+                "negationCondition": false,
+                "matchValues": [
+                  "0.0.0.0/0"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "BlockSuspiciousCountries",
+            "priority": 300,
+            "ruleType": "MatchRule",
+            "action": "Block",
+            "matchConditions": [
+              {
+                "matchVariables": [
+                  {
+                    "variableName": "RemoteAddr"
+                  }
+                ],
+                "operator": "GeoMatch",
+                "negationCondition": false,
+                "matchValues": [
+                  "CN",
+                  "RU",
+                  "KP",
+                  "IR"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "AllowFactoryNetworks",
+            "priority": 50,
+            "ruleType": "MatchRule",
+            "action": "Allow",
+            "matchConditions": [
+              {
+                "matchVariables": [
+                  {
+                    "variableName": "RemoteAddr"
+                  }
+                ],
+                "operator": "IPMatch",
+                "negationCondition": false,
+                "matchValues": [
+                  "10.0.0.0/8",
+                  "172.16.0.0/12",
+                  "192.168.0.0/16"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "BlockFileUploadAttacks",
+            "priority": 400,
+            "ruleType": "MatchRule",
+            "action": "Block",
+            "matchConditions": [
+              {
+                "matchVariables": [
+                  {
+                    "variableName": "RequestHeaders",
+                    "selector": "Content-Type"
+                  }
+                ],
+                "operator": "Contains",
+                "negationCondition": false,
+                "matchValues": [
+                  "application/x-msdownload",
+                  "application/x-executable",
+                  "application/x-msdos-program"
+                ],
+                "transforms": [
+                  "Lowercase"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  
+  # Application Gateway Configuration
+  app-gateway-config.json: |
+    {
+      "properties": {
+        "sku": {
+          "name": "WAF_v2",
+          "tier": "WAF_v2",
+          "capacity": 2
+        },
+        "gatewayIPConfigurations": [
+          {
+            "name": "appGatewayIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+              }
+            }
+          }
+        ],
+        "frontendIPConfigurations": [
+          {
+            "name": "appGwPublicFrontendIp",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/publicIPAddresses/ms5-appgw-public-ip"
+              }
+            }
+          }
+        ],
+        "frontendPorts": [
+          {
+            "name": "port_80",
+            "properties": {
+              "port": 80
+            }
+          },
+          {
+            "name": "port_443",
+            "properties": {
+              "port": 443
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "ms5-backend-pool",
+            "properties": {
+              "backendAddresses": [
+                {
+                  "fqdn": "ms5-backend.ms5-production.svc.cluster.local"
+                }
+              ]
+            }
+          },
+          {
+            "name": "ms5-frontend-pool",
+            "properties": {
+              "backendAddresses": [
+                {
+                  "fqdn": "ms5-frontend-service.ms5-frontend.svc.cluster.local"
+                }
+              ]
+            }
+          }
+        ],
+        "backendHttpSettingsCollection": [
+          {
+            "name": "ms5-backend-http-settings",
+            "properties": {
+              "port": 8000,
+              "protocol": "Http",
+              "cookieBasedAffinity": "Disabled",
+              "pickHostNameFromBackendAddress": false,
+              "requestTimeout": 60,
+              "probe": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/probes/ms5-backend-health-probe"
+              }
+            }
+          },
+          {
+            "name": "ms5-frontend-http-settings",
+            "properties": {
+              "port": 80,
+              "protocol": "Http",
+              "cookieBasedAffinity": "Disabled",
+              "pickHostNameFromBackendAddress": false,
+              "requestTimeout": 30,
+              "probe": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/probes/ms5-frontend-health-probe"
+              }
+            }
+          }
+        ],
+        "httpListeners": [
+          {
+            "name": "ms5-http-listener",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/frontendIPConfigurations/appGwPublicFrontendIp"
+              },
+              "frontendPort": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/frontendPorts/port_80"
+              },
+              "protocol": "Http",
+              "hostNames": [
+                "ms5floor.com",
+                "www.ms5floor.com",
+                "api.ms5floor.com"
+              ]
+            }
+          },
+          {
+            "name": "ms5-https-listener",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/frontendIPConfigurations/appGwPublicFrontendIp"
+              },
+              "frontendPort": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/frontendPorts/port_443"
+              },
+              "protocol": "Https",
+              "sslCertificate": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/sslCertificates/ms5-ssl-cert"
+              },
+              "hostNames": [
+                "ms5floor.com",
+                "www.ms5floor.com",
+                "api.ms5floor.com"
+              ]
+            }
+          }
+        ],
+        "requestRoutingRules": [
+          {
+            "name": "ms5-routing-rule-http",
+            "properties": {
+              "ruleType": "Basic",
+              "httpListener": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/httpListeners/ms5-http-listener"
+              },
+              "redirectConfiguration": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/redirectConfigurations/ms5-http-to-https-redirect"
+              }
+            }
+          },
+          {
+            "name": "ms5-routing-rule-https",
+            "properties": {
+              "ruleType": "PathBasedRouting",
+              "httpListener": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/httpListeners/ms5-https-listener"
+              },
+              "urlPathMap": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/urlPathMaps/ms5-path-map"
+              }
+            }
+          }
+        ],
+        "urlPathMaps": [
+          {
+            "name": "ms5-path-map",
+            "properties": {
+              "defaultBackendAddressPool": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/backendAddressPools/ms5-frontend-pool"
+              },
+              "defaultBackendHttpSettings": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/backendHttpSettingsCollection/ms5-frontend-http-settings"
+              },
+              "pathRules": [
+                {
+                  "name": "api-path-rule",
+                  "properties": {
+                    "paths": [
+                      "/api/*",
+                      "/v1/*",
+                      "/docs/*",
+                      "/openapi.json"
+                    ],
+                    "backendAddressPool": {
+                      "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/backendAddressPools/ms5-backend-pool"
+                    },
+                    "backendHttpSettings": {
+                      "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/backendHttpSettingsCollection/ms5-backend-http-settings"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "redirectConfigurations": [
+          {
+            "name": "ms5-http-to-https-redirect",
+            "properties": {
+              "redirectType": "Permanent",
+              "targetListener": {
+                "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/applicationGateways/ms5-app-gateway/httpListeners/ms5-https-listener"
+              },
+              "includePath": true,
+              "includeQueryString": true
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "ms5-backend-health-probe",
+            "properties": {
+              "protocol": "Http",
+              "host": "127.0.0.1",
+              "path": "/health",
+              "interval": 30,
+              "timeout": 30,
+              "unhealthyThreshold": 3,
+              "pickHostNameFromBackendHttpSettings": false,
+              "minServers": 0,
+              "match": {
+                "statusCodes": [
+                  "200-399"
+                ]
+              }
+            }
+          },
+          {
+            "name": "ms5-frontend-health-probe",
+            "properties": {
+              "protocol": "Http",
+              "host": "127.0.0.1",
+              "path": "/",
+              "interval": 30,
+              "timeout": 30,
+              "unhealthyThreshold": 3,
+              "pickHostNameFromBackendHttpSettings": false,
+              "minServers": 0,
+              "match": {
+                "statusCodes": [
+                  "200-399"
+                ]
+              }
+            }
+          }
+        ],
+        "webApplicationFirewallConfiguration": {
+          "enabled": true,
+          "firewallMode": "Prevention",
+          "ruleSetType": "OWASP",
+          "ruleSetVersion": "3.2",
+          "requestBodyCheck": true,
+          "maxRequestBodySizeInKb": 128,
+          "fileUploadLimitInMb": 100
+        }
+      }
+    }

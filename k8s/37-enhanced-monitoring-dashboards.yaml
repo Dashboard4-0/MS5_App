@@ -1,0 +1,1078 @@
+---
+# MS5.0 Floor Dashboard - Phase 6B: Enhanced Monitoring Dashboards
+# Comprehensive Grafana dashboards for all stakeholders
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-enhanced
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+data:
+  ms5-system-health.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 System Health Dashboard",
+        "tags": ["ms5", "system", "health"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster Health Score",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_cluster_health_score",
+                "legendFormat": "Health Score"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 90}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Node Resource Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_node_utilization_percent{resource_type=\"cpu\"}",
+                "legendFormat": "CPU - {{node_name}}"
+              },
+              {
+                "expr": "ms5_node_utilization_percent{resource_type=\"memory\"}",
+                "legendFormat": "Memory - {{node_name}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Percentage",
+                "max": 100,
+                "min": 0,
+                "unit": "percent"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Pod Restarts",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(ms5_pod_restarts_total[5m])",
+                "legendFormat": "{{namespace}}/{{pod_name}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "API Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(ms5_api_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P95 - {{endpoint}}"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(ms5_api_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P50 - {{endpoint}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Response Time",
+                "unit": "s"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Database Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_db_connections_active",
+                "legendFormat": "Active Connections - {{database}}"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(ms5_db_query_duration_seconds_bucket[5m]))",
+                "legendFormat": "Query P95 - {{table}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "WebSocket Connections",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_websocket_connections_active",
+                "legendFormat": "Active Connections"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 50},
+                    {"color": "red", "value": 100}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16}
+          },
+          {
+            "id": 7,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_system_memory_usage_bytes{component=\"backend\"} / 1024 / 1024",
+                "legendFormat": "Backend - {{pod_name}}"
+              },
+              {
+                "expr": "ms5_system_memory_usage_bytes{component=\"database\"} / 1024 / 1024",
+                "legendFormat": "Database - {{pod_name}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Memory Usage",
+                "unit": "MB"
+              }
+            ],
+            "gridPos": {"h": 4, "w": 12, "x": 6, "y": 16}
+          },
+          {
+            "id": 8,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_system_cpu_usage_percent{component=\"backend\"}",
+                "legendFormat": "Backend - {{pod_name}}"
+              },
+              {
+                "expr": "ms5_system_cpu_usage_percent{component=\"database\"}",
+                "legendFormat": "Database - {{pod_name}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "CPU Usage",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 4, "w": 12, "x": 18, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  ms5-production-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Production Dashboard",
+        "tags": ["ms5", "production", "oee"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Overall Equipment Effectiveness (OEE)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_production_oee * 100",
+                "legendFormat": "{{line_id}} - {{equipment_code}} ({{shift}})"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "OEE Percentage",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Production Throughput",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_production_throughput",
+                "legendFormat": "{{line_id}} - {{product_type}} ({{shift}})"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Units per Hour"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Production Efficiency",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(ms5_production_efficiency_percent)",
+                "legendFormat": "Average Efficiency"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 85}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Quality Defect Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_quality_defect_rate",
+                "legendFormat": "{{line_id}} - {{product_type}} ({{shift}})"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Defects per 1000 Units"
+              }
+            ],
+            "gridPos": {"h": 4, "w": 12, "x": 6, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Energy Consumption",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_energy_consumption_kwh",
+                "legendFormat": "{{equipment_code}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Energy Consumption",
+                "unit": "kWh"
+              }
+            ],
+            "gridPos": {"h": 4, "w": 12, "x": 18, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Active Andon Events",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ms5_andon_events_active",
+                "legendFormat": "{{line_id}} - {{priority}} - {{status}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12}
+          }
+        ],
+        "time": {
+          "from": "now-24h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  ms5-business-metrics.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Business Metrics Dashboard",
+        "tags": ["ms5", "business", "kpi"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Production KPIs Summary",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ms5_production_oee * 100",
+                "legendFormat": "OEE - {{line_id}}"
+              },
+              {
+                "expr": "ms5_production_efficiency_percent",
+                "legendFormat": "Efficiency - {{line_id}}"
+              },
+              {
+                "expr": "ms5_production_throughput",
+                "legendFormat": "Throughput - {{line_id}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Quality Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_quality_defect_rate",
+                "legendFormat": "Defect Rate - {{line_id}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Defects per 1000 Units"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Maintenance Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_maintenance_downtime_minutes",
+                "legendFormat": "{{equipment_code}} - {{maintenance_type}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Downtime Minutes"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Cost Analysis",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_resource_cost_usd",
+                "legendFormat": "{{resource_type}} - {{namespace}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Cost USD"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-7d",
+          "to": "now"
+        },
+        "refresh": "1m"
+      }
+    }
+  
+  ms5-executive-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Executive Dashboard",
+        "tags": ["ms5", "executive", "summary"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Overall System Health",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_cluster_health_score",
+                "legendFormat": "System Health"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 90}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Average OEE",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(ms5_production_oee) * 100",
+                "legendFormat": "Average OEE"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 85}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Production Efficiency",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(ms5_production_efficiency_percent)",
+                "legendFormat": "Production Efficiency"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 85}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Quality Performance",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(ms5_quality_defect_rate)",
+                "legendFormat": "Defect Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 5},
+                    {"color": "red", "value": 10}
+                  ]
+                },
+                "unit": "short"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0}
+          },
+          {
+            "id": 5,
+            "title": "Cost Optimization",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(ms5_resource_cost_usd)",
+                "legendFormat": "Total Cost"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 1000},
+                    {"color": "red", "value": 2000}
+                  ]
+                },
+                "unit": "currencyUSD"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 0, "y": 6}
+          },
+          {
+            "id": 6,
+            "title": "System Availability",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(up) * 100",
+                "legendFormat": "Availability"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 95},
+                    {"color": "green", "value": 99}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 6, "w": 6, "x": 6, "y": 6}
+          },
+          {
+            "id": 7,
+            "title": "Production Trends",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_production_oee * 100",
+                "legendFormat": "OEE - {{line_id}}"
+              },
+              {
+                "expr": "ms5_production_efficiency_percent",
+                "legendFormat": "Efficiency - {{line_id}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Percentage",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6}
+          },
+          {
+            "id": 8,
+            "title": "Cost Trends",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_resource_cost_usd",
+                "legendFormat": "{{resource_type}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Cost USD"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+          }
+        ],
+        "time": {
+          "from": "now-30d",
+          "to": "now"
+        },
+        "refresh": "5m"
+      }
+    }
+  
+  ms5-operations-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Operations Dashboard",
+        "tags": ["ms5", "operations", "technical"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(ms5_api_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P95 - {{endpoint}}"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(ms5_api_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P50 - {{endpoint}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Response Time",
+                "unit": "s"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "API Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(ms5_api_requests_total{status_code=~\"5..\"}[5m]) / rate(ms5_api_requests_total[5m]) * 100",
+                "legendFormat": "Error Rate - {{endpoint}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Error Rate",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Database Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_db_connections_active",
+                "legendFormat": "Active Connections - {{database}}"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(ms5_db_query_duration_seconds_bucket[5m]))",
+                "legendFormat": "Query P95 - {{table}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "WebSocket Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_websocket_connections_active",
+                "legendFormat": "Active Connections - {{namespace}}"
+              },
+              {
+                "expr": "rate(ms5_websocket_messages_total[5m])",
+                "legendFormat": "Messages/sec - {{message_type}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Resource Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_system_cpu_usage_percent",
+                "legendFormat": "CPU - {{component}}"
+              },
+              {
+                "expr": "ms5_system_memory_usage_bytes / 1024 / 1024",
+                "legendFormat": "Memory MB - {{component}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Pod Health",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "rate(ms5_pod_restarts_total[5m])",
+                "legendFormat": "{{namespace}}/{{pod_name}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  ms5-factory-floor-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Factory Floor Dashboard",
+        "tags": ["ms5", "factory", "floor"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Production Line Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ms5_production_oee * 100",
+                "legendFormat": "{{line_id}} - {{equipment_code}} ({{shift}})"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Equipment Health",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_production_oee * 100",
+                "legendFormat": "OEE - {{equipment_code}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "OEE Percentage",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Quality Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_quality_defect_rate",
+                "legendFormat": "{{line_id}} - {{product_type}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Defects per 1000 Units"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Maintenance Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ms5_maintenance_downtime_minutes",
+                "legendFormat": "{{equipment_code}} - {{maintenance_type}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Active Andon Events",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "ms5_andon_events_active",
+                "legendFormat": "{{line_id}} - {{priority}} - {{status}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-8h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  ms5-sli-slo-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 SLI/SLO Dashboard",
+        "tags": ["ms5", "sli", "slo"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Level Indicators",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_sli_value",
+                "legendFormat": "{{sli_name}} - {{service}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "SLI Value"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Service Level Objectives",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_slo_error_budget_percent",
+                "legendFormat": "Error Budget - {{slo_name}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Error Budget Percentage",
+                "unit": "percent",
+                "max": 100,
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "API Availability SLI",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_sli_value{sli_name=\"api_availability\"}",
+                "legendFormat": "API Availability"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 95},
+                    {"color": "green", "value": 99}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "API Latency SLI",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_sli_value{sli_name=\"api_latency\"}",
+                "legendFormat": "API Latency"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 0.1},
+                    {"color": "red", "value": 0.2}
+                  ]
+                },
+                "unit": "s"
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Production OEE SLI",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_sli_value{sli_name=\"production_oee\"}",
+                "legendFormat": "Production OEE"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 70},
+                    {"color": "green", "value": 85}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Andon Response Time SLI",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_sli_value{sli_name=\"andon_response_time\"}",
+                "legendFormat": "Andon Response Time"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 300},
+                    {"color": "red", "value": 600}
+                  ]
+                },
+                "unit": "s"
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-7d",
+          "to": "now"
+        },
+        "refresh": "1m"
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources-enhanced
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus.ms5-production.svc.cluster.local:9090
+      isDefault: true
+      editable: true
+      jsonData:
+        timeInterval: "30s"
+        queryTimeout: "60s"
+        httpMethod: "POST"
+    - name: Elasticsearch
+      type: elasticsearch
+      access: proxy
+      url: http://elasticsearch.logging.svc.cluster.local:9200
+      database: ms5-logs-*
+      jsonData:
+        index: ms5-logs-*
+        timeField: "@timestamp"
+        esVersion: "8.0.0"
+        maxConcurrentShardRequests: 5
+        interval: "Daily"
+        timeInterval: "30s"
+    - name: Jaeger
+      type: jaeger
+      access: proxy
+      url: http://jaeger-query.jaeger.svc.cluster.local:16686
+      editable: true
+      jsonData:
+        tracesToLogs:
+          datasourceUid: 'elasticsearch'
+          tags: ['job', 'instance', 'pod', 'namespace']
+          mappedTags: [{ key: 'service.name', value: 'service' }]
+          mapTagNamesEnabled: false
+          spanStartTimeShift: '-1h'
+          spanEndTimeShift: '1h'
+          filterByTraceID: false
+          filterBySpanID: false
+        tracesToMetrics:
+          datasourceUid: 'prometheus'
+          tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+          queries:
+            - name: 'Service request rate'
+              query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m]))'
+            - name: 'Service error rate'
+              query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags,status_code=~"5.."}[5m]))'
+        serviceMap:
+          datasourceUid: 'prometheus'
+        nodeGraph:
+          enabled: true

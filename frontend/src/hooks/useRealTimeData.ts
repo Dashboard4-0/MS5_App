@@ -1,312 +1,548 @@
 /**
- * MS5.0 Floor Dashboard - Real-time Data Hook
+ * MS5.0 Floor Dashboard - Real-Time Data Hook
  * 
- * This hook provides real-time data binding for production metrics,
- * OEE data, equipment status, and other live updates from the backend.
+ * This hook provides real-time data synchronization for factory operations with:
+ * - WebSocket integration for live updates
+ * - Data caching and offline support
+ * - Factory-specific optimizations
+ * - Tablet-specific performance tuning
+ * - Error handling and recovery
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
-import { 
-  updateOEEData, 
-  updateEquipmentStatus, 
-  updateDowntimeData,
-  updateProductionData 
-} from '../store/slices/dashboardSlice';
-import { 
-  addAndonEvent, 
-  updateAndonEvent, 
-  resolveAndonEvent 
-} from '../store/slices/andonSlice';
-import { 
-  updateJobStatus, 
-  addJobAssignment 
-} from '../store/slices/jobsSlice';
-import { EVENT_TYPES } from '../config/constants';
+import { useWebSocket, useFactoryWebSocket } from './useWebSocket';
 import { logger } from '../utils/logger';
-import useWebSocket from './useWebSocket';
 
-interface UseRealTimeDataOptions {
-  lineId?: string;
-  equipmentCode?: string;
-  enableOEE?: boolean;
-  enableEquipment?: boolean;
-  enableDowntime?: boolean;
-  enableProduction?: boolean;
-  enableAndon?: boolean;
-  enableJobs?: boolean;
-  autoSubscribe?: boolean;
+// Real-time data configuration
+interface RealTimeDataConfig {
+  url: string;
+  factoryNetwork?: boolean;
+  tabletOptimized?: boolean;
+  cacheEnabled?: boolean;
+  syncInterval?: number;
+  maxCacheSize?: number;
+  offlineSync?: boolean;
 }
 
+// Data types for factory operations
+interface ProductionData {
+  lineId: string;
+  status: 'running' | 'stopped' | 'maintenance' | 'error';
+  speed: number;
+  efficiency: number;
+  quality: number;
+  timestamp: number;
+}
+
+interface EquipmentData {
+  equipmentId: string;
+  status: 'operational' | 'warning' | 'fault' | 'maintenance';
+  temperature: number;
+  pressure: number;
+  vibration: number;
+  timestamp: number;
+}
+
+interface AndonData {
+  andonId: string;
+  status: 'normal' | 'warning' | 'fault' | 'escalated';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  timestamp: number;
+}
+
+interface OEEData {
+  lineId: string;
+  availability: number;
+  performance: number;
+  quality: number;
+  oee: number;
+  timestamp: number;
+}
+
+// Combined data interface
+interface FactoryData {
+  production: ProductionData[];
+  equipment: EquipmentData[];
+  andon: AndonData[];
+  oee: OEEData[];
+  lastUpdate: number;
+}
+
+// Hook return interface
 interface UseRealTimeDataReturn {
+  // Data state
+  data: FactoryData | null;
+  isLoading: boolean;
   isConnected: boolean;
-  isSubscribed: boolean;
-  lastUpdate: Date | null;
+  isOffline: boolean;
+  lastSync: number;
   error: string | null;
-  subscribe: () => void;
-  unsubscribe: () => void;
+  
+  // Statistics
+  messageCount: number;
+  errorCount: number;
+  cacheSize: number;
+  syncLatency: number;
+  
+  // Methods
   refresh: () => void;
+  clearCache: () => void;
+  forceSync: () => void;
+  getCachedData: (type: string) => any;
+  
+  // WebSocket integration
+  sendMessage: (type: string, data: any) => void;
+  subscribe: (type: string, callback: (data: any) => void) => void;
+  unsubscribe: (type: string) => void;
 }
 
-export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTimeDataReturn => {
-  const {
-    lineId,
-    equipmentCode,
-    enableOEE = true,
-    enableEquipment = true,
-    enableDowntime = true,
-    enableProduction = true,
-    enableAndon = true,
-    enableJobs = true,
-    autoSubscribe = true
-  } = options;
-
-  const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+/**
+ * Real-Time Data Hook
+ * 
+ * Provides real-time factory data synchronization
+ */
+export const useRealTimeData = (config: RealTimeDataConfig): UseRealTimeDataReturn => {
+  // State management
+  const [data, setData] = useState<FactoryData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastSync, setLastSync] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [cacheSize, setCacheSize] = useState(0);
+  const [syncLatency, setSyncLatency] = useState(0);
   
-  const subscriptionsRef = useRef<Set<string>>(new Set());
-  const { isConnected, subscribe: wsSubscribe, unsubscribe: wsUnsubscribe } = useWebSocket({
-    autoConnect: true,
-    onError: (error) => setError(error)
+  // Refs for data management
+  const dataCacheRef = useRef<Map<string, any>>(new Map());
+  const subscribersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
+  
+  // WebSocket integration
+  const webSocket = useFactoryWebSocket(config.url, {
+    onMessage: (message) => {
+      handleWebSocketMessage(message);
+    },
+    onConnect: () => {
+      setIsLoading(false);
+      setError(null);
+      requestInitialData();
+    },
+    onDisconnect: () => {
+      setError('Connection lost');
+    },
+    onError: (error) => {
+      setError('Connection error');
+      logger.error('WebSocket error in real-time data', { error });
+    }
   });
-
-  // Handle OEE updates
-  const handleOEEUpdate = useCallback((data: any) => {
+  
+  /**
+   * Handle WebSocket messages
+   */
+  const handleWebSocketMessage = useCallback((message: any) => {
+    const startTime = Date.now();
+    
     try {
-      dispatch(updateOEEData(data));
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('OEE data updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating OEE data', err);
-      setError('Failed to update OEE data');
-    }
-  }, [dispatch]);
-
-  // Handle equipment status updates
-  const handleEquipmentStatusUpdate = useCallback((data: any) => {
-    try {
-      dispatch(updateEquipmentStatus(data));
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('Equipment status updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating equipment status', err);
-      setError('Failed to update equipment status');
-    }
-  }, [dispatch]);
-
-  // Handle downtime events
-  const handleDowntimeEvent = useCallback((data: any) => {
-    try {
-      dispatch(updateDowntimeData(data));
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('Downtime data updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating downtime data', err);
-      setError('Failed to update downtime data');
-    }
-  }, [dispatch]);
-
-  // Handle production updates
-  const handleProductionUpdate = useCallback((data: any) => {
-    try {
-      dispatch(updateProductionData(data));
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('Production data updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating production data', err);
-      setError('Failed to update production data');
-    }
-  }, [dispatch]);
-
-  // Handle Andon events
-  const handleAndonEvent = useCallback((data: any) => {
-    try {
-      if (data.event_type === 'new') {
-        dispatch(addAndonEvent(data));
-      } else if (data.event_type === 'update') {
-        dispatch(updateAndonEvent(data));
-      } else if (data.event_type === 'resolve') {
-        dispatch(resolveAndonEvent(data.id));
+      switch (message.type) {
+        case 'production_update':
+          updateProductionData(message.data);
+          break;
+        case 'equipment_update':
+          updateEquipmentData(message.data);
+          break;
+        case 'andon_update':
+          updateAndonData(message.data);
+          break;
+        case 'oee_update':
+          updateOEEData(message.data);
+          break;
+        case 'factory_status':
+          updateFactoryStatus(message.data);
+          break;
+        case 'sync_complete':
+          handleSyncComplete(message.data);
+          break;
+        default:
+          logger.debug('Unknown message type', { type: message.type });
       }
       
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('Andon event updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating Andon event', err);
-      setError('Failed to update Andon event');
+      // Update sync latency
+      setSyncLatency(Date.now() - startTime);
+      setLastSync(Date.now());
+      
+    } catch (error) {
+      logger.error('Error handling WebSocket message', { error, message });
+      setError('Data processing error');
     }
-  }, [dispatch]);
-
-  // Handle job updates
-  const handleJobUpdate = useCallback((data: any) => {
-    try {
-      if (data.event_type === 'assigned') {
-        dispatch(addJobAssignment(data));
-      } else {
-        dispatch(updateJobStatus(data));
+  }, []);
+  
+  /**
+   * Update production data
+   */
+  const updateProductionData = useCallback((newData: ProductionData[]) => {
+    setData(prevData => {
+      if (!prevData) {
+        return {
+          production: newData,
+          equipment: [],
+          andon: [],
+          oee: [],
+          lastUpdate: Date.now()
+        };
       }
       
-      setLastUpdate(new Date());
-      setError(null);
-      logger.debug('Job data updated via real-time hook', data);
-    } catch (err) {
-      logger.error('Error updating job data', err);
-      setError('Failed to update job data');
+      return {
+        ...prevData,
+        production: newData,
+        lastUpdate: Date.now()
+      };
+    });
+    
+    // Cache the data
+    if (config.cacheEnabled) {
+      dataCacheRef.current.set('production', newData);
+      updateCacheSize();
     }
-  }, [dispatch]);
-
-  // Subscribe to real-time data
-  const subscribe = useCallback(() => {
-    if (!isConnected) {
-      logger.warn('Cannot subscribe to real-time data: WebSocket not connected');
-      return;
+    
+    // Notify subscribers
+    notifySubscribers('production', newData);
+  }, [config.cacheEnabled]);
+  
+  /**
+   * Update equipment data
+   */
+  const updateEquipmentData = useCallback((newData: EquipmentData[]) => {
+    setData(prevData => {
+      if (!prevData) {
+        return {
+          production: [],
+          equipment: newData,
+          andon: [],
+          oee: [],
+          lastUpdate: Date.now()
+        };
+      }
+      
+      return {
+        ...prevData,
+        equipment: newData,
+        lastUpdate: Date.now()
+      };
+    });
+    
+    // Cache the data
+    if (config.cacheEnabled) {
+      dataCacheRef.current.set('equipment', newData);
+      updateCacheSize();
     }
-
-    try {
-      // Subscribe to OEE updates
-      if (enableOEE) {
-        const oeeSubscriptionId = wsSubscribe(EVENT_TYPES.OEE_UPDATE, handleOEEUpdate);
-        subscriptionsRef.current.add(oeeSubscriptionId);
+    
+    // Notify subscribers
+    notifySubscribers('equipment', newData);
+  }, [config.cacheEnabled]);
+  
+  /**
+   * Update andon data
+   */
+  const updateAndonData = useCallback((newData: AndonData[]) => {
+    setData(prevData => {
+      if (!prevData) {
+        return {
+          production: [],
+          equipment: [],
+          andon: newData,
+          oee: [],
+          lastUpdate: Date.now()
+        };
       }
-
-      // Subscribe to equipment status updates
-      if (enableEquipment) {
-        const equipmentSubscriptionId = wsSubscribe(EVENT_TYPES.EQUIPMENT_STATUS_CHANGE, handleEquipmentStatusUpdate);
-        subscriptionsRef.current.add(equipmentSubscriptionId);
+      
+      return {
+        ...prevData,
+        andon: newData,
+        lastUpdate: Date.now()
+      };
+    });
+    
+    // Cache the data
+    if (config.cacheEnabled) {
+      dataCacheRef.current.set('andon', newData);
+      updateCacheSize();
+    }
+    
+    // Notify subscribers
+    notifySubscribers('andon', newData);
+  }, [config.cacheEnabled]);
+  
+  /**
+   * Update OEE data
+   */
+  const updateOEEData = useCallback((newData: OEEData[]) => {
+    setData(prevData => {
+      if (!prevData) {
+        return {
+          production: [],
+          equipment: [],
+          andon: [],
+          oee: newData,
+          lastUpdate: Date.now()
+        };
       }
-
-      // Subscribe to downtime events
-      if (enableDowntime) {
-        const downtimeSubscriptionId = wsSubscribe(EVENT_TYPES.DOWNTIME_EVENT, handleDowntimeEvent);
-        subscriptionsRef.current.add(downtimeSubscriptionId);
-      }
-
-      // Subscribe to production updates
-      if (enableProduction) {
-        const productionSubscriptionId = wsSubscribe(EVENT_TYPES.PRODUCTION_UPDATE, handleProductionUpdate);
-        subscriptionsRef.current.add(productionSubscriptionId);
-      }
-
-      // Subscribe to Andon events
-      if (enableAndon) {
-        const andonSubscriptionId = wsSubscribe(EVENT_TYPES.ANDON_ALERT, handleAndonEvent);
-        subscriptionsRef.current.add(andonSubscriptionId);
-      }
-
-      // Subscribe to job updates
-      if (enableJobs) {
-        const jobSubscriptionId = wsSubscribe(EVENT_TYPES.JOB_UPDATE, handleJobUpdate);
-        subscriptionsRef.current.add(jobSubscriptionId);
-      }
-
-      // Subscribe to line-specific updates if lineId provided
-      if (lineId) {
-        const lineSubscriptionId = wsSubscribe(EVENT_TYPES.LINE_STATUS_UPDATE, (data) => {
-          if (data.line_id === lineId) {
-            handleProductionUpdate(data);
-          }
-        });
-        subscriptionsRef.current.add(lineSubscriptionId);
-      }
-
-      // Subscribe to equipment-specific updates if equipmentCode provided
-      if (equipmentCode) {
-        const equipmentSubscriptionId = wsSubscribe(EVENT_TYPES.EQUIPMENT_STATUS_CHANGE, (data) => {
-          if (data.equipment_code === equipmentCode) {
-            handleEquipmentStatusUpdate(data);
-          }
-        });
-        subscriptionsRef.current.add(equipmentSubscriptionId);
-      }
-
-      setIsSubscribed(true);
-      setError(null);
-      logger.info('Subscribed to real-time data', { 
-        lineId, 
-        equipmentCode, 
-        subscriptions: Array.from(subscriptionsRef.current) 
+      
+      return {
+        ...prevData,
+        oee: newData,
+        lastUpdate: Date.now()
+      };
+    });
+    
+    // Cache the data
+    if (config.cacheEnabled) {
+      dataCacheRef.current.set('oee', newData);
+      updateCacheSize();
+    }
+    
+    // Notify subscribers
+    notifySubscribers('oee', newData);
+  }, [config.cacheEnabled]);
+  
+  /**
+   * Update factory status
+   */
+  const updateFactoryStatus = useCallback((status: any) => {
+    setData(prevData => ({
+      ...prevData,
+      lastUpdate: Date.now()
+    }));
+    
+    // Notify subscribers
+    notifySubscribers('status', status);
+  }, []);
+  
+  /**
+   * Handle sync complete
+   */
+  const handleSyncComplete = useCallback((syncData: any) => {
+    setLastSync(Date.now());
+    setError(null);
+    
+    logger.info('Real-time data sync complete', {
+      timestamp: Date.now(),
+      dataTypes: Object.keys(syncData)
+    });
+  }, []);
+  
+  /**
+   * Request initial data
+   */
+  const requestInitialData = useCallback(() => {
+    if (webSocket.isConnected) {
+      webSocket.send({
+        type: 'request_data',
+        data: {
+          types: ['production', 'equipment', 'andon', 'oee'],
+          timestamp: Date.now()
+        }
       });
-
-    } catch (err) {
-      logger.error('Failed to subscribe to real-time data', err);
-      setError('Failed to subscribe to real-time data');
     }
-  }, [
-    isConnected,
-    enableOEE,
-    enableEquipment,
-    enableDowntime,
-    enableProduction,
-    enableAndon,
-    enableJobs,
-    lineId,
-    equipmentCode,
-    wsSubscribe,
-    handleOEEUpdate,
-    handleEquipmentStatusUpdate,
-    handleDowntimeEvent,
-    handleProductionUpdate,
-    handleAndonEvent,
-    handleJobUpdate
-  ]);
-
-  // Unsubscribe from real-time data
-  const unsubscribe = useCallback(() => {
-    try {
-      subscriptionsRef.current.forEach((subscriptionId) => {
-        wsUnsubscribe(subscriptionId);
+  }, [webSocket]);
+  
+  /**
+   * Update cache size
+   */
+  const updateCacheSize = useCallback(() => {
+    const size = dataCacheRef.current.size;
+    setCacheSize(size);
+    
+    // Limit cache size
+    if (config.maxCacheSize && size > config.maxCacheSize) {
+      const keys = Array.from(dataCacheRef.current.keys());
+      const keysToDelete = keys.slice(0, size - config.maxCacheSize);
+      keysToDelete.forEach(key => dataCacheRef.current.delete(key));
+      setCacheSize(config.maxCacheSize);
+    }
+  }, [config.maxCacheSize]);
+  
+  /**
+   * Notify subscribers
+   */
+  const notifySubscribers = useCallback((type: string, data: any) => {
+    const subscribers = subscribersRef.current.get(type);
+    if (subscribers) {
+      subscribers.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          logger.error('Error in subscriber callback', { error, type });
+        }
       });
-      subscriptionsRef.current.clear();
-      
-      setIsSubscribed(false);
-      setError(null);
-      logger.info('Unsubscribed from real-time data');
-    } catch (err) {
-      logger.error('Failed to unsubscribe from real-time data', err);
-      setError('Failed to unsubscribe from real-time data');
     }
-  }, [wsUnsubscribe]);
-
-  // Refresh data (re-subscribe)
+  }, []);
+  
+  /**
+   * Refresh data
+   */
   const refresh = useCallback(() => {
-    unsubscribe();
-    setTimeout(() => {
-      subscribe();
-    }, 100);
-  }, [subscribe, unsubscribe]);
-
-  // Auto-subscribe when connected
-  useEffect(() => {
-    if (autoSubscribe && isConnected && !isSubscribed) {
-      subscribe();
+    setIsLoading(true);
+    requestInitialData();
+  }, [requestInitialData]);
+  
+  /**
+   * Clear cache
+   */
+  const clearCache = useCallback(() => {
+    dataCacheRef.current.clear();
+    setCacheSize(0);
+  }, []);
+  
+  /**
+   * Force sync
+   */
+  const forceSync = useCallback(() => {
+    if (webSocket.isConnected) {
+      webSocket.send({
+        type: 'force_sync',
+        data: {
+          timestamp: Date.now()
+        }
+      });
     }
-  }, [autoSubscribe, isConnected, isSubscribed, subscribe]);
-
+  }, [webSocket]);
+  
+  /**
+   * Get cached data
+   */
+  const getCachedData = useCallback((type: string): any => {
+    return dataCacheRef.current.get(type);
+  }, []);
+  
+  /**
+   * Send message
+   */
+  const sendMessage = useCallback((type: string, data: any) => {
+    if (webSocket.isConnected) {
+      webSocket.send({ type, data, timestamp: Date.now() });
+    }
+  }, [webSocket]);
+  
+  /**
+   * Subscribe to data updates
+   */
+  const subscribe = useCallback((type: string, callback: (data: any) => void) => {
+    if (!subscribersRef.current.has(type)) {
+      subscribersRef.current.set(type, new Set());
+    }
+    subscribersRef.current.get(type)!.add(callback);
+  }, []);
+  
+  /**
+   * Unsubscribe from data updates
+   */
+  const unsubscribe = useCallback((type: string) => {
+    subscribersRef.current.delete(type);
+  }, []);
+  
+  // Set up periodic sync
+  useEffect(() => {
+    if (config.syncInterval && config.syncInterval > 0) {
+      syncTimerRef.current = setInterval(() => {
+        if (webSocket.isConnected) {
+          forceSync();
+        }
+      }, config.syncInterval);
+    }
+    
+    return () => {
+      if (syncTimerRef.current) {
+        clearInterval(syncTimerRef.current);
+      }
+    };
+  }, [config.syncInterval, forceSync, webSocket.isConnected]);
+  
+  // Load cached data on mount
+  useEffect(() => {
+    if (config.cacheEnabled) {
+      const cachedData = {
+        production: dataCacheRef.current.get('production') || [],
+        equipment: dataCacheRef.current.get('equipment') || [],
+        andon: dataCacheRef.current.get('andon') || [],
+        oee: dataCacheRef.current.get('oee') || [],
+        lastUpdate: Date.now()
+      };
+      
+      setData(cachedData);
+      setIsLoading(false);
+    }
+  }, [config.cacheEnabled]);
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      unsubscribe();
+      if (syncTimerRef.current) {
+        clearInterval(syncTimerRef.current);
+      }
+      subscribersRef.current.clear();
     };
-  }, [unsubscribe]);
-
+  }, []);
+  
   return {
-    isConnected,
-    isSubscribed,
-    lastUpdate,
+    // Data state
+    data,
+    isLoading,
+    isConnected: webSocket.isConnected,
+    isOffline: webSocket.isOffline,
+    lastSync,
     error,
+    
+    // Statistics
+    messageCount: webSocket.messageCount,
+    errorCount: webSocket.errorCount,
+    cacheSize,
+    syncLatency,
+    
+    // Methods
+    refresh,
+    clearCache,
+    forceSync,
+    getCachedData,
+    
+    // WebSocket integration
+    sendMessage,
     subscribe,
-    unsubscribe,
-    refresh
+    unsubscribe
   };
+};
+
+/**
+ * Factory Real-Time Data Hook
+ * 
+ * Pre-configured for factory environment
+ */
+export const useFactoryRealTimeData = (url: string): UseRealTimeDataReturn => {
+  return useRealTimeData({
+    url,
+    factoryNetwork: true,
+    tabletOptimized: true,
+    cacheEnabled: true,
+    syncInterval: 30000,
+    maxCacheSize: 1000,
+    offlineSync: true
+  });
+};
+
+/**
+ * Tablet Real-Time Data Hook
+ * 
+ * Pre-configured for tablet deployment
+ */
+export const useTabletRealTimeData = (url: string): UseRealTimeDataReturn => {
+  return useRealTimeData({
+    url,
+    factoryNetwork: false,
+    tabletOptimized: true,
+    cacheEnabled: true,
+    syncInterval: 60000,
+    maxCacheSize: 500,
+    offlineSync: true
+  });
 };
 
 export default useRealTimeData;

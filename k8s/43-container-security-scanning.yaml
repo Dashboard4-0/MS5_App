@@ -1,0 +1,665 @@
+---
+# MS5.0 Floor Dashboard - Container Security Scanning
+# Phase 7B: Advanced Security & Compliance
+#
+# This manifest implements comprehensive container security scanning
+# with vulnerability management, compliance scanning, and runtime security.
+#
+# Security Architecture:
+# - ACR Vulnerability Scanning: Automated container image scanning
+# - Image Security Policies: Base image security requirements
+# - Runtime Security Monitoring: Container runtime security with Falco
+# - Compliance Scanning: CIS benchmark and regulatory compliance
+# - Vulnerability Management: Automated vulnerability remediation
+
+# Azure Container Registry Security Scanning Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acr-security-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  acr-scanning-policy.yaml: |
+    # Azure Container Registry Security Scanning Policy
+    # Comprehensive vulnerability scanning and compliance checking
+    
+    apiVersion: security.azure.com/v1
+    kind: SecurityPolicy
+    metadata:
+      name: ms5-acr-security-policy
+      namespace: ms5-production
+    spec:
+      # Vulnerability scanning configuration
+      vulnerabilityScanning:
+        enabled: true
+        scanOnPush: true
+        scanSchedule: "0 2 * * *"  # Daily at 2 AM
+        vulnerabilityThreshold: "medium"
+        autoFix: false
+        notificationChannels:
+          - "slack"
+          - "email"
+      
+      # Image security requirements
+      imageSecurity:
+        baseImageRequirements:
+          - name: "alpine"
+            minVersion: "3.18"
+            allowedVersions: ["3.18+", "3.19+"]
+          - name: "ubuntu"
+            minVersion: "22.04"
+            allowedVersions: ["22.04+"]
+          - name: "debian"
+            minVersion: "12"
+            allowedVersions: ["12+"]
+        
+        packageRequirements:
+          - name: "openssl"
+            minVersion: "3.0.0"
+            vulnerabilityThreshold: "medium"
+          - name: "glibc"
+            minVersion: "2.35"
+            vulnerabilityThreshold: "high"
+          - name: "curl"
+            minVersion: "8.0.0"
+            vulnerabilityThreshold: "medium"
+      
+      # License compliance checking
+      licenseCompliance:
+        enabled: true
+        allowedLicenses:
+          - "MIT"
+          - "Apache-2.0"
+          - "BSD-3-Clause"
+          - "ISC"
+          - "GPL-2.0"
+        blockedLicenses:
+          - "GPL-3.0"
+          - "AGPL-3.0"
+          - "Proprietary"
+        notificationThreshold: "blocked"
+      
+      # Malware scanning
+      malwareScanning:
+        enabled: true
+        scanOnPush: true
+        quarantineInfected: true
+        notificationChannels:
+          - "security-team"
+          - "slack"
+---
+# Container Image Security Policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: image-security-policies
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  image-security-rules.yaml: |
+    # Container Image Security Rules
+    # Enforces security requirements for all container images
+    
+    apiVersion: security.azure.com/v1
+    kind: ImageSecurityPolicy
+    metadata:
+      name: ms5-image-security-rules
+      namespace: ms5-production
+    spec:
+      # Base image security requirements
+      baseImageSecurity:
+        allowedBaseImages:
+          - "alpine:3.18"
+          - "alpine:3.19"
+          - "ubuntu:22.04"
+          - "debian:12"
+        blockedBaseImages:
+          - "alpine:3.16"
+          - "ubuntu:20.04"
+          - "debian:11"
+      
+      # Package vulnerability requirements
+      packageSecurity:
+        criticalVulnerabilities: 0
+        highVulnerabilities: 0
+        mediumVulnerabilities: 5
+        lowVulnerabilities: 10
+        vulnerabilityAgeThreshold: "30d"
+      
+      # Container configuration requirements
+      containerSecurity:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        privileged: false
+        capabilities:
+          drop: ["ALL"]
+          add: []
+      
+      # Resource requirements
+      resourceRequirements:
+        cpu:
+          request: "100m"
+          limit: "500m"
+        memory:
+          request: "128Mi"
+          limit: "512Mi"
+      
+      # Security scanning requirements
+      scanningRequirements:
+        vulnerabilityScan: true
+        malwareScan: true
+        licenseScan: true
+        complianceScan: true
+---
+# Runtime Security Monitoring with Falco
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: falco
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      serviceAccountName: falco
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: falco
+        image: falcosecurity/falco:latest
+        ports:
+        - containerPort: 8765
+          name: http
+        - containerPort: 8766
+          name: grpc
+        env:
+        - name: FALCO_GRPC_ENABLED
+          value: "true"
+        - name: FALCO_GRPC_BIND_ADDRESS
+          value: "0.0.0.0:8766"
+        - name: FALCO_GRPC_THREADS
+          value: "8"
+        - name: FALCO_HTTP_ENABLED
+          value: "true"
+        - name: FALCO_HTTP_BIND_ADDRESS
+          value: "0.0.0.0:8765"
+        - name: FALCO_HTTP_THREADS
+          value: "8"
+        - name: FALCO_K8S_AUDIT_ENDPOINT
+          value: "http://falco-audit-webhook:8080/audit"
+        volumeMounts:
+        - name: falco-config
+          mountPath: /etc/falco
+        - name: falco-rules
+          mountPath: /etc/falco/rules.d
+        - name: falco-plugins
+          mountPath: /usr/share/falco/plugins
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: var-log
+          mountPath: /host/var/log
+          readOnly: true
+        - name: var-run
+          mountPath: /host/var/run
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8765
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8765
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: falco-config
+        configMap:
+          name: falco-config
+      - name: falco-rules
+        configMap:
+          name: falco-rules
+      - name: falco-plugins
+        configMap:
+          name: falco-plugins
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: var-log
+        hostPath:
+          path: /var/log
+      - name: var-run
+        hostPath:
+          path: /var/run
+---
+# Falco Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  falco.yaml: |
+    # Falco Runtime Security Configuration
+    # Comprehensive runtime security monitoring
+    
+    # Rules file configuration
+    rules_file:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/rules.d
+    
+    # JSON output configuration
+    json_output: true
+    json_include_output_property: true
+    
+    # Logging configuration
+    log_level: info
+    log_stderr: true
+    log_syslog: false
+    log_file: /var/log/falco.log
+    
+    # Output configuration
+    stdout_output:
+      enabled: true
+    
+    file_output:
+      enabled: true
+      keep_alive: false
+      filename: /var/log/falco-events.log
+    
+    # HTTP output for webhook notifications
+    http_output:
+      enabled: true
+      url: "http://falco-webhook:8080/webhook"
+      user_agent: "falco"
+      timeout: 2000
+      method: "POST"
+    
+    # gRPC output for real-time streaming
+    grpc_output:
+      enabled: true
+      bind_address: "0.0.0.0:8766"
+      threadiness: 8
+    
+    # Kubernetes configuration
+    k8s_audit_endpoint: "http://falco-audit-webhook:8080/audit"
+    k8s_audit_webhook_enabled: true
+    
+    # Security configuration
+    security:
+      enabled: true
+      enforce_on_start: true
+      run_as_root: false
+      run_as_user: 1000
+      run_as_group: 1000
+---
+# Falco Security Rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-rules
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  ms5-security-rules.yaml: |
+    # MS5.0 Custom Security Rules
+    # Manufacturing-specific security monitoring rules
+    
+    # Privilege escalation detection
+    - rule: Privilege Escalation Attempt
+      desc: Detect privilege escalation attempts
+      condition: >
+        spawned_process and
+        (proc.name in (sudo, su, pkexec, gksu, gksudo) or
+         proc.name in (sudo, su, pkexec, gksu, gksudo) or
+         proc.name in (sudo, su, pkexec, gksu, gksudo))
+      output: >
+        Privilege escalation attempt detected
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [privilege_escalation, security]
+    
+    # Container escape detection
+    - rule: Container Escape Attempt
+      desc: Detect container escape attempts
+      condition: >
+        spawned_process and
+        (proc.name in (docker, kubectl, crictl, containerd) or
+         proc.cmdline contains "docker" or
+         proc.cmdline contains "kubectl" or
+         proc.cmdline contains "crictl")
+      output: >
+        Container escape attempt detected
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [container_escape, security]
+    
+    # Suspicious network activity
+    - rule: Suspicious Network Activity
+      desc: Detect suspicious network connections
+      condition: >
+        outbound and
+        (fd.sockfamily = ip and
+         (fd.net != "127.0.0.0/8" and
+          fd.net != "10.0.0.0/8" and
+          fd.net != "172.16.0.0/12" and
+          fd.net != "192.168.0.0/16"))
+      output: >
+        Suspicious network connection detected
+        (user=%user.name connection=%fd.name container=%container.name)
+      priority: WARNING
+      tags: [network, security]
+    
+    # File system tampering
+    - rule: File System Tampering
+      desc: Detect file system tampering attempts
+      condition: >
+        (open_write and
+         (fd.name contains "/etc/" or
+          fd.name contains "/usr/bin/" or
+          fd.name contains "/usr/sbin/" or
+          fd.name contains "/bin/" or
+          fd.name contains "/sbin/"))
+      output: >
+        File system tampering detected
+        (user=%user.name file=%fd.name container=%container.name)
+      priority: CRITICAL
+      tags: [file_system, security]
+    
+    # Process injection detection
+    - rule: Process Injection Attempt
+      desc: Detect process injection attempts
+      condition: >
+        spawned_process and
+        (proc.name in (ptrace, gdb, strace, ltrace) or
+         proc.cmdline contains "ptrace" or
+         proc.cmdline contains "gdb")
+      output: >
+        Process injection attempt detected
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [process_injection, security]
+    
+    # Manufacturing system specific rules
+    - rule: PLC Communication Tampering
+      desc: Detect unauthorized PLC communication
+      condition: >
+        spawned_process and
+        (proc.name in (modbus, opcua, ethernetip) or
+         proc.cmdline contains "modbus" or
+         proc.cmdline contains "opcua")
+      output: >
+        Unauthorized PLC communication detected
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [plc, manufacturing, security]
+    
+    # Database access monitoring
+    - rule: Unauthorized Database Access
+      desc: Detect unauthorized database access
+      condition: >
+        spawned_process and
+        (proc.name in (psql, mysql, mongo, redis-cli) or
+         proc.cmdline contains "psql" or
+         proc.cmdline contains "mysql")
+      output: >
+        Unauthorized database access detected
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: WARNING
+      tags: [database, security]
+---
+# Falco Plugins Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-plugins
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  plugins.yaml: |
+    # Falco Plugins Configuration
+    # Additional security monitoring plugins
+    
+    plugins:
+      - name: k8saudit
+        library_path: libk8saudit.so
+        init_config:
+          ""
+        open_params: ""
+      - name: json
+        library_path: libjson.so
+        init_config:
+          ""
+        open_params: ""
+---
+# Falco Service Account and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["security.azure.com"]
+  resources: ["securitypolicies"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+subjects:
+- kind: ServiceAccount
+  name: falco
+  namespace: ms5-production
+roleRef:
+  kind: ClusterRole
+  name: falco
+  apiGroup: rbac.authorization.k8s.io
+---
+# Falco Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: falco
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  selector:
+    app: falco
+  ports:
+  - name: http
+    port: 8765
+    targetPort: 8765
+    protocol: TCP
+  - name: grpc
+    port: 8766
+    targetPort: 8766
+    protocol: TCP
+---
+# Container Security Monitoring Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: container-security-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  container-security-alerts.yaml: |
+    # Container Security Monitoring Alerts
+    # Comprehensive security monitoring for containerized workloads
+    
+    groups:
+    - name: container-security-monitoring
+      rules:
+      - alert: ContainerVulnerabilityDetected
+        expr: container_vulnerability_count{severity="critical"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Critical container vulnerability detected"
+          description: "Critical vulnerability {{ $labels.cve_id }} detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerMalwareDetected
+        expr: container_malware_detected == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Malware detected in container"
+          description: "Malware {{ $labels.malware_name }} detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerLicenseViolation
+        expr: container_license_violation == 1
+        for: 0m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "License violation detected"
+          description: "License violation {{ $labels.license_name }} detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerRuntimeSecurityViolation
+        expr: increase(falco_events_total{priority="CRITICAL"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Container runtime security violation"
+          description: "Critical security violation detected in container {{ $labels.container_name }}: {{ $labels.rule_name }}"
+      
+      - alert: ContainerPrivilegeEscalation
+        expr: increase(falco_events_total{rule="Privilege Escalation Attempt"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Container privilege escalation attempt"
+          description: "Privilege escalation attempt detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerEscapeAttempt
+        expr: increase(falco_events_total{rule="Container Escape Attempt"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Container escape attempt"
+          description: "Container escape attempt detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerFileSystemTampering
+        expr: increase(falco_events_total{rule="File System Tampering"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Container file system tampering"
+          description: "File system tampering detected in container {{ $labels.container_name }}"
+      
+      - alert: ContainerProcessInjection
+        expr: increase(falco_events_total{rule="Process Injection Attempt"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Container process injection attempt"
+          description: "Process injection attempt detected in container {{ $labels.container_name }}"

@@ -1,0 +1,458 @@
+---
+# MS5.0 Floor Dashboard - Phase 6B: Jaeger Distributed Tracing
+# Comprehensive distributed tracing implementation for AKS deployment
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jaeger
+  labels:
+    name: jaeger
+    app: ms5-dashboard
+    component: tracing
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+data:
+  jaeger.yaml: |
+    collector:
+      grpc:
+        host_port: ":14250"
+      http:
+        host_port: ":14268"
+      zipkin:
+        host_port: ":9411"
+    query:
+      base_path: "/jaeger"
+    agent:
+      grpc:
+        host_port: ":14250"
+      http:
+        host_port: ":14268"
+      zipkin:
+        host_port: ":9411"
+    storage:
+      type: elasticsearch
+      elasticsearch:
+        server_urls: http://elasticsearch.monitoring.svc.cluster.local:9200
+        index_prefix: jaeger
+        username: ""
+        password: ""
+        max_span_age: 168h
+        max_num_spans: 50000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-collector
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: tracing
+      service: jaeger-collector
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: tracing
+        service: jaeger-collector
+    spec:
+      containers:
+      - name: jaeger-collector
+        image: jaegertracing/jaeger-collector:1.47
+        ports:
+        - containerPort: 14250
+          name: grpc
+        - containerPort: 14268
+          name: http
+        - containerPort: 9411
+          name: zipkin
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: "elasticsearch"
+        - name: ES_SERVER_URLS
+          value: "http://elasticsearch.monitoring.svc.cluster.local:9200"
+        - name: ES_INDEX_PREFIX
+          value: "jaeger"
+        - name: ES_MAX_SPAN_AGE
+          value: "168h"
+        - name: ES_MAX_NUM_SPANS
+          value: "50000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: jaeger-config
+          mountPath: /etc/jaeger
+      volumes:
+      - name: jaeger-config
+        configMap:
+          name: jaeger-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-dashboard
+                - key: component
+                  operator: In
+                  values:
+                  - tracing
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-collector
+spec:
+  ports:
+  - port: 14250
+    targetPort: 14250
+    protocol: TCP
+    name: grpc
+  - port: 14268
+    targetPort: 14268
+    protocol: TCP
+    name: http
+  - port: 9411
+    targetPort: 9411
+    protocol: TCP
+    name: zipkin
+  selector:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-collector
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-query
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-query
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: tracing
+      service: jaeger-query
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: tracing
+        service: jaeger-query
+    spec:
+      containers:
+      - name: jaeger-query
+        image: jaegertracing/jaeger-query:1.47
+        ports:
+        - containerPort: 16686
+          name: http
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: "elasticsearch"
+        - name: ES_SERVER_URLS
+          value: "http://elasticsearch.monitoring.svc.cluster.local:9200"
+        - name: ES_INDEX_PREFIX
+          value: "jaeger"
+        - name: QUERY_BASE_PATH
+          value: "/jaeger"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 16686
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 16686
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: jaeger-config
+          mountPath: /etc/jaeger
+      volumes:
+      - name: jaeger-config
+        configMap:
+          name: jaeger-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-dashboard
+                - key: component
+                  operator: In
+                  values:
+                  - tracing
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-query
+spec:
+  ports:
+  - port: 16686
+    targetPort: 16686
+    protocol: TCP
+    name: http
+  selector:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-query
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-agent
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: tracing
+      service: jaeger-agent
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: tracing
+        service: jaeger-agent
+    spec:
+      containers:
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:1.47
+        ports:
+        - containerPort: 14250
+          name: grpc
+        - containerPort: 14268
+          name: http
+        - containerPort: 9411
+          name: zipkin
+        env:
+        - name: REPORTER_GRPC_HOST_PORT
+          value: "jaeger-collector.jaeger.svc.cluster.local:14250"
+        - name: AGENT_HTTP_BIND_PORT
+          value: "14268"
+        - name: AGENT_GRPC_BIND_PORT
+          value: "14250"
+        - name: AGENT_ZIPKIN_HTTP_PORT
+          value: "9411"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-agent
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-agent
+spec:
+  ports:
+  - port: 14250
+    targetPort: 14250
+    protocol: TCP
+    name: grpc
+  - port: 14268
+    targetPort: 14268
+    protocol: TCP
+    name: http
+  - port: 9411
+    targetPort: 9411
+    protocol: TCP
+    name: zipkin
+  selector:
+    app: ms5-dashboard
+    component: tracing
+    service: jaeger-agent
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-query-ingress
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - jaeger.ms5floor.com
+    secretName: jaeger-tls
+  rules:
+  - host: jaeger.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger-query
+            port:
+              number: 16686
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger-monitor
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: tracing
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: jaeger-alerts
+  namespace: jaeger
+  labels:
+    app: ms5-dashboard
+    component: tracing
+spec:
+  groups:
+  - name: jaeger.rules
+    rules:
+    - alert: JaegerCollectorDown
+      expr: up{job="jaeger-collector"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: jaeger
+      annotations:
+        summary: "Jaeger collector is down"
+        description: "Jaeger collector has been down for more than 5 minutes"
+    
+    - alert: JaegerQueryDown
+      expr: up{job="jaeger-query"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: jaeger
+      annotations:
+        summary: "Jaeger query service is down"
+        description: "Jaeger query service has been down for more than 5 minutes"
+    
+    - alert: JaegerHighMemoryUsage
+      expr: (container_memory_usage_bytes{name="jaeger-collector"} / container_spec_memory_limit_bytes{name="jaeger-collector"}) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: jaeger
+      annotations:
+        summary: "Jaeger collector high memory usage"
+        description: "Jaeger collector memory usage is above 80%"
+    
+    - alert: JaegerHighCPUUsage
+      expr: (rate(container_cpu_usage_seconds_total{name="jaeger-collector"}[5m]) / container_spec_cpu_quota{name="jaeger-collector"}) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: jaeger
+      annotations:
+        summary: "Jaeger collector high CPU usage"
+        description: "Jaeger collector CPU usage is above 80%"

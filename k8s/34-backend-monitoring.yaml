@@ -1,0 +1,519 @@
+---
+# MS5.0 Backend Services - Enhanced Monitoring Configuration
+# This manifest provides comprehensive monitoring for backend services including
+# Prometheus ServiceMonitor, SLI/SLO definitions, and custom metrics
+
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: ms5-backend-monitor
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: backend
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'ms5_.*'
+      action: keep
+    - sourceLabels: [__name__]
+      regex: 'http_.*'
+      action: keep
+    - sourceLabels: [__name__]
+      regex: 'celery_.*'
+      action: keep
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: ms5-celery-worker-monitor
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery-worker
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: celery-worker
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'celery_.*'
+      action: keep
+    - sourceLabels: [__name__]
+      regex: 'ms5_.*'
+      action: keep
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: ms5-flower-monitor
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: flower
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: flower
+  endpoints:
+  - port: flower
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+---
+# PrometheusRule for Backend Service Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ms5-backend-alerts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: ms5.backend
+    rules:
+    # Backend API Health Alerts
+    - alert: MS5BackendDown
+      expr: up{job="ms5-backend"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: backend
+      annotations:
+        summary: "MS5.0 Backend API is down"
+        description: "MS5.0 Backend API has been down for more than 1 minute"
+        runbook_url: "https://docs.ms5.com/runbooks/backend-down"
+    
+    - alert: MS5BackendHighErrorRate
+      expr: rate(http_requests_total{job="ms5-backend",status=~"5.."}[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        component: backend
+      annotations:
+        summary: "MS5.0 Backend API high error rate"
+        description: "MS5.0 Backend API error rate is {{ $value }} errors per second"
+        runbook_url: "https://docs.ms5.com/runbooks/high-error-rate"
+    
+    - alert: MS5BackendHighLatency
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ms5-backend"}[5m])) > 0.5
+      for: 3m
+      labels:
+        severity: warning
+        component: backend
+      annotations:
+        summary: "MS5.0 Backend API high latency"
+        description: "95th percentile latency is {{ $value }} seconds"
+        runbook_url: "https://docs.ms5.com/runbooks/high-latency"
+    
+    # Celery Worker Health Alerts
+    - alert: MS5CeleryWorkerDown
+      expr: up{job="ms5-celery-worker"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: celery-worker
+      annotations:
+        summary: "MS5.0 Celery Worker is down"
+        description: "MS5.0 Celery Worker has been down for more than 2 minutes"
+        runbook_url: "https://docs.ms5.com/runbooks/celery-worker-down"
+    
+    - alert: MS5CeleryTaskFailureRate
+      expr: rate(celery_tasks_failed_total[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        component: celery-worker
+      annotations:
+        summary: "MS5.0 Celery high task failure rate"
+        description: "Celery task failure rate is {{ $value }} failures per second"
+        runbook_url: "https://docs.ms5.com/runbooks/celery-task-failures"
+    
+    - alert: MS5CeleryQueueBacklog
+      expr: celery_queue_length > 100
+      for: 5m
+      labels:
+        severity: warning
+        component: celery-worker
+      annotations:
+        summary: "MS5.0 Celery queue backlog"
+        description: "Celery queue {{ $labels.queue }} has {{ $value }} pending tasks"
+        runbook_url: "https://docs.ms5.com/runbooks/celery-queue-backlog"
+    
+    # Database Connection Alerts
+    - alert: MS5DatabaseConnectionPoolHigh
+      expr: ms5_database_connections_active / ms5_database_connections_max > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: database
+      annotations:
+        summary: "MS5.0 Database connection pool high utilization"
+        description: "Database connection pool utilization is {{ $value | humanizePercentage }}"
+        runbook_url: "https://docs.ms5.com/runbooks/database-connection-pool"
+    
+    - alert: MS5DatabaseSlowQueries
+      expr: rate(ms5_database_slow_queries_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: database
+      annotations:
+        summary: "MS5.0 Database slow queries detected"
+        description: "Slow query rate is {{ $value }} queries per second"
+        runbook_url: "https://docs.ms5.com/runbooks/database-slow-queries"
+    
+    # Redis Cache Alerts
+    - alert: MS5RedisDown
+      expr: up{job="redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: redis
+      annotations:
+        summary: "MS5.0 Redis is down"
+        description: "MS5.0 Redis has been down for more than 1 minute"
+        runbook_url: "https://docs.ms5.com/runbooks/redis-down"
+    
+    - alert: MS5RedisHighMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: redis
+      annotations:
+        summary: "MS5.0 Redis high memory usage"
+        description: "Redis memory usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://docs.ms5.com/runbooks/redis-memory-usage"
+    
+    - alert: MS5RedisLowHitRate
+      expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.8
+      for: 10m
+      labels:
+        severity: warning
+        component: redis
+      annotations:
+        summary: "MS5.0 Redis low hit rate"
+        description: "Redis cache hit rate is {{ $value | humanizePercentage }}"
+        runbook_url: "https://docs.ms5.com/runbooks/redis-hit-rate"
+    
+    # Production Metrics Alerts
+    - alert: MS5ProductionLineDown
+      expr: ms5_production_line_status == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: production
+      annotations:
+        summary: "MS5.0 Production line down"
+        description: "Production line {{ $labels.line_id }} is down"
+        runbook_url: "https://docs.ms5.com/runbooks/production-line-down"
+    
+    - alert: MS5OEELow
+      expr: ms5_oee_score < 70
+      for: 15m
+      labels:
+        severity: warning
+        component: oee
+      annotations:
+        summary: "MS5.0 Low OEE score"
+        description: "OEE score for line {{ $labels.line_id }} is {{ $value }}%"
+        runbook_url: "https://docs.ms5.com/runbooks/low-oee"
+    
+    - alert: MS5HighDefectRate
+      expr: rate(ms5_defects_total[10m]) > 0.05
+      for: 10m
+      labels:
+        severity: warning
+        component: quality
+      annotations:
+        summary: "MS5.0 High defect rate"
+        description: "Defect rate is {{ $value }} defects per second"
+        runbook_url: "https://docs.ms5.com/runbooks/high-defect-rate"
+    
+    # Resource Utilization Alerts
+    - alert: MS5HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{container="backend"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        component: resources
+      annotations:
+        summary: "MS5.0 Backend high CPU usage"
+        description: "Backend CPU usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://docs.ms5.com/runbooks/high-cpu-usage"
+    
+    - alert: MS5HighMemoryUsage
+      expr: container_memory_usage_bytes{container="backend"} / container_spec_memory_limit_bytes{container="backend"} > 0.85
+      for: 10m
+      labels:
+        severity: warning
+        component: resources
+      annotations:
+        summary: "MS5.0 Backend high memory usage"
+        description: "Backend memory usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://docs.ms5.com/runbooks/high-memory-usage"
+    
+    # Business Metrics Alerts
+    - alert: MS5ProductionTargetMissed
+      expr: ms5_production_actual / ms5_production_target < 0.9
+      for: 30m
+      labels:
+        severity: warning
+        component: business
+      annotations:
+        summary: "MS5.0 Production target missed"
+        description: "Production is {{ $value | humanizePercentage }} of target"
+        runbook_url: "https://docs.ms5.com/runbooks/production-target-missed"
+    
+    - alert: MS5MaintenanceOverdue
+      expr: time() - ms5_last_maintenance_timestamp > 86400 * 7
+      for: 1h
+      labels:
+        severity: warning
+        component: maintenance
+      annotations:
+        summary: "MS5.0 Maintenance overdue"
+        description: "Equipment {{ $labels.equipment_id }} maintenance is overdue"
+        runbook_url: "https://docs.ms5.com/runbooks/maintenance-overdue"
+---
+# Grafana Dashboard ConfigMap for Backend Services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-backend-dashboard
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Backend Services Dashboard",
+        "tags": ["ms5", "backend", "production"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Response Time (seconds)",
+                "min": 0
+              }
+            ],
+            "xAxes": [
+              {
+                "label": "Time"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "API Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{job=\"ms5-backend\"}[5m])",
+                "legendFormat": "{{ method }} {{ status }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests per second",
+                "min": 0
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Celery Task Queue Length",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "celery_queue_length",
+                "legendFormat": "{{ queue }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Queue Length",
+                "min": 0
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Celery Task Success Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(celery_tasks_success_total[5m]) / rate(celery_tasks_total[5m]) * 100",
+                "legendFormat": "Success Rate"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Success Rate (%)",
+                "min": 0,
+                "max": 100
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Database Connection Pool",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_database_connections_active",
+                "legendFormat": "Active Connections"
+              },
+              {
+                "expr": "ms5_database_connections_max",
+                "legendFormat": "Max Connections"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Connections",
+                "min": 0
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Redis Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "redis_memory_used_bytes",
+                "legendFormat": "Used Memory"
+              },
+              {
+                "expr": "redis_memory_max_bytes",
+                "legendFormat": "Max Memory"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Memory (bytes)",
+                "min": 0
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+# Service Level Indicators (SLI) Definition
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-backend-sli-definitions
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+data:
+  sli-definitions.yaml: |
+    # MS5.0 Backend Services SLI Definitions
+    slis:
+      # API Availability SLI
+      api_availability:
+        name: "API Availability"
+        description: "Percentage of successful API requests"
+        query: "rate(http_requests_total{job=\"ms5-backend\",status!~\"5..\"}[5m]) / rate(http_requests_total{job=\"ms5-backend\"}[5m]) * 100"
+        target: 99.9
+        window: "5m"
+      
+      # API Latency SLI
+      api_latency:
+        name: "API Latency"
+        description: "95th percentile API response time"
+        query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))"
+        target: 0.2
+        window: "5m"
+      
+      # Celery Task Success Rate SLI
+      celery_success_rate:
+        name: "Celery Task Success Rate"
+        description: "Percentage of successful Celery tasks"
+        query: "rate(celery_tasks_success_total[5m]) / rate(celery_tasks_total[5m]) * 100"
+        target: 95.0
+        window: "5m"
+      
+      # Database Connection Pool SLI
+      database_connection_pool:
+        name: "Database Connection Pool Utilization"
+        description: "Database connection pool utilization percentage"
+        query: "ms5_database_connections_active / ms5_database_connections_max * 100"
+        target: 80.0
+        window: "5m"
+      
+      # Redis Hit Rate SLI
+      redis_hit_rate:
+        name: "Redis Cache Hit Rate"
+        description: "Redis cache hit rate percentage"
+        query: "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100"
+        target: 90.0
+        window: "5m"
+      
+      # Production Line Uptime SLI
+      production_uptime:
+        name: "Production Line Uptime"
+        description: "Percentage of time production lines are operational"
+        query: "avg_over_time(ms5_production_line_status[5m]) * 100"
+        target: 98.0
+        window: "5m"
+      
+      # OEE Performance SLI
+      oee_performance:
+        name: "OEE Performance"
+        description: "Average OEE score across all production lines"
+        query: "avg(ms5_oee_score)"
+        target: 75.0
+        window: "15m"

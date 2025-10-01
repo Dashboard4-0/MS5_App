@@ -1,0 +1,349 @@
+---
+# MS5.0 Floor Dashboard - Enhanced AlertManager Deployment
+# Production-grade StatefulSet with persistent storage, high availability, and Azure integration
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-data-pvc
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    storage-tier: premium
+  annotations:
+    description: "Persistent storage for AlertManager data with high availability"
+    managed-by: "ms5-devops-team"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi  # AlertManager data storage
+  storageClassName: managed-premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    version: "v0.25.0"
+  annotations:
+    description: "Enhanced AlertManager StatefulSet with Azure integration and intelligent alert routing"
+    managed-by: "ms5-devops-team"
+spec:
+  serviceName: alertmanager
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: alertmanager
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: alertmanager
+        environment: production
+        version: "v0.25.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: alertmanager
+      securityContext:
+        fsGroup: 65534
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.25.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9093
+          name: web
+          protocol: TCP
+        command:
+        - alertmanager
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        - --web.external-url=https://alertmanager.ms5floor.com
+        - --web.route-prefix=/
+        - --log.level=info
+        - --log.format=json
+        - --web.listen-address=:9093
+        - --cluster.listen-address=:9094
+        - --cluster.peer=alertmanager-0.alertmanager.monitoring.svc.cluster.local:9094
+        - --cluster.advertise-address=$(POD_IP):9094
+        - --web.external-url=https://alertmanager.ms5floor.com
+        - --web.route-prefix=/
+        - --web.get-concurrency=0
+        - --web.max-concurrency=0
+        - --web.timeout=0s
+        - --data.retention=120h
+        - --alerts.gc-interval=30m
+        - --web.external-url=https://alertmanager.ms5floor.com
+        - --web.route-prefix=/
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: SMTP_PASSWORD
+              optional: true
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: SLACK_WEBHOOK_URL
+              optional: true
+        - name: TEAMS_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: TEAMS_WEBHOOK_URL
+              optional: true
+        - name: PAGERDUTY_CRITICAL_SERVICE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: PAGERDUTY_CRITICAL_SERVICE_KEY
+              optional: true
+        - name: PAGERDUTY_HIGH_PRIORITY_SERVICE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: PAGERDUTY_HIGH_PRIORITY_SERVICE_KEY
+              optional: true
+        - name: WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: WEBHOOK_URL
+              optional: true
+        - name: WEBHOOK_BEARER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: WEBHOOK_BEARER_TOKEN
+              optional: true
+        - name: AZURE_COMM_SERVICES_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: AZURE_COMM_SERVICES_ENDPOINT
+              optional: true
+        - name: AZURE_COMM_SERVICES_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: AZURE_COMM_SERVICES_ACCESS_KEY
+              optional: true
+        - name: CRITICAL_ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: CRITICAL_ALERT_EMAIL
+              optional: true
+        - name: HIGH_PRIORITY_ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: HIGH_PRIORITY_ALERT_EMAIL
+              optional: true
+        - name: MEDIUM_PRIORITY_ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: MEDIUM_PRIORITY_ALERT_EMAIL
+              optional: true
+        - name: LOW_PRIORITY_ALERT_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: LOW_PRIORITY_ALERT_EMAIL
+              optional: true
+        - name: BACKEND_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: BACKEND_TEAM_EMAIL
+              optional: true
+        - name: DATABASE_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: DATABASE_TEAM_EMAIL
+              optional: true
+        - name: CACHE_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: CACHE_TEAM_EMAIL
+              optional: true
+        - name: CELERY_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: CELERY_TEAM_EMAIL
+              optional: true
+        - name: STORAGE_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: STORAGE_TEAM_EMAIL
+              optional: true
+        - name: PRODUCTION_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: PRODUCTION_TEAM_EMAIL
+              optional: true
+        - name: MAINTENANCE_TEAM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: alertmanager-secrets
+              key: MAINTENANCE_TEAM_EMAIL
+              optional: true
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+            ephemeral-storage: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "2Gi"
+        volumeMounts:
+        - name: alertmanager-data
+          mountPath: /alertmanager
+        - name: alertmanager-config
+          mountPath: /etc/alertmanager
+          readOnly: true
+        - name: alertmanager-tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          capabilities:
+            drop:
+            - ALL
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Gracefully shutting down AlertManager..."
+                sleep 5
+      # Init container for data migration and validation
+      initContainers:
+      - name: alertmanager-init
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Initializing AlertManager data directory..."
+          chown -R 65534:65534 /alertmanager
+          chmod -R 755 /alertmanager
+          echo "AlertManager initialization complete"
+        volumeMounts:
+        - name: alertmanager-data
+          mountPath: /alertmanager
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+      volumes:
+      - name: alertmanager-data
+        persistentVolumeClaim:
+          claimName: alertmanager-data-pvc
+      - name: alertmanager-config
+        configMap:
+          name: alertmanager-config
+      - name: alertmanager-tmp
+        emptyDir: {}
+      # Anti-affinity to ensure pods are distributed across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["ms5-dashboard"]
+                - key: component
+                  operator: In
+                  values: ["alertmanager"]
+              topologyKey: kubernetes.io/hostname
+      # Tolerations for node scheduling
+      tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      # Node selector for monitoring nodes
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/monitoring: "true"
+  # Volume claim templates for StatefulSet
+  volumeClaimTemplates:
+  - metadata:
+      name: alertmanager-data
+      labels:
+        app: ms5-dashboard
+        component: alertmanager
+        environment: production
+      annotations:
+        description: "Persistent storage for AlertManager data and configuration"
+        managed-by: "ms5-devops-team"
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: managed-premium

@@ -1,0 +1,284 @@
+# Deployment Quality Gates Configuration
+# Defines deployment validation rules and automated approval processes
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-quality-gates
+  namespace: ci-cd
+  labels:
+    app.kubernetes.io/name: deployment-quality-gates
+    app.kubernetes.io/part-of: ci-cd-pipeline
+    app.kubernetes.io/component: deployment-validation
+data:
+  deployment-gates.yaml: |
+    # Deployment Quality Gates Configuration
+    # Starship-grade deployment validation for zero-downtime operations
+    
+    deployment_gates:
+      # Health Check Gates
+      - name: "kubernetes-health-check"
+        description: "All Kubernetes resources must be healthy"
+        type: "kubernetes"
+        condition: "all_pods_ready"
+        timeout: "300s"
+        retry_count: 3
+        retry_interval: "30s"
+        severity: "critical"
+        
+      - name: "service-connectivity-check"
+        description: "All services must be accessible"
+        type: "connectivity"
+        condition: "all_services_responding"
+        timeout: "120s"
+        retry_count: 5
+        retry_interval: "10s"
+        severity: "critical"
+      
+      # Performance Gates
+      - name: "response-time-check"
+        description: "API response time must be under threshold"
+        type: "performance"
+        condition: "avg_response_time < 200ms"
+        timeout: "180s"
+        measurement_window: "60s"
+        severity: "high"
+        
+      - name: "throughput-check"
+        description: "API throughput must meet minimum requirements"
+        type: "performance"
+        condition: "requests_per_second >= 100"
+        timeout: "180s"
+        measurement_window: "60s"
+        severity: "high"
+        
+      - name: "error-rate-check"
+        description: "Error rate must be below threshold"
+        type: "performance"
+        condition: "error_rate < 1%"
+        timeout: "180s"
+        measurement_window: "60s"
+        severity: "critical"
+      
+      # Security Gates
+      - name: "container-security-scan"
+        description: "Container images must pass security scan"
+        type: "security_scan"
+        condition: "no_critical_vulnerabilities"
+        timeout: "600s"
+        severity: "critical"
+        
+      - name: "runtime-security-check"
+        description: "Runtime security policies must be enforced"
+        type: "security_policy"
+        condition: "all_policies_enforced"
+        timeout: "120s"
+        severity: "high"
+        
+      - name: "network-policy-validation"
+        description: "Network policies must be correctly applied"
+        type: "network_security"
+        condition: "network_policies_active"
+        timeout: "60s"
+        severity: "high"
+      
+      # Resource Gates
+      - name: "resource-utilization-check"
+        description: "Resource utilization must be within limits"
+        type: "resource_monitoring"
+        condition: "cpu_utilization < 80% AND memory_utilization < 85%"
+        timeout: "120s"
+        measurement_window: "60s"
+        severity: "medium"
+        
+      - name: "storage-capacity-check"
+        description: "Storage capacity must be sufficient"
+        type: "storage_monitoring"
+        condition: "storage_utilization < 80%"
+        timeout: "60s"
+        severity: "medium"
+      
+      # Business Logic Gates
+      - name: "database-migration-check"
+        description: "Database migrations must complete successfully"
+        type: "database"
+        condition: "migrations_successful"
+        timeout: "600s"
+        severity: "critical"
+        
+      - name: "data-integrity-check"
+        description: "Data integrity must be maintained"
+        type: "data_validation"
+        condition: "data_integrity_verified"
+        timeout: "300s"
+        severity: "critical"
+      
+      # Cost Impact Gates
+      - name: "cost-impact-analysis"
+        description: "Cost increase must be within acceptable limits"
+        type: "cost_analysis"
+        condition: "cost_increase < 15%"
+        timeout: "300s"
+        severity: "medium"
+        
+      - name: "resource-efficiency-check"
+        description: "Resource efficiency must meet targets"
+        type: "efficiency_analysis"
+        condition: "resource_efficiency >= 70%"
+        timeout: "180s"
+        severity: "low"
+    
+    # Environment-Specific Gate Configuration
+    environments:
+      production:
+        required_gates:
+        - "kubernetes-health-check"
+        - "service-connectivity-check"
+        - "response-time-check"
+        - "error-rate-check"
+        - "container-security-scan"
+        - "runtime-security-check"
+        - "database-migration-check"
+        - "data-integrity-check"
+        
+        blocking_gates:
+        - "kubernetes-health-check"
+        - "service-connectivity-check"
+        - "error-rate-check"
+        - "container-security-scan"
+        - "database-migration-check"
+        - "data-integrity-check"
+        
+        approval_required: true
+        approval_timeout: "3600s"  # 1 hour
+        
+      staging:
+        required_gates:
+        - "kubernetes-health-check"
+        - "service-connectivity-check"
+        - "response-time-check"
+        - "container-security-scan"
+        - "database-migration-check"
+        
+        blocking_gates:
+        - "kubernetes-health-check"
+        - "service-connectivity-check"
+        - "container-security-scan"
+        - "database-migration-check"
+        
+        approval_required: false
+        
+      development:
+        required_gates:
+        - "kubernetes-health-check"
+        - "service-connectivity-check"
+        
+        blocking_gates:
+        - "kubernetes-health-check"
+        
+        approval_required: false
+    
+    # Automated Rollback Configuration
+    rollback_triggers:
+      - name: "high-error-rate"
+        condition: "error_rate > 5%"
+        measurement_window: "300s"
+        action: "automatic_rollback"
+        
+      - name: "service-unavailable"
+        condition: "service_availability < 95%"
+        measurement_window: "180s"
+        action: "automatic_rollback"
+        
+      - name: "critical-performance-degradation"
+        condition: "avg_response_time > 1000ms"
+        measurement_window: "300s"
+        action: "automatic_rollback"
+        
+      - name: "resource-exhaustion"
+        condition: "memory_utilization > 95% OR cpu_utilization > 95%"
+        measurement_window: "120s"
+        action: "automatic_rollback"
+    
+    # Approval Workflow Configuration
+    approval_workflows:
+      production_deployment:
+        approvers:
+        - group: "devops-team"
+          required_approvals: 2
+        - group: "security-team"
+          required_approvals: 1
+        - group: "product-team"
+          required_approvals: 1
+        
+        approval_conditions:
+        - "all_quality_gates_passed"
+        - "security_scan_completed"
+        - "performance_tests_passed"
+        
+        timeout: "3600s"
+        
+      hotfix_deployment:
+        approvers:
+        - group: "devops-team"
+          required_approvals: 1
+        - group: "security-team"
+          required_approvals: 1
+        
+        approval_conditions:
+        - "critical_quality_gates_passed"
+        - "security_scan_completed"
+        
+        timeout: "1800s"
+    
+    # Notification Configuration
+    notifications:
+      gate_failure:
+        channels:
+        - slack
+        - email
+        - pagerduty
+        template: |
+          🚨 Deployment Gate Failure
+          
+          **Environment**: {{ .environment }}
+          **Application**: {{ .application }}
+          **Version**: {{ .version }}
+          
+          **Failed Gate**: {{ .gate_name }}
+          **Condition**: {{ .condition }}
+          **Current Status**: {{ .current_status }}
+          
+          **Action Required**: {{ .required_action }}
+          
+      rollback_triggered:
+        channels:
+        - slack
+        - email
+        - pagerduty
+        template: |
+          🔄 Automatic Rollback Triggered
+          
+          **Environment**: {{ .environment }}
+          **Application**: {{ .application }}
+          **Trigger**: {{ .rollback_trigger }}
+          
+          **Previous Version**: {{ .previous_version }}
+          **Current Version**: {{ .current_version }}
+          
+          **Rollback Status**: {{ .rollback_status }}
+          
+      approval_required:
+        channels:
+        - slack
+        - email
+        template: |
+          ✋ Deployment Approval Required
+          
+          **Environment**: {{ .environment }}
+          **Application**: {{ .application }}
+          **Version**: {{ .version }}
+          
+          **Approvers**: {{ .required_approvers }}
+          **Timeout**: {{ .approval_timeout }}
+          
+          **Approval Link**: {{ .approval_link }}

@@ -1,0 +1,300 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-slo-configuration
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: sli-slo
+data:
+  slo-configuration.yml: |
+    # MS5.0 Floor Dashboard - Service Level Objectives (SLO) Configuration
+    
+    # Backend API SLOs
+    backend_api_slos:
+      availability:
+        sli: "backend_api_availability"
+        target: 99.9
+        window: "30d"
+        description: "Backend API should be available 99.9% of the time"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      response_time:
+        sli: "backend_api_response_time_p95"
+        target: 0.2
+        window: "30d"
+        description: "95th percentile response time should be under 200ms"
+        alert_threshold: 0.5
+        alert_window: "5m"
+        unit: "seconds"
+      
+      error_rate:
+        sli: "backend_api_error_rate"
+        target: 0.1
+        window: "30d"
+        description: "Error rate should be under 0.1%"
+        alert_threshold: 0.5
+        alert_window: "5m"
+      
+      throughput:
+        sli: "backend_api_throughput"
+        target: 100
+        window: "30d"
+        description: "API should handle at least 100 requests per second"
+        alert_threshold: 50
+        alert_window: "5m"
+        unit: "requests/second"
+    
+    # Database SLOs
+    database_slos:
+      availability:
+        sli: "database_availability"
+        target: 99.9
+        window: "30d"
+        description: "Database should be available 99.9% of the time"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      query_performance:
+        sli: "database_query_response_time_p95"
+        target: 0.1
+        window: "30d"
+        description: "95th percentile query response time should be under 100ms"
+        alert_threshold: 0.2
+        alert_window: "5m"
+        unit: "seconds"
+      
+      connection_utilization:
+        sli: "database_connection_utilization"
+        target: 80
+        window: "30d"
+        description: "Database connection utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+      
+      disk_utilization:
+        sli: "database_disk_utilization"
+        target: 80
+        window: "30d"
+        description: "Database disk utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+    
+    # Redis Cache SLOs
+    redis_slos:
+      availability:
+        sli: "redis_availability"
+        target: 99.9
+        window: "30d"
+        description: "Redis should be available 99.9% of the time"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      response_time:
+        sli: "redis_response_time_p95"
+        target: 0.01
+        window: "30d"
+        description: "95th percentile response time should be under 10ms"
+        alert_threshold: 0.05
+        alert_window: "5m"
+        unit: "seconds"
+      
+      memory_utilization:
+        sli: "redis_memory_utilization"
+        target: 80
+        window: "30d"
+        description: "Redis memory utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+      
+      hit_ratio:
+        sli: "redis_hit_ratio"
+        target: 95
+        window: "30d"
+        description: "Redis cache hit ratio should be above 95%"
+        alert_threshold: 90
+        alert_window: "5m"
+    
+    # Celery Worker SLOs
+    celery_slos:
+      availability:
+        sli: "celery_worker_availability"
+        target: 99.9
+        window: "30d"
+        description: "Celery workers should be available 99.9% of the time"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      queue_length:
+        sli: "celery_queue_length"
+        target: 10
+        window: "30d"
+        description: "Celery queue length should be under 10 tasks"
+        alert_threshold: 50
+        alert_window: "5m"
+        unit: "tasks"
+      
+      success_rate:
+        sli: "celery_task_success_rate"
+        target: 99.5
+        window: "30d"
+        description: "Celery task success rate should be above 99.5%"
+        alert_threshold: 99.0
+        alert_window: "5m"
+      
+      task_duration:
+        sli: "celery_task_duration_p95"
+        target: 300
+        window: "30d"
+        description: "95th percentile task duration should be under 5 minutes"
+        alert_threshold: 600
+        alert_window: "5m"
+        unit: "seconds"
+    
+    # MinIO Object Storage SLOs
+    minio_slos:
+      availability:
+        sli: "minio_availability"
+        target: 99.9
+        window: "30d"
+        description: "MinIO should be available 99.9% of the time"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      response_time:
+        sli: "minio_response_time_p95"
+        target: 0.5
+        window: "30d"
+        description: "95th percentile response time should be under 500ms"
+        alert_threshold: 1.0
+        alert_window: "5m"
+        unit: "seconds"
+      
+      storage_utilization:
+        sli: "minio_storage_utilization"
+        target: 80
+        window: "30d"
+        description: "MinIO storage utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+    
+    # WebSocket SLOs
+    websocket_slos:
+      connection_success_rate:
+        sli: "websocket_connection_success_rate"
+        target: 99.5
+        window: "30d"
+        description: "WebSocket connection success rate should be above 99.5%"
+        alert_threshold: 99.0
+        alert_window: "5m"
+      
+      message_delivery_rate:
+        sli: "websocket_message_delivery_rate"
+        target: 99.9
+        window: "30d"
+        description: "WebSocket message delivery rate should be above 99.9%"
+        alert_threshold: 99.5
+        alert_window: "5m"
+    
+    # Production Metrics SLOs
+    production_slos:
+      line_availability:
+        sli: "production_line_availability"
+        target: 95
+        window: "30d"
+        description: "Production line availability should be above 95%"
+        alert_threshold: 90
+        alert_window: "5m"
+      
+      oee_accuracy:
+        sli: "oee_calculation_accuracy"
+        target: 5
+        window: "30d"
+        description: "OEE calculation accuracy should be within 5%"
+        alert_threshold: 10
+        alert_window: "5m"
+      
+      data_freshness:
+        sli: "production_data_freshness"
+        target: 60
+        window: "30d"
+        description: "Production data should be fresh within 60 seconds"
+        alert_threshold: 120
+        alert_window: "5m"
+        unit: "seconds"
+    
+    # System Resource SLOs
+    system_slos:
+      cpu_utilization:
+        sli: "cpu_utilization"
+        target: 70
+        window: "30d"
+        description: "Average CPU utilization should be under 70%"
+        alert_threshold: 85
+        alert_window: "5m"
+      
+      memory_utilization:
+        sli: "memory_utilization"
+        target: 80
+        window: "30d"
+        description: "Average memory utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+      
+      disk_utilization:
+        sli: "disk_utilization"
+        target: 80
+        window: "30d"
+        description: "Average disk utilization should be under 80%"
+        alert_threshold: 90
+        alert_window: "5m"
+    
+    # Network SLOs
+    network_slos:
+      latency:
+        sli: "network_latency_p95"
+        target: 0.1
+        window: "30d"
+        description: "95th percentile network latency should be under 100ms"
+        alert_threshold: 0.2
+        alert_window: "5m"
+        unit: "seconds"
+      
+      throughput:
+        sli: "network_throughput"
+        target: 1000000000
+        window: "30d"
+        description: "Network throughput should be above 1GB/s"
+        alert_threshold: 500000000
+        alert_window: "5m"
+        unit: "bytes/second"
+    
+    # Overall System SLOs
+    overall_slos:
+      system_availability:
+        sli: "backend_api_availability"
+        target: 99.9
+        window: "30d"
+        description: "Overall system availability should be 99.9%"
+        alert_threshold: 99.5
+        alert_window: "5m"
+      
+      end_to_end_response_time:
+        sli: "backend_api_response_time_p95"
+        target: 0.2
+        window: "30d"
+        description: "End-to-end response time should be under 200ms"
+        alert_threshold: 0.5
+        alert_window: "5m"
+        unit: "seconds"
+      
+      data_consistency:
+        sli: "production_data_freshness"
+        target: 60
+        window: "30d"
+        description: "Data consistency should be maintained within 60 seconds"
+        alert_threshold: 120
+        alert_window: "5m"
+        unit: "seconds"

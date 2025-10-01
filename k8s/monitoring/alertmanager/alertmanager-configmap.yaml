@@ -1,0 +1,621 @@
+---
+# MS5.0 Floor Dashboard - Enhanced AlertManager Configuration
+# Production-grade configuration with Azure integration and intelligent alert routing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    version: "v0.25.0"
+  annotations:
+    description: "Enhanced AlertManager configuration with Azure integration and intelligent alert routing"
+    managed-by: "ms5-devops-team"
+data:
+  alertmanager.yml: |
+    global:
+      # SMTP configuration for email notifications
+      smtp_smarthost: 'smtp.office365.com:587'
+      smtp_from: 'alerts@ms5floor.com'
+      smtp_auth_username: 'alerts@ms5floor.com'
+      smtp_auth_password: '${SMTP_PASSWORD}'
+      smtp_auth_secret: '${SMTP_PASSWORD}'
+      smtp_require_tls: true
+      
+      # Azure Communication Services for SMS
+      azure_communication_services_endpoint: '${AZURE_COMM_SERVICES_ENDPOINT}'
+      azure_communication_services_access_key: '${AZURE_COMM_SERVICES_ACCESS_KEY}'
+      
+      # PagerDuty configuration
+      pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+      
+      # Slack configuration
+      slack_api_url: '${SLACK_WEBHOOK_URL}'
+      
+      # Microsoft Teams configuration
+      teams_webhook_url: '${TEAMS_WEBHOOK_URL}'
+      
+      # Webhook configuration
+      webhook_url: '${WEBHOOK_URL}'
+      
+      # Resolve timeout for alert resolution
+      resolve_timeout: 5m
+      
+      # HTTP configuration
+      http_config:
+        follow_redirects: true
+        enable_http2: true
+    
+    # Alert routing configuration with business impact-based routing
+    route:
+      # Global grouping and timing configuration
+      group_by: ['alertname', 'cluster', 'service', 'business_impact', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'default'
+      
+      # Business impact-based routing
+      routes:
+      # Critical business impact alerts - immediate notification
+      - match:
+          business_impact: critical
+        receiver: 'critical-alerts'
+        group_wait: 5s
+        group_interval: 5s
+        repeat_interval: 15m
+        continue: true
+        
+      # High business impact alerts - fast notification
+      - match:
+          business_impact: high
+        receiver: 'high-priority-alerts'
+        group_wait: 30s
+        group_interval: 30s
+        repeat_interval: 30m
+        continue: true
+        
+      # Medium business impact alerts - standard notification
+      - match:
+          business_impact: medium
+        receiver: 'medium-priority-alerts'
+        group_wait: 2m
+        group_interval: 2m
+        repeat_interval: 2h
+        continue: true
+        
+      # Low business impact alerts - delayed notification
+      - match:
+          business_impact: low
+        receiver: 'low-priority-alerts'
+        group_wait: 5m
+        group_interval: 5m
+        repeat_interval: 6h
+        continue: true
+        
+      # Service-specific routing
+      - match:
+          service: 'ms5-backend'
+        receiver: 'backend-alerts'
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        continue: true
+        
+      - match:
+          service: 'postgres'
+        receiver: 'database-alerts'
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        continue: true
+        
+      - match:
+          service: 'redis'
+        receiver: 'cache-alerts'
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        continue: true
+        
+      - match:
+          service: 'celery'
+        receiver: 'celery-alerts'
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        continue: true
+        
+      - match:
+          service: 'minio'
+        receiver: 'storage-alerts'
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        continue: true
+        
+      # Production line specific routing
+      - match:
+          service: 'production-line'
+        receiver: 'production-alerts'
+        group_wait: 5s
+        group_interval: 5s
+        repeat_interval: 15m
+        continue: true
+        
+      # Maintenance window routing
+      - match:
+          maintenance_window: 'true'
+        receiver: 'maintenance-alerts'
+        group_wait: 1m
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: true
+    
+    # Alert receivers configuration
+    receivers:
+    # Default receiver for unhandled alerts
+    - name: 'default'
+      webhook_configs:
+      - url: 'http://ms5-backend.ms5-production.svc.cluster.local:8000/webhooks/alerts'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_BEARER_TOKEN}'
+        title: 'MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Business Impact:* {{ .Labels.business_impact }}
+          *Time:* {{ .StartsAt }}
+          {{ end }}
+    
+    # Critical alerts receiver - immediate notification via all channels
+    - name: 'critical-alerts'
+      email_configs:
+      - to: '${CRITICAL_ALERT_EMAIL}'
+        subject: '[CRITICAL] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          ALERT: {{ .Annotations.summary }}
+          DESCRIPTION: {{ .Annotations.description }}
+          SEVERITY: {{ .Labels.severity }}
+          SERVICE: {{ .Labels.service }}
+          INSTANCE: {{ .Labels.instance }}
+          BUSINESS IMPACT: {{ .Labels.business_impact }}
+          TIME: {{ .StartsAt }}
+          RUNBOOK: {{ .Annotations.runbook_url }}
+          {{ end }}
+        headers:
+          X-Priority: "1"
+          X-MSMail-Priority: "High"
+          Importance: "High"
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-critical-alerts'
+        title: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Business Impact:* {{ .Labels.business_impact }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'danger'
+        send_resolved: true
+      teams_configs:
+      - webhook_url: '${TEAMS_WEBHOOK_URL}'
+        title: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Severity:** {{ .Labels.severity }}
+          **Service:** {{ .Labels.service }}
+          **Instance:** {{ .Labels.instance }}
+          **Business Impact:** {{ .Labels.business_impact }}
+          **Time:** {{ .StartsAt }}
+          **Runbook:** {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'Attention'
+        send_resolved: true
+      pagerduty_configs:
+      - service_key: '${PAGERDUTY_CRITICAL_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .Annotations.summary }}'
+        severity: 'critical'
+        details:
+          alertname: '{{ .GroupLabels.alertname }}'
+          service: '{{ .Labels.service }}'
+          instance: '{{ .Labels.instance }}'
+          business_impact: '{{ .Labels.business_impact }}'
+          runbook_url: '{{ .Annotations.runbook_url }}'
+        send_resolved: true
+      webhook_configs:
+      - url: 'http://ms5-backend.ms5-production.svc.cluster.local:8000/webhooks/critical-alerts'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_BEARER_TOKEN}'
+        title: 'CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Business Impact: {{ .Labels.business_impact }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+    
+    # High priority alerts receiver
+    - name: 'high-priority-alerts'
+      email_configs:
+      - to: '${HIGH_PRIORITY_ALERT_EMAIL}'
+        subject: '[HIGH] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Business Impact: {{ .Labels.business_impact }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+        headers:
+          X-Priority: "2"
+          X-MSMail-Priority: "Normal"
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-high-priority-alerts'
+        title: '⚠️ HIGH PRIORITY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Business Impact:* {{ .Labels.business_impact }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'warning'
+        send_resolved: true
+      teams_configs:
+      - webhook_url: '${TEAMS_WEBHOOK_URL}'
+        title: '⚠️ HIGH PRIORITY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Severity:** {{ .Labels.severity }}
+          **Service:** {{ .Labels.service }}
+          **Instance:** {{ .Labels.instance }}
+          **Business Impact:** {{ .Labels.business_impact }}
+          **Time:** {{ .StartsAt }}
+          **Runbook:** {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'Warning'
+        send_resolved: true
+      pagerduty_configs:
+      - service_key: '${PAGERDUTY_HIGH_PRIORITY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .Annotations.summary }}'
+        severity: 'warning'
+        details:
+          alertname: '{{ .GroupLabels.alertname }}'
+          service: '{{ .Labels.service }}'
+          instance: '{{ .Labels.instance }}'
+          business_impact: '{{ .Labels.business_impact }}'
+          runbook_url: '{{ .Annotations.runbook_url }}'
+        send_resolved: true
+    
+    # Medium priority alerts receiver
+    - name: 'medium-priority-alerts'
+      email_configs:
+      - to: '${MEDIUM_PRIORITY_ALERT_EMAIL}'
+        subject: '[MEDIUM] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Business Impact: {{ .Labels.business_impact }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-medium-priority-alerts'
+        title: '📊 MEDIUM PRIORITY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Business Impact:* {{ .Labels.business_impact }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'good'
+        send_resolved: true
+    
+    # Low priority alerts receiver
+    - name: 'low-priority-alerts'
+      email_configs:
+      - to: '${LOW_PRIORITY_ALERT_EMAIL}'
+        subject: '[LOW] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Business Impact: {{ .Labels.business_impact }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-low-priority-alerts'
+        title: 'ℹ️ LOW PRIORITY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Business Impact:* {{ .Labels.business_impact }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'good'
+        send_resolved: true
+    
+    # Service-specific receivers
+    - name: 'backend-alerts'
+      email_configs:
+      - to: '${BACKEND_TEAM_EMAIL}'
+        subject: '[MS5.0 Backend] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-backend-team'
+        title: 'Backend Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'database-alerts'
+      email_configs:
+      - to: '${DATABASE_TEAM_EMAIL}'
+        subject: '[MS5.0 Database] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-database-team'
+        title: 'Database Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'cache-alerts'
+      email_configs:
+      - to: '${CACHE_TEAM_EMAIL}'
+        subject: '[MS5.0 Cache] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-cache-team'
+        title: 'Cache Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'celery-alerts'
+      email_configs:
+      - to: '${CELERY_TEAM_EMAIL}'
+        subject: '[MS5.0 Celery] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-celery-team'
+        title: 'Celery Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'storage-alerts'
+      email_configs:
+      - to: '${STORAGE_TEAM_EMAIL}'
+        subject: '[MS5.0 Storage] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-storage-team'
+        title: 'Storage Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'production-alerts'
+      email_configs:
+      - to: '${PRODUCTION_TEAM_EMAIL}'
+        subject: '[MS5.0 Production] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-production-team'
+        title: 'Production Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    - name: 'maintenance-alerts'
+      email_configs:
+      - to: '${MAINTENANCE_TEAM_EMAIL}'
+        subject: '[MS5.0 Maintenance] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ms5-maintenance-team'
+        title: 'Maintenance Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Time:* {{ .StartsAt }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    
+    # Inhibition rules to prevent alert spam
+    inhibit_rules:
+    # Inhibit warning alerts when critical alerts are firing
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'cluster', 'service', 'instance']
+    # Inhibit alerts during maintenance windows
+    - source_match:
+        maintenance_window: 'true'
+      target_match_re:
+        severity: 'warning|info'
+      equal: ['alertname', 'cluster', 'service']
+    # Inhibit duplicate alerts for the same service
+    - source_match:
+        alertname: 'ServiceDown'
+      target_match:
+        alertname: 'ServiceHighErrorRate'
+      equal: ['service', 'instance']
+    # Inhibit low priority alerts when high priority alerts are firing
+    - source_match:
+        business_impact: 'high'
+      target_match:
+        business_impact: 'low'
+      equal: ['alertname', 'cluster', 'service']
+    # Inhibit medium priority alerts when critical alerts are firing
+    - source_match:
+        business_impact: 'critical'
+      target_match:
+        business_impact: 'medium'
+      equal: ['alertname', 'cluster', 'service']

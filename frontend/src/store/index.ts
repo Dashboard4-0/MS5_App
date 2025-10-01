@@ -23,6 +23,9 @@ import qualitySlice from './slices/qualitySlice';
 import settingsSlice from './slices/settingsSlice';
 import offlineSlice from './slices/offlineSlice';
 
+// Import WebSocket middleware and reducer
+import { websocketMiddleware, websocketReducer } from './middleware/websocketMiddleware';
+
 // Persist configuration
 const persistConfig = {
   key: 'root',
@@ -44,6 +47,7 @@ const rootReducer = combineReducers({
   quality: qualitySlice,
   settings: settingsSlice,
   offline: offlineSlice,
+  websocket: websocketReducer,
 });
 
 // Persisted reducer
@@ -57,7 +61,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).concat(websocketMiddleware),
   devTools: __DEV__,
 });
 

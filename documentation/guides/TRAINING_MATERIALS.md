@@ -577,6 +577,351 @@ Specialized training for quality inspectors covering quality control procedures,
 - **Peer Learning**: Collaborative exercises and discussions
 - **Continuous Improvement**: Regular exercise updates and improvements
 
+### Comprehensive Hands-on Exercise Library
+
+#### Exercise 1: Complete Production Cycle Simulation
+**Duration**: 2 hours  
+**Difficulty**: Intermediate  
+**Roles**: All Production Roles  
+
+**Scenario**: Simulate a complete production shift with realistic challenges and requirements.
+
+**Step-by-Step Instructions**:
+
+1. **Pre-Shift Setup (15 minutes)**
+   - Log into the system using your assigned credentials
+   - Navigate to the Production Dashboard
+   - Review the current production schedule
+   - Check equipment status and availability
+   - Verify material availability and inventory levels
+   - Review any outstanding issues or alerts from the previous shift
+
+2. **Production Planning (20 minutes)**
+   - Create a new production schedule for the next 8 hours
+   - Allocate resources (personnel, equipment, materials)
+   - Set production targets and quality standards
+   - Configure alerts and notifications
+   - Assign jobs to specific operators
+   - Review and approve the production plan
+
+3. **Job Execution (45 minutes)**
+   - Accept assigned jobs from the job queue
+   - Start production jobs and begin execution
+   - Monitor real-time production data and metrics
+   - Record production data at regular intervals
+   - Handle quality checks and inspections
+   - Respond to equipment alerts and issues
+   - Complete jobs and record final results
+
+4. **Quality Management (20 minutes)**
+   - Perform scheduled quality inspections
+   - Record quality data and measurements
+   - Identify and classify any defects
+   - Initiate corrective actions for quality issues
+   - Update quality status and documentation
+   - Generate quality reports
+
+5. **Issue Resolution (15 minutes)**
+   - Respond to Andon alerts and notifications
+   - Escalate issues according to procedures
+   - Document problem resolution steps
+   - Update system status and communications
+   - Coordinate with maintenance and support teams
+
+6. **Shift Completion (5 minutes)**
+   - Complete all active jobs and tasks
+   - Generate shift summary reports
+   - Document any outstanding issues
+   - Hand over to the next shift
+   - Update system status and notifications
+
+**Success Criteria**:
+- Complete all assigned jobs within time limits
+- Maintain quality standards throughout the shift
+- Properly handle and resolve all issues
+- Generate accurate reports and documentation
+- Demonstrate effective communication and coordination
+
+#### Exercise 2: Advanced OEE Analysis and Optimization
+**Duration**: 1.5 hours  
+**Difficulty**: Advanced  
+**Roles**: Production Manager, Engineer  
+
+**Scenario**: Analyze production performance data and implement optimization strategies.
+
+**Step-by-Step Instructions**:
+
+1. **Data Collection and Analysis (30 minutes)**
+   - Access the OEE Dashboard and Performance Analytics
+   - Collect data for the last 30 days of production
+   - Analyze availability, performance, and quality metrics
+   - Identify trends and patterns in the data
+   - Compare performance across different production lines
+   - Generate comprehensive OEE reports
+
+2. **Root Cause Analysis (25 minutes)**
+   - Identify the top 5 performance bottlenecks
+   - Analyze downtime causes and frequency
+   - Review quality issues and their impact
+   - Examine equipment performance and maintenance records
+   - Identify process inefficiencies and waste
+   - Document findings and root causes
+
+3. **Optimization Planning (20 minutes)**
+   - Develop improvement strategies for identified issues
+   - Create action plans with specific timelines
+   - Allocate resources for improvement initiatives
+   - Set measurable improvement targets
+   - Plan implementation phases and milestones
+   - Create monitoring and tracking procedures
+
+4. **Implementation Simulation (15 minutes)**
+   - Simulate implementation of top 3 improvement strategies
+   - Update production schedules and procedures
+   - Configure new monitoring and alerting rules
+   - Train team members on new procedures
+   - Document changes and update procedures
+   - Set up tracking and measurement systems
+
+**Success Criteria**:
+- Accurately identify performance bottlenecks
+- Develop realistic and achievable improvement plans
+- Demonstrate understanding of OEE principles
+- Show ability to analyze complex data
+- Present clear and actionable recommendations
+
+#### Exercise 3: Emergency Response and Crisis Management
+**Duration**: 1 hour  
+**Difficulty**: Advanced  
+**Roles**: Shift Manager, Production Manager  
+
+**Scenario**: Handle multiple simultaneous emergencies while maintaining production continuity.
+
+**Step-by-Step Instructions**:
+
+1. **Emergency Detection (10 minutes)**
+   - Monitor system alerts and notifications
+   - Identify multiple simultaneous issues:
+     - Equipment failure on Line 1
+     - Quality issue requiring immediate attention
+     - Material shortage affecting production
+     - Personnel safety incident
+   - Assess severity and priority of each issue
+   - Activate emergency response procedures
+
+2. **Crisis Coordination (20 minutes)**
+   - Establish emergency command center
+   - Assign responsibilities to team members
+   - Coordinate with maintenance, quality, and safety teams
+   - Communicate with management and stakeholders
+   - Implement contingency plans for affected production
+   - Document all actions and decisions
+
+3. **Issue Resolution (20 minutes)**
+   - Resolve equipment failure (simulate maintenance call)
+   - Address quality issue with immediate corrective action
+   - Implement material substitution or alternative sourcing
+   - Handle safety incident according to procedures
+   - Monitor system status and production impact
+   - Update all stakeholders on progress
+
+4. **Recovery and Documentation (10 minutes)**
+   - Restore normal production operations
+   - Conduct post-incident review and analysis
+   - Document lessons learned and improvements
+   - Update procedures based on experience
+   - Generate incident reports
+   - Plan follow-up actions and monitoring
+
+**Success Criteria**:
+- Successfully manage multiple simultaneous crises
+- Maintain effective communication throughout
+- Implement appropriate emergency procedures
+- Minimize production impact and downtime
+- Complete thorough documentation and follow-up
+
+#### Exercise 4: Advanced Reporting and Analytics
+**Duration**: 1.5 hours  
+**Difficulty**: Intermediate  
+**Roles**: All Management Roles  
+
+**Scenario**: Create comprehensive reports and perform advanced data analysis for management review.
+
+**Step-by-Step Instructions**:
+
+1. **Report Planning and Design (20 minutes)**
+   - Identify reporting requirements and objectives
+   - Select appropriate data sources and time periods
+   - Design report layout and structure
+   - Define key performance indicators (KPIs)
+   - Plan data visualization and presentation
+   - Set up automated report scheduling
+
+2. **Data Collection and Preparation (25 minutes)**
+   - Collect data from multiple sources:
+     - Production performance data
+     - Quality metrics and trends
+     - Equipment utilization and maintenance
+     - Personnel productivity and attendance
+     - Cost and efficiency metrics
+   - Clean and validate data for accuracy
+   - Organize data for analysis and reporting
+   - Create calculated fields and derived metrics
+
+3. **Report Generation and Analysis (30 minutes)**
+   - Generate comprehensive production reports
+   - Create executive summary dashboards
+   - Develop trend analysis and forecasting
+   - Perform comparative analysis across periods
+   - Create visualizations and charts
+   - Export reports in multiple formats
+
+4. **Presentation and Communication (15 minutes)**
+   - Prepare report presentations for stakeholders
+   - Create executive summaries and key findings
+   - Develop recommendations and action items
+   - Schedule report distribution and review meetings
+   - Set up automated report delivery
+   - Document report usage and feedback
+
+**Success Criteria**:
+- Generate accurate and comprehensive reports
+- Demonstrate effective data analysis skills
+- Create clear and actionable insights
+- Present information in professional format
+- Show understanding of business metrics and KPIs
+
+#### Exercise 5: System Administration and Configuration
+**Duration**: 2 hours  
+**Difficulty**: Advanced  
+**Roles**: System Administrator, IT Staff  
+
+**Scenario**: Perform comprehensive system administration tasks including configuration, monitoring, and maintenance.
+
+**Step-by-Step Instructions**:
+
+1. **System Monitoring and Health Check (30 minutes)**
+   - Access system administration dashboard
+   - Review system performance metrics and alerts
+   - Check database performance and storage
+   - Monitor network connectivity and latency
+   - Review security logs and access patterns
+   - Verify backup system status and integrity
+
+2. **User Management and Security (25 minutes)**
+   - Review user accounts and permissions
+   - Create new user accounts with appropriate roles
+   - Update user permissions and access levels
+   - Configure security policies and settings
+   - Review and update password policies
+   - Audit user activity and access logs
+
+3. **System Configuration and Optimization (35 minutes)**
+   - Review and update system configuration settings
+   - Optimize database performance and indexing
+   - Configure monitoring and alerting rules
+   - Update system parameters and thresholds
+   - Review and update backup schedules
+   - Configure system maintenance windows
+
+4. **Maintenance and Updates (20 minutes)**
+   - Plan and execute system maintenance tasks
+   - Apply system updates and patches
+   - Perform database maintenance and optimization
+   - Update system documentation
+   - Test system functionality after changes
+   - Document all changes and procedures
+
+5. **Disaster Recovery Testing (10 minutes)**
+   - Test backup and recovery procedures
+   - Verify data integrity and completeness
+   - Test failover and redundancy systems
+   - Document recovery procedures and timelines
+   - Update disaster recovery plans
+   - Schedule regular recovery testing
+
+**Success Criteria**:
+- Successfully complete all administration tasks
+- Maintain system security and performance
+- Demonstrate proper change management procedures
+- Show understanding of system architecture
+- Complete thorough documentation and testing
+
+#### Exercise 6: Mobile and Offline Operations
+**Duration**: 1 hour  
+**Difficulty**: Intermediate  
+**Roles**: All Field Roles  
+
+**Scenario**: Operate the system using mobile devices and handle offline scenarios.
+
+**Step-by-Step Instructions**:
+
+1. **Mobile Device Setup and Configuration (15 minutes)**
+   - Access the system using a mobile device or tablet
+   - Configure mobile-specific settings and preferences
+   - Test touch interface and navigation
+   - Verify offline data synchronization
+   - Configure mobile notifications and alerts
+   - Test biometric authentication (if available)
+
+2. **Offline Operations Simulation (25 minutes)**
+   - Simulate network connectivity loss
+   - Continue operations in offline mode
+   - Enter production data and job updates
+   - Record quality checks and inspections
+   - Handle Andon events and issue reporting
+   - Test offline data storage and queuing
+
+3. **Data Synchronization and Recovery (15 minutes)**
+   - Restore network connectivity
+   - Synchronize offline data with the main system
+   - Verify data integrity and completeness
+   - Resolve any synchronization conflicts
+   - Update system status and notifications
+   - Generate synchronization reports
+
+4. **Mobile-Specific Features Testing (5 minutes)**
+   - Test camera integration for photo capture
+   - Use GPS location services for asset tracking
+   - Test barcode/QR code scanning functionality
+   - Verify mobile-specific workflows
+   - Test mobile reporting and data entry
+   - Validate mobile security features
+
+**Success Criteria**:
+- Successfully operate system on mobile devices
+- Handle offline scenarios effectively
+- Maintain data integrity during synchronization
+- Demonstrate mobile-specific capabilities
+- Show understanding of offline/online transitions
+
+### Exercise Assessment and Evaluation
+
+#### Assessment Criteria
+- **Technical Competency**: Ability to use system features effectively
+- **Process Understanding**: Understanding of business processes and workflows
+- **Problem Solving**: Ability to identify and resolve issues
+- **Communication**: Effective communication and documentation
+- **Safety and Compliance**: Adherence to safety and compliance procedures
+- **Efficiency**: Completion of tasks within time limits
+- **Quality**: Accuracy and completeness of work
+
+#### Evaluation Methods
+- **Instructor Observation**: Direct observation of exercise performance
+- **System Logs**: Review of system activity and data entry
+- **Peer Review**: Feedback from other participants
+- **Self-Assessment**: Participant self-evaluation and reflection
+- **Written Assessment**: Post-exercise knowledge testing
+- **Practical Demonstration**: Demonstration of key skills and competencies
+
+#### Feedback and Improvement
+- **Immediate Feedback**: Real-time feedback during exercises
+- **Post-Exercise Review**: Comprehensive review and discussion
+- **Individual Coaching**: One-on-one coaching and development
+- **Group Learning**: Collaborative learning and knowledge sharing
+- **Continuous Improvement**: Regular updates and enhancements
+- **Best Practice Sharing**: Sharing of successful approaches and techniques
+
 ## Assessment Materials
 
 ### Assessment Types
@@ -892,6 +1237,92 @@ Specialized training for quality inspectors covering quality control procedures,
 - **Conference Facilities**: Conference facilities for group training
 - **Hands-on Labs**: Hands-on training labs and equipment
 - **Virtual Training**: Virtual training facilities and platforms
+
+---
+
+## Support Procedures & Escalation Paths
+
+### Support Structure
+
+#### Support Team Roles
+- **Support Manager**: Overall support operations and strategy
+- **Level 1 Support**: Initial triage and basic issue resolution
+- **Level 2 Support**: Technical issue resolution and system administration
+- **Level 3 Support**: Advanced technical support and vendor coordination
+- **Subject Matter Experts**: Specialized knowledge in specific areas
+- **Escalation Managers**: Handle critical incidents and escalations
+
+#### Support Coverage
+- **Business Hours**: Monday-Friday, 7:00 AM - 6:00 PM (Local Time)
+- **Extended Hours**: Monday-Friday, 6:00 AM - 8:00 PM (Local Time)
+- **24/7 Critical Support**: For production-critical issues
+- **Holiday Coverage**: Reduced coverage with emergency escalation
+- **On-Call Rotation**: 24/7 on-call support for critical systems
+
+### Incident Management
+
+#### Severity Levels
+- **Critical (P1)**: Complete system outage or major functionality loss
+- **High (P2)**: Significant functionality impact affecting multiple users
+- **Medium (P3)**: Limited functionality impact affecting some users
+- **Low (P4)**: Minor issues with workaround available
+
+#### Service Level Agreements
+- **Critical Issues (P1)**: 15 minutes initial response, 4 hours resolution
+- **High Priority Issues (P2)**: 1 hour initial response, 8 hours resolution
+- **Medium Priority Issues (P3)**: 4 hours initial response, 24 hours resolution
+- **Low Priority Issues (P4)**: 8 hours initial response, 72 hours resolution
+
+### Escalation Procedures
+
+#### Escalation Triggers
+- **SLA Violations**: Response or resolution time exceeded
+- **Severity Level**: Critical incidents automatically escalate
+- **Multiple Attempts**: Failed resolution attempts
+- **User Complaints**: User dissatisfaction or complaints
+- **Business Impact**: Significant business impact identified
+
+#### Escalation Paths
+
+**Technical Escalation Path**:
+1. **Level 1 Support** → **Level 2 Support**
+2. **Level 2 Support** → **Level 3 Support**
+3. **Level 3 Support** → **Vendor Support**
+
+**Management Escalation Path**:
+1. **Support Team** → **Support Manager**
+2. **Support Manager** → **IT Director**
+3. **IT Director** → **Executive Management**
+
+### Support Channels
+
+#### Primary Support Channels
+- **Help Desk Portal**: Web-based incident submission and tracking
+- **Phone Support**: Direct phone line to support team
+- **Email Support**: Dedicated support email address
+- **Live Chat**: Real-time chat with support team
+
+#### Emergency Support Channels
+- **Emergency Hotline**: 24/7 emergency support hotline
+- **SMS Alerts**: SMS alerts for critical incidents
+- **Status Page**: Real-time status page updates
+- **Conference Bridges**: Emergency conference call capabilities
+
+### Emergency Procedures
+
+#### Emergency Response Plan
+- **Critical System Outage**: Complete system failure
+- **Security Incident**: Security breach or compromise
+- **Data Loss**: Loss of critical data or information
+- **Natural Disaster**: Natural disaster affecting operations
+- **Cyber Attack**: Cyber attack or security breach
+
+#### Emergency Response Team
+- **Incident Commander**: Overall incident command and coordination
+- **Technical Lead**: Technical response and resolution
+- **Communication Lead**: Communication and stakeholder management
+- **Business Lead**: Business impact assessment and management
+- **Recovery Lead**: Recovery and restoration coordination
 
 ---
 

@@ -1,0 +1,437 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Network Policy for Zero-Trust Networking"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from backend namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-backend
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow ingress from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-frontend
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow egress to backend services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-backend
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+  # Allow egress to monitoring services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9093
+  # Allow egress to DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow egress to external HTTPS
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to external HTTP (for health checks)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow egress to Azure services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-egress-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: egress
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Egress
+  egress:
+  # Allow egress to Kubernetes API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to Azure Container Registry
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to Azure Key Vault
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to Azure Monitor
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to Azure Log Analytics
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to external CDN
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow egress to external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to external WebSocket endpoints
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-ingress-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow ingress from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from backend namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-backend
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow ingress from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-frontend
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from external sources (via ingress)
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-websocket-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: websocket
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow WebSocket connections from ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 80
+  # Allow WebSocket connections from backend
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-backend
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  # Allow WebSocket connections to backend
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow WebSocket connections to external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-monitoring-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow monitoring from Prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow monitoring from Grafana
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow metrics export to Prometheus
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow metrics export to Grafana
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow metrics export to Azure Monitor
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-security-netpol
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: security
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow security scanning from security namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: security
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 9090
+  # Allow security monitoring from security namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: security
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow security scanning to security namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: security
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow security monitoring to security namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: security
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow security updates from external sources
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-default-deny
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+    deployment: aks
+    policy-type: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress: []

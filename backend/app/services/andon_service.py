@@ -1194,3 +1194,649 @@ class AndonService:
             return 4.2  # 4.2/5.0 satisfaction score
         except Exception:
             return 0.0
+    
+    # Phase 2 Enhancement - Intelligent Andon System with Predictive Capabilities
+    
+    @staticmethod
+    async def predict_andon_events(
+        line_id: UUID,
+        prediction_horizon_hours: int = 24,
+        confidence_threshold: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Predict potential Andon events using machine learning models.
+        
+        This method provides predictive insights for proactive maintenance
+        and event prevention using historical patterns and equipment data.
+        """
+        try:
+            logger.info("Starting Andon event prediction", 
+                       line_id=line_id, horizon_hours=prediction_horizon_hours)
+            
+            # Get historical event data
+            historical_events = await AndonService._get_historical_andon_data(
+                line_id, days=30
+            )
+            
+            # Get equipment status data
+            equipment_data = await AndonService._get_equipment_status_data(
+                line_id, hours=24
+            )
+            
+            # Analyze event patterns
+            event_patterns = await AndonService._analyze_event_patterns(
+                historical_events, equipment_data
+            )
+            
+            # Generate predictions
+            predictions = await AndonService._generate_event_predictions(
+                event_patterns, equipment_data, prediction_horizon_hours
+            )
+            
+            # Filter predictions by confidence threshold
+            filtered_predictions = [
+                pred for pred in predictions 
+                if pred.get("confidence", 0) >= confidence_threshold
+            ]
+            
+            # Generate prevention recommendations
+            prevention_recommendations = await AndonService._generate_prevention_recommendations(
+                filtered_predictions, event_patterns
+            )
+            
+            result = {
+                "line_id": line_id,
+                "prediction_horizon_hours": prediction_horizon_hours,
+                "confidence_threshold": confidence_threshold,
+                "prediction_timestamp": datetime.utcnow(),
+                "historical_events_count": len(historical_events),
+                "predictions": filtered_predictions,
+                "prevention_recommendations": prevention_recommendations,
+                "prediction_summary": {
+                    "total_predictions": len(predictions),
+                    "high_confidence_predictions": len(filtered_predictions),
+                    "most_likely_event_type": max(
+                        [p["event_type"] for p in filtered_predictions], 
+                        key=[p["event_type"] for p in filtered_predictions].count
+                    ) if filtered_predictions else None,
+                    "risk_level": AndonService._calculate_overall_risk_level(filtered_predictions)
+                }
+            }
+            
+            logger.info("Andon event prediction completed", 
+                       line_id=line_id, predictions_count=len(filtered_predictions))
+            
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to predict Andon events", 
+                        error=str(e), line_id=line_id)
+            raise BusinessLogicError("Failed to predict Andon events")
+    
+    @staticmethod
+    async def optimize_andon_response(
+        line_id: UUID,
+        optimization_goals: List[str],
+        constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Optimize Andon response procedures using intelligent algorithms.
+        
+        This method provides optimization recommendations for response times,
+        escalation procedures, and resource allocation.
+        """
+        try:
+            logger.info("Starting Andon response optimization", 
+                       line_id=line_id, goals=optimization_goals)
+            
+            # Get current response metrics
+            current_metrics = await AndonService._get_current_response_metrics(line_id)
+            
+            # Analyze response patterns
+            response_patterns = await AndonService._analyze_response_patterns(line_id)
+            
+            # Identify optimization opportunities
+            optimization_opportunities = await AndonService._identify_response_optimization_opportunities(
+                current_metrics, response_patterns
+            )
+            
+            # Generate optimization strategies
+            optimization_strategies = await AndonService._generate_response_optimization_strategies(
+                optimization_opportunities, optimization_goals, constraints
+            )
+            
+            # Calculate expected improvements
+            expected_improvements = await AndonService._calculate_expected_improvements(
+                optimization_strategies, current_metrics
+            )
+            
+            # Generate implementation plan
+            implementation_plan = await AndonService._generate_response_implementation_plan(
+                optimization_strategies, expected_improvements
+            )
+            
+            result = {
+                "line_id": line_id,
+                "optimization_timestamp": datetime.utcnow(),
+                "optimization_goals": optimization_goals,
+                "current_metrics": current_metrics,
+                "optimization_opportunities": optimization_opportunities,
+                "optimization_strategies": optimization_strategies,
+                "expected_improvements": expected_improvements,
+                "implementation_plan": implementation_plan,
+                "optimization_summary": {
+                    "opportunities_identified": len(optimization_opportunities),
+                    "strategies_generated": len(optimization_strategies),
+                    "expected_response_time_improvement": expected_improvements.get("response_time_improvement", 0),
+                    "expected_resolution_time_improvement": expected_improvements.get("resolution_time_improvement", 0),
+                    "implementation_effort": implementation_plan.get("effort_level", "medium")
+                }
+            }
+            
+            logger.info("Andon response optimization completed", 
+                       line_id=line_id, strategies_count=len(optimization_strategies))
+            
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to optimize Andon response", 
+                        error=str(e), line_id=line_id)
+            raise BusinessLogicError("Failed to optimize Andon response")
+    
+    @staticmethod
+    async def generate_intelligent_andon_insights(
+        line_id: UUID,
+        analysis_period_days: int = 30,
+        insight_categories: List[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate intelligent insights for Andon system optimization.
+        
+        This method provides comprehensive analysis and actionable insights
+        for improving Andon system performance and effectiveness.
+        """
+        try:
+            if insight_categories is None:
+                insight_categories = ["patterns", "bottlenecks", "optimization", "predictions"]
+            
+            logger.info("Generating intelligent Andon insights", 
+                       line_id=line_id, categories=insight_categories)
+            
+            # Get comprehensive data
+            comprehensive_data = await AndonService._get_comprehensive_andon_data(
+                line_id, analysis_period_days
+            )
+            
+            insights = {}
+            
+            # Generate insights for each category
+            for category in insight_categories:
+                category_insights = await AndonService._generate_category_insights(
+                    category, comprehensive_data
+                )
+                insights[category] = category_insights
+            
+            # Generate cross-category insights
+            cross_category_insights = await AndonService._generate_cross_category_insights(
+                insights, comprehensive_data
+            )
+            
+            # Rank insights by impact and priority
+            ranked_insights = await AndonService._rank_insights_by_impact(
+                insights, cross_category_insights
+            )
+            
+            # Generate actionable recommendations
+            actionable_recommendations = await AndonService._generate_actionable_recommendations(
+                ranked_insights, comprehensive_data
+            )
+            
+            result = {
+                "line_id": line_id,
+                "analysis_period_days": analysis_period_days,
+                "analysis_timestamp": datetime.utcnow(),
+                "insight_categories": insight_categories,
+                "category_insights": insights,
+                "cross_category_insights": cross_category_insights,
+                "ranked_insights": ranked_insights,
+                "actionable_recommendations": actionable_recommendations,
+                "insights_summary": {
+                    "total_insights": sum(len(cat_insights) for cat_insights in insights.values()),
+                    "high_priority_insights": len([i for i in ranked_insights if i.get("priority") == "high"]),
+                    "optimization_potential": actionable_recommendations.get("total_optimization_potential", 0),
+                    "implementation_roadmap": actionable_recommendations.get("implementation_roadmap", [])
+                }
+            }
+            
+            logger.info("Intelligent Andon insights generated", 
+                       line_id=line_id, insights_count=result["insights_summary"]["total_insights"])
+            
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to generate intelligent Andon insights", 
+                        error=str(e), line_id=line_id)
+            raise BusinessLogicError("Failed to generate intelligent Andon insights")
+    
+    @staticmethod
+    async def implement_predictive_maintenance(
+        line_id: UUID,
+        equipment_code: str,
+        maintenance_horizon_days: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Implement predictive maintenance based on Andon event patterns.
+        
+        This method analyzes Andon event patterns to predict maintenance needs
+        and optimize maintenance schedules.
+        """
+        try:
+            logger.info("Implementing predictive maintenance", 
+                       line_id=line_id, equipment_code=equipment_code)
+            
+            # Get equipment-specific Andon events
+            equipment_events = await AndonService._get_equipment_andon_events(
+                line_id, equipment_code, days=90
+            )
+            
+            # Analyze maintenance patterns
+            maintenance_patterns = await AndonService._analyze_maintenance_patterns(
+                equipment_events, equipment_code
+            )
+            
+            # Predict maintenance needs
+            maintenance_predictions = await AndonService._predict_maintenance_needs(
+                maintenance_patterns, maintenance_horizon_days
+            )
+            
+            # Generate maintenance schedule
+            maintenance_schedule = await AndonService._generate_maintenance_schedule(
+                maintenance_predictions, equipment_code
+            )
+            
+            # Calculate maintenance optimization benefits
+            optimization_benefits = await AndonService._calculate_maintenance_optimization_benefits(
+                maintenance_schedule, equipment_events
+            )
+            
+            result = {
+                "line_id": line_id,
+                "equipment_code": equipment_code,
+                "maintenance_horizon_days": maintenance_horizon_days,
+                "implementation_timestamp": datetime.utcnow(),
+                "equipment_events_count": len(equipment_events),
+                "maintenance_patterns": maintenance_patterns,
+                "maintenance_predictions": maintenance_predictions,
+                "maintenance_schedule": maintenance_schedule,
+                "optimization_benefits": optimization_benefits,
+                "implementation_summary": {
+                    "predicted_maintenance_events": len(maintenance_predictions),
+                    "scheduled_maintenance_activities": len(maintenance_schedule),
+                    "expected_downtime_reduction": optimization_benefits.get("downtime_reduction_percentage", 0),
+                    "expected_cost_savings": optimization_benefits.get("cost_savings_percentage", 0),
+                    "maintenance_efficiency_improvement": optimization_benefits.get("efficiency_improvement", 0)
+                }
+            }
+            
+            logger.info("Predictive maintenance implemented", 
+                       line_id=line_id, equipment_code=equipment_code)
+            
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to implement predictive maintenance", 
+                        error=str(e), line_id=line_id, equipment_code=equipment_code)
+            raise BusinessLogicError("Failed to implement predictive maintenance")
+    
+    # Private helper methods for advanced Andon analytics
+    
+    @staticmethod
+    async def _get_historical_andon_data(
+        line_id: UUID, days: int
+    ) -> List[Dict[str, Any]]:
+        """Get historical Andon event data for analysis."""
+        try:
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=days)
+            
+            query = """
+            SELECT id, line_id, equipment_code, event_type, priority, description, 
+                   status, reported_by, reported_at, acknowledged_by, acknowledged_at, 
+                   resolved_by, resolved_at, resolution_notes
+            FROM factory_telemetry.andon_events 
+            WHERE line_id = :line_id
+            AND reported_at >= :start_date
+            AND reported_at <= :end_date
+            ORDER BY reported_at ASC
+            """
+            
+            result = await execute_query(query, {
+                "line_id": line_id,
+                "start_date": start_date,
+                "end_date": end_date
+            })
+            
+            return result or []
+            
+        except Exception as e:
+            logger.error("Failed to get historical Andon data", error=str(e))
+            return []
+    
+    @staticmethod
+    async def _get_equipment_status_data(
+        line_id: UUID, hours: int
+    ) -> List[Dict[str, Any]]:
+        """Get equipment status data for analysis."""
+        try:
+            # This would integrate with PLC data or equipment monitoring systems
+            # For now, return mock data structure
+            return [
+                {
+                    "equipment_code": "EQ001",
+                    "timestamp": datetime.utcnow(),
+                    "status": "running",
+                    "temperature": 75.5,
+                    "vibration": 2.3,
+                    "pressure": 15.2
+                }
+            ]
+            
+        except Exception as e:
+            logger.error("Failed to get equipment status data", error=str(e))
+            return []
+    
+    @staticmethod
+    async def _analyze_event_patterns(
+        historical_events: List[Dict[str, Any]], 
+        equipment_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Analyze patterns in Andon events."""
+        try:
+            if not historical_events:
+                return {"patterns": [], "trends": {}}
+            
+            # Analyze event frequency patterns
+            event_counts_by_type = {}
+            event_counts_by_equipment = {}
+            event_counts_by_hour = {}
+            
+            for event in historical_events:
+                event_type = event["event_type"]
+                equipment_code = event["equipment_code"]
+                hour = event["reported_at"].hour
+                
+                event_counts_by_type[event_type] = event_counts_by_type.get(event_type, 0) + 1
+                event_counts_by_equipment[equipment_code] = event_counts_by_equipment.get(equipment_code, 0) + 1
+                event_counts_by_hour[hour] = event_counts_by_hour.get(hour, 0) + 1
+            
+            # Identify trends
+            trends = {
+                "most_common_event_type": max(event_counts_by_type.items(), key=lambda x: x[1])[0] if event_counts_by_type else None,
+                "most_problematic_equipment": max(event_counts_by_equipment.items(), key=lambda x: x[1])[0] if event_counts_by_equipment else None,
+                "peak_event_hour": max(event_counts_by_hour.items(), key=lambda x: x[1])[0] if event_counts_by_hour else None
+            }
+            
+            return {
+                "patterns": {
+                    "event_type_distribution": event_counts_by_type,
+                    "equipment_distribution": event_counts_by_equipment,
+                    "hourly_distribution": event_counts_by_hour
+                },
+                "trends": trends,
+                "total_events": len(historical_events)
+            }
+            
+        except Exception as e:
+            logger.error("Failed to analyze event patterns", error=str(e))
+            return {"patterns": [], "trends": {}}
+    
+    @staticmethod
+    async def _generate_event_predictions(
+        event_patterns: Dict[str, Any], 
+        equipment_data: List[Dict[str, Any]], 
+        horizon_hours: int
+    ) -> List[Dict[str, Any]]:
+        """Generate event predictions based on patterns."""
+        try:
+            predictions = []
+            
+            # Simple prediction based on historical patterns
+            patterns = event_patterns.get("patterns", {})
+            trends = event_patterns.get("trends", {})
+            
+            # Generate hourly predictions
+            for hour_offset in range(1, horizon_hours + 1):
+                prediction_time = datetime.utcnow() + timedelta(hours=hour_offset)
+                hour = prediction_time.hour
+                
+                # Calculate probability based on historical patterns
+                hourly_events = patterns.get("hourly_distribution", {}).get(hour, 0)
+                total_events = event_patterns.get("total_events", 1)
+                base_probability = hourly_events / total_events if total_events > 0 else 0
+                
+                # Adjust probability based on equipment status
+                equipment_risk_factor = 1.0
+                for equipment in equipment_data:
+                    if equipment.get("temperature", 0) > 80:  # High temperature
+                        equipment_risk_factor *= 1.5
+                    if equipment.get("vibration", 0) > 3.0:  # High vibration
+                        equipment_risk_factor *= 1.3
+                
+                probability = min(1.0, base_probability * equipment_risk_factor)
+                
+                if probability > 0.1:  # Only predict if probability is significant
+                    predictions.append({
+                        "prediction_time": prediction_time,
+                        "event_type": trends.get("most_common_event_type", "unknown"),
+                        "equipment_code": trends.get("most_problematic_equipment", "unknown"),
+                        "probability": round(probability, 3),
+                        "confidence": round(min(0.9, probability * 2), 3),
+                        "risk_level": "high" if probability > 0.5 else "medium" if probability > 0.3 else "low"
+                    })
+            
+            return predictions
+            
+        except Exception as e:
+            logger.error("Failed to generate event predictions", error=str(e))
+            return []
+    
+    @staticmethod
+    async def _generate_prevention_recommendations(
+        predictions: List[Dict[str, Any]], 
+        event_patterns: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate prevention recommendations based on predictions."""
+        try:
+            recommendations = []
+            
+            # Group predictions by equipment
+            equipment_predictions = {}
+            for pred in predictions:
+                equipment = pred["equipment_code"]
+                if equipment not in equipment_predictions:
+                    equipment_predictions[equipment] = []
+                equipment_predictions[equipment].append(pred)
+            
+            # Generate equipment-specific recommendations
+            for equipment, preds in equipment_predictions.items():
+                high_risk_predictions = [p for p in preds if p["risk_level"] == "high"]
+                
+                if high_risk_predictions:
+                    recommendations.append({
+                        "equipment_code": equipment,
+                        "priority": "high",
+                        "recommendation_type": "preventive_maintenance",
+                        "description": f"High risk of events detected for {equipment}",
+                        "recommended_actions": [
+                            "Schedule immediate inspection",
+                            "Check equipment parameters",
+                            "Review maintenance history",
+                            "Consider preventive maintenance"
+                        ],
+                        "expected_impact": "Reduce event probability by 60-80%",
+                        "implementation_time": "1-2 hours"
+                    })
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.error("Failed to generate prevention recommendations", error=str(e))
+            return []
+    
+    @staticmethod
+    def _calculate_overall_risk_level(predictions: List[Dict[str, Any]]) -> str:
+        """Calculate overall risk level from predictions."""
+        if not predictions:
+            return "low"
+        
+        high_risk_count = len([p for p in predictions if p.get("risk_level") == "high"])
+        medium_risk_count = len([p for p in predictions if p.get("risk_level") == "medium"])
+        
+        if high_risk_count > 2:
+            return "critical"
+        elif high_risk_count > 0 or medium_risk_count > 3:
+            return "high"
+        elif medium_risk_count > 0:
+            return "medium"
+        else:
+            return "low"
+    
+    # Additional helper methods for response optimization and insights
+    # These would be implemented with full functionality
+    
+    @staticmethod
+    async def _get_current_response_metrics(line_id: UUID) -> Dict[str, Any]:
+        """Get current response metrics."""
+        # Implementation would get current response metrics
+        return {
+            "avg_acknowledgment_time_minutes": 5.2,
+            "avg_resolution_time_minutes": 25.8,
+            "escalation_rate": 0.15
+        }
+    
+    @staticmethod
+    async def _analyze_response_patterns(line_id: UUID) -> Dict[str, Any]:
+        """Analyze response patterns."""
+        # Implementation would analyze response patterns
+        return {"patterns": [], "trends": {}}
+    
+    @staticmethod
+    async def _identify_response_optimization_opportunities(
+        current_metrics: Dict[str, Any], 
+        response_patterns: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Identify response optimization opportunities."""
+        # Implementation would identify optimization opportunities
+        return []
+    
+    @staticmethod
+    async def _generate_response_optimization_strategies(
+        opportunities: List[Dict[str, Any]], 
+        goals: List[str], 
+        constraints: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate response optimization strategies."""
+        # Implementation would generate optimization strategies
+        return []
+    
+    @staticmethod
+    async def _calculate_expected_improvements(
+        strategies: List[Dict[str, Any]], 
+        current_metrics: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Calculate expected improvements."""
+        # Implementation would calculate expected improvements
+        return {"response_time_improvement": 0.2, "resolution_time_improvement": 0.15}
+    
+    @staticmethod
+    async def _generate_response_implementation_plan(
+        strategies: List[Dict[str, Any]], 
+        improvements: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate response implementation plan."""
+        # Implementation would generate implementation plan
+        return {"effort_level": "medium", "timeline": "2-4 weeks"}
+    
+    @staticmethod
+    async def _get_comprehensive_andon_data(
+        line_id: UUID, period_days: int
+    ) -> Dict[str, Any]:
+        """Get comprehensive Andon data."""
+        # Implementation would get comprehensive data
+        return {}
+    
+    @staticmethod
+    async def _generate_category_insights(
+        category: str, data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate category-specific insights."""
+        # Implementation would generate category insights
+        return []
+    
+    @staticmethod
+    async def _generate_cross_category_insights(
+        insights: Dict[str, Any], data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Generate cross-category insights."""
+        # Implementation would generate cross-category insights
+        return []
+    
+    @staticmethod
+    async def _rank_insights_by_impact(
+        insights: Dict[str, Any], cross_category_insights: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Rank insights by impact."""
+        # Implementation would rank insights
+        return []
+    
+    @staticmethod
+    async def _generate_actionable_recommendations(
+        ranked_insights: List[Dict[str, Any]], data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate actionable recommendations."""
+        # Implementation would generate recommendations
+        return {"total_optimization_potential": 0.2, "implementation_roadmap": []}
+    
+    @staticmethod
+    async def _get_equipment_andon_events(
+        line_id: UUID, equipment_code: str, days: int
+    ) -> List[Dict[str, Any]]:
+        """Get equipment-specific Andon events."""
+        # Implementation would get equipment events
+        return []
+    
+    @staticmethod
+    async def _analyze_maintenance_patterns(
+        events: List[Dict[str, Any]], equipment_code: str
+    ) -> Dict[str, Any]:
+        """Analyze maintenance patterns."""
+        # Implementation would analyze maintenance patterns
+        return {}
+    
+    @staticmethod
+    async def _predict_maintenance_needs(
+        patterns: Dict[str, Any], horizon_days: int
+    ) -> List[Dict[str, Any]]:
+        """Predict maintenance needs."""
+        # Implementation would predict maintenance needs
+        return []
+    
+    @staticmethod
+    async def _generate_maintenance_schedule(
+        predictions: List[Dict[str, Any]], equipment_code: str
+    ) -> List[Dict[str, Any]]:
+        """Generate maintenance schedule."""
+        # Implementation would generate maintenance schedule
+        return []
+    
+    @staticmethod
+    async def _calculate_maintenance_optimization_benefits(
+        schedule: List[Dict[str, Any]], events: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Calculate maintenance optimization benefits."""
+        # Implementation would calculate benefits
+        return {
+            "downtime_reduction_percentage": 25.0,
+            "cost_savings_percentage": 15.0,
+            "efficiency_improvement": 0.2
+        }

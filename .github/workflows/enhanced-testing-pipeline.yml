@@ -1,0 +1,437 @@
+# Enhanced Testing Pipeline for MS5.0 Floor Dashboard
+# Comprehensive testing integration with quality gates and validation
+name: Enhanced Testing Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for testing'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  # Azure Configuration
+  AZURE_CONTAINER_REGISTRY: ms5acrprod.azurecr.io
+  AZURE_CONTAINER_REGISTRY_STAGING: ms5acrstaging.azurecr.io
+  AKS_CLUSTER_NAME: ms5-aks-cluster
+  AKS_CLUSTER_NAME_STAGING: ms5-aks-cluster-staging
+  AKS_RESOURCE_GROUP: ms5-rg
+  AKS_RESOURCE_GROUP_STAGING: ms5-rg-staging
+  
+  # Testing Configuration
+  TEST_TIMEOUT: 1800  # 30 minutes
+  QUALITY_GATE_TIMEOUT: 600  # 10 minutes
+  COVERAGE_THRESHOLD: 85
+  PERFORMANCE_THRESHOLD_MS: 200
+
+jobs:
+  # Code Quality Analysis
+  code-quality-analysis:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      quality-gate-status: ${{ steps.quality-gates.outputs.status }}
+      coverage-percentage: ${{ steps.coverage.outputs.percentage }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov pytest-xdist bandit safety mypy black isort flake8
+
+      - name: Code formatting check
+        run: |
+          black --check backend/
+          isort --check-only backend/
+
+      - name: Linting
+        run: |
+          flake8 backend/ --max-line-length=88 --extend-ignore=E203,W503
+          mypy backend/app --ignore-missing-imports
+
+      - name: Security analysis
+        run: |
+          bandit -r backend/app -f json -o bandit-report.json
+          safety check --json --output safety-report.json
+
+      - name: Unit tests with coverage
+        id: coverage
+        run: |
+          pytest backend/tests/unit/ \
+            --cov=backend/app \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            --junitxml=unit-test-results.xml \
+            -n auto
+          
+          # Extract coverage percentage
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); print(tree.getroot().attrib['line-rate'])")
+          COVERAGE_PERCENT=$(python -c "print(int(float('$COVERAGE') * 100))")
+          echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+
+      - name: Dependency vulnerability scan
+        run: |
+          pip-audit --format=json --output=pip-audit-report.json
+
+      - name: Quality gates evaluation
+        id: quality-gates
+        run: |
+          python scripts/evaluate-quality-gates.py \
+            --coverage-report coverage.xml \
+            --security-report bandit-report.json \
+            --safety-report safety-report.json \
+            --audit-report pip-audit-report.json \
+            --threshold ${{ env.COVERAGE_THRESHOLD }} \
+            --output quality-gates-result.json
+          
+          STATUS=$(jq -r '.overall_status' quality-gates-result.json)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: code-quality-results
+          path: |
+            unit-test-results.xml
+            coverage.xml
+            htmlcov/
+            bandit-report.json
+            safety-report.json
+            pip-audit-report.json
+            quality-gates-result.json
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Test Results
+          path: unit-test-results.xml
+          reporter: java-junit
+
+  # Integration Testing
+  integration-testing:
+    name: Integration Testing
+    runs-on: ubuntu-latest
+    needs: code-quality-analysis
+    if: needs.code-quality-analysis.outputs.quality-gate-status == 'passed'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: ms5_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/ms5_test
+        run: |
+          cd backend
+          alembic upgrade head
+
+      - name: Integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/ms5_test
+          REDIS_URL: redis://localhost:6379/0
+          TESTING: true
+        run: |
+          pytest backend/tests/integration/ \
+            --junitxml=integration-test-results.xml \
+            -v \
+            --tb=short
+
+      - name: API contract tests
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/ms5_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest backend/tests/contract/ \
+            --junitxml=contract-test-results.xml \
+            -v
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            integration-test-results.xml
+            contract-test-results.xml
+
+  # Kubernetes Deployment Testing
+  kubernetes-deployment-testing:
+    name: Kubernetes Deployment Testing
+    runs-on: ubuntu-latest
+    needs: [code-quality-analysis, integration-testing]
+    if: needs.code-quality-analysis.outputs.quality-gate-status == 'passed'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl for staging
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.AKS_RESOURCE_GROUP_STAGING }} \
+            --name ${{ env.AKS_CLUSTER_NAME_STAGING }} \
+            --overwrite-existing
+
+      - name: Deploy to staging
+        run: |
+          # Apply staging manifests
+          kubectl apply -k k8s/gitops/staging/backend/
+          
+          # Wait for deployment to be ready
+          kubectl rollout status deployment/staging-ms5-backend -n ms5-staging --timeout=600s
+
+      - name: Run Kubernetes deployment tests
+        run: |
+          python scripts/run-k8s-deployment-tests.py \
+            --namespace ms5-staging \
+            --app-label ms5-backend \
+            --service-name staging-ms5-backend-service \
+            --deployment-name staging-ms5-backend \
+            --config k8s/testing/integration/kubernetes-deployment-tests.yaml \
+            --output k8s-test-results.xml
+
+      - name: Performance testing
+        run: |
+          # Get service endpoint
+          STAGING_ENDPOINT=$(kubectl get service staging-ms5-backend-service -n ms5-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          # Run performance tests
+          python scripts/run-performance-tests.py \
+            --endpoint "http://$STAGING_ENDPOINT:8000" \
+            --duration 300 \
+            --concurrent-users 50 \
+            --threshold-ms ${{ env.PERFORMANCE_THRESHOLD_MS }} \
+            --output performance-test-results.json
+
+      - name: Security scanning in cluster
+        run: |
+          # Run Trivy security scan on deployed pods
+          kubectl run trivy-scan --rm -i --restart=Never \
+            --image=aquasec/trivy:latest \
+            -- image staging-ms5-backend:latest \
+            --format json \
+            --output /tmp/trivy-results.json
+
+      - name: Upload K8s test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: k8s-deployment-test-results
+          path: |
+            k8s-test-results.xml
+            performance-test-results.json
+
+  # End-to-End Testing
+  e2e-testing:
+    name: End-to-End Testing
+    runs-on: ubuntu-latest
+    needs: kubernetes-deployment-testing
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend for testing
+        run: |
+          cd frontend
+          npm run build:test
+
+      - name: Set up Playwright
+        run: |
+          cd frontend
+          npx playwright install --with-deps
+
+      - name: Run E2E tests
+        env:
+          BASE_URL: https://staging.ms5floor.com
+        run: |
+          cd frontend
+          npx playwright test \
+            --reporter=junit \
+            --output-dir=test-results \
+            --project=chromium
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+
+  # Quality Gate Validation
+  quality-gate-validation:
+    name: Quality Gate Validation
+    runs-on: ubuntu-latest
+    needs: [code-quality-analysis, integration-testing, kubernetes-deployment-testing, e2e-testing]
+    if: always()
+    outputs:
+      deployment-approved: ${{ steps.final-validation.outputs.approved }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all test results
+        uses: actions/download-artifact@v3
+
+      - name: Aggregate test results
+        run: |
+          python scripts/aggregate-test-results.py \
+            --code-quality code-quality-results/ \
+            --integration integration-test-results/ \
+            --k8s-deployment k8s-deployment-test-results/ \
+            --e2e e2e-test-results/ \
+            --output aggregated-results.json
+
+      - name: Final quality gate validation
+        id: final-validation
+        run: |
+          python scripts/final-quality-gate-validation.py \
+            --results aggregated-results.json \
+            --environment ${{ github.event.inputs.environment || 'staging' }} \
+            --config k8s/testing/quality-gates/deployment-quality-gates.yaml \
+            --output final-validation-result.json
+          
+          APPROVED=$(jq -r '.deployment_approved' final-validation-result.json)
+          echo "approved=$APPROVED" >> $GITHUB_OUTPUT
+
+      - name: Generate test report
+        run: |
+          python scripts/generate-test-report.py \
+            --results aggregated-results.json \
+            --validation final-validation-result.json \
+            --output test-report.html
+
+      - name: Upload final results
+        uses: actions/upload-artifact@v3
+        with:
+          name: final-test-results
+          path: |
+            aggregated-results.json
+            final-validation-result.json
+            test-report.html
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('final-validation-result.json', 'utf8'));
+            
+            const comment = `## 🧪 Test Results Summary
+            
+            **Overall Status**: ${results.deployment_approved ? '✅ PASSED' : '❌ FAILED'}
+            **Coverage**: ${results.coverage_percentage}%
+            **Quality Gates**: ${results.quality_gates_passed}/${results.total_quality_gates}
+            
+            ### Test Results
+            - **Unit Tests**: ${results.unit_tests.status}
+            - **Integration Tests**: ${results.integration_tests.status}
+            - **K8s Deployment Tests**: ${results.k8s_tests.status}
+            - **E2E Tests**: ${results.e2e_tests.status}
+            - **Security Scan**: ${results.security_scan.status}
+            - **Performance Tests**: ${results.performance_tests.status}
+            
+            ${results.deployment_approved ? 
+              '🚀 **Ready for deployment!**' : 
+              '⚠️ **Deployment blocked due to quality gate failures**'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Deployment Approval (for production)
+  deployment-approval:
+    name: Deployment Approval
+    runs-on: ubuntu-latest
+    needs: quality-gate-validation
+    if: needs.quality-gate-validation.outputs.deployment-approved == 'true' && github.ref == 'refs/heads/main'
+    environment: production-approval
+    steps:
+      - name: Request deployment approval
+        run: |
+          echo "🚀 All quality gates passed. Deployment approved for production."
+          echo "Deployment will proceed after manual approval."

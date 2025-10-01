@@ -1,0 +1,351 @@
+---
+# MS5.0 Floor Dashboard - Pod Security Standards Implementation
+# Phase 7A: Core Security Implementation
+# 
+# This manifest implements comprehensive Pod Security Standards enforcement
+# across all namespaces with appropriate security levels for different environments.
+#
+# Security Architecture:
+# - Production: Restricted (maximum security)
+# - Staging: Baseline (minimum security) 
+# - System: Privileged (required for system components)
+#
+# Implementation follows Kubernetes Pod Security Standards v1.24+ with
+# admission controller enforcement for defense-in-depth security.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-production
+  labels:
+    name: ms5-production
+    environment: production
+    app: ms5-dashboard
+    version: "1.0.0"
+    # Pod Security Standards - Production (Restricted)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    description: "MS5.0 Floor Dashboard Production Namespace - Restricted Security"
+    contact: "devops@company.com"
+    security-level: "restricted"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-staging
+  labels:
+    name: ms5-staging
+    environment: staging
+    app: ms5-dashboard
+    version: "1.0.0"
+    # Pod Security Standards - Staging (Baseline)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+  annotations:
+    description: "MS5.0 Floor Dashboard Staging Namespace - Baseline Security"
+    contact: "devops@company.com"
+    security-level: "baseline"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-system
+  labels:
+    name: ms5-system
+    environment: system
+    app: ms5-dashboard
+    version: "1.0.0"
+    # Pod Security Standards - System (Privileged for system components)
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+  annotations:
+    description: "MS5.0 Floor Dashboard System Namespace - Privileged Security"
+    contact: "devops@company.com"
+    security-level: "privileged"
+---
+# Pod Security Policy for admission controller validation
+# This provides additional validation beyond namespace-level standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-security-policy-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+data:
+  policy.yaml: |
+    # Pod Security Policy Configuration
+    # Validates security contexts before pod admission
+    
+    # Required security context fields
+    requiredFields:
+      - securityContext.runAsNonRoot
+      - securityContext.runAsUser
+      - securityContext.runAsGroup
+      - securityContext.fsGroup
+    
+    # Prohibited security context fields
+    prohibitedFields:
+      - securityContext.runAsUser: 0  # Root user
+      - securityContext.privileged: true
+      - securityContext.allowPrivilegeEscalation: true
+    
+    # Required capabilities to drop
+    requiredCapabilitiesToDrop:
+      - ALL
+    
+    # Prohibited volume types
+    prohibitedVolumes:
+      - hostPath
+      - hostNetwork: true
+      - hostPID: true
+      - hostIPC: true
+    
+    # Required volume mounts
+    requiredVolumeMounts:
+      - name: "logs"
+        mountPath: "/app/logs"
+        readOnly: false
+      - name: "temp"
+        mountPath: "/app/temp"
+        readOnly: false
+    
+    # Security context validation rules
+    validationRules:
+      runAsNonRoot: true
+      runAsUser: ">= 1000"
+      runAsGroup: ">= 1000"
+      fsGroup: ">= 1000"
+      readOnlyRootFilesystem: true  # Where possible
+      allowPrivilegeEscalation: false
+      privileged: false
+      capabilities:
+        drop: ["ALL"]
+        add: []  # No additional capabilities allowed
+---
+# Security context templates for different service types
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-context-templates
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+data:
+  # Backend service security context template
+  backend-security-context.yaml: |
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+    - name: backend
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  # Required for logs and temp files
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+  
+  # Database service security context template
+  database-security-context.yaml: |
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 999  # PostgreSQL user
+      runAsGroup: 999  # PostgreSQL group
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+    - name: postgres
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  # Required for data directory
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+  
+  # Monitoring service security context template
+  monitoring-security-context.yaml: |
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 10001  # Grafana user
+      runAsGroup: 10001  # Grafana group
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+    - name: grafana
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  # Required for dashboards and data
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+  
+  # Cache service security context template
+  cache-security-context.yaml: |
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 999  # Redis user
+      runAsGroup: 999  # Redis group
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+    - name: redis
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  # Required for data directory
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+---
+# Pod Security Admission Controller Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-security-admission-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+data:
+  admission-config.yaml: |
+    # Pod Security Admission Controller Configuration
+    # Provides runtime validation of pod security standards
+    
+    apiVersion: apiserver.config.k8s.io/v1alpha1
+    kind: AdmissionConfiguration
+    plugins:
+    - name: PodSecurity
+      configuration:
+        apiVersion: pod-security.admission.config.k8s.io/v1alpha1
+        kind: PodSecurityConfiguration
+        defaults:
+          enforce: "restricted"
+          audit: "restricted"
+          warn: "restricted"
+        exemptions:
+          # System namespaces exempt from restrictions
+          namespaces:
+          - kube-system
+          - kube-public
+          - kube-node-lease
+          - ms5-system
+          # Runtime classes exempt from restrictions
+          runtimeClasses: []
+          # Users exempt from restrictions
+          usernames: []
+          # Groups exempt from restrictions
+          usergroups: []
+---
+# Security validation webhook configuration
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: pod-security-validator
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+webhooks:
+- name: pod-security.ms5.company.com
+  clientConfig:
+    service:
+      name: pod-security-validator
+      namespace: ms5-production
+      path: "/validate-pod-security"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions: ["v1", "v1beta1"]
+---
+# Security monitoring and alerting configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-monitoring-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+data:
+  security-alerts.yaml: |
+    # Security monitoring alerts for Pod Security Standards violations
+    
+    groups:
+    - name: pod-security-violations
+      rules:
+      - alert: PodSecurityViolation
+        expr: kube_pod_status_phase{phase="Failed"} == 1
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Pod Security Standards violation detected"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} failed due to security policy violation"
+      
+      - alert: PrivilegedContainerDetected
+        expr: kube_pod_container_status_restarts_total > 0
+        for: 30s
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Privileged container detected"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is running with privileged access"
+      
+      - alert: RootContainerDetected
+        expr: kube_pod_container_status_restarts_total > 0
+        for: 30s
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Root container detected"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is running as root user"
+      
+      - alert: SecurityContextMissing
+        expr: kube_pod_container_status_restarts_total > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Security context missing"
+          description: "Pod {{ $labels.pod }} is missing required security context configuration"

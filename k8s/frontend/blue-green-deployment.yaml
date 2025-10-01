@@ -1,0 +1,377 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ms5-frontend-rollout
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: frontend
+    tier: frontend
+    environment: production
+    deployment: aks
+    strategy: blue-green
+  annotations:
+    description: "MS5.0 Floor Dashboard Blue-Green Deployment for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    blueGreen:
+      # Active service (currently serving traffic)
+      activeService: ms5-frontend-active
+      # Preview service (new version being tested)
+      previewService: ms5-frontend-preview
+      # Auto-promotion disabled for manual validation
+      autoPromotionEnabled: false
+      # Scale down delay for blue-green switch
+      scaleDownDelaySeconds: 30
+      # Pre-promotion analysis
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        - templateName: error-rate
+        - templateName: latency
+        args:
+        - name: service-name
+          value: ms5-frontend-preview
+        - name: service-namespace
+          value: ms5-frontend
+        - name: success-rate-threshold
+          value: "99"
+        - name: error-rate-threshold
+          value: "1"
+        - name: latency-threshold
+          value: "200"
+      # Post-promotion analysis
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        - templateName: error-rate
+        - templateName: latency
+        args:
+        - name: service-name
+          value: ms5-frontend-active
+        - name: service-namespace
+          value: ms5-frontend
+        - name: success-rate-threshold
+          value: "99"
+        - name: error-rate-threshold
+          value: "1"
+        - name: latency-threshold
+          value: "200"
+  selector:
+    matchLabels:
+      app: ms5-frontend
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: ms5-frontend
+        component: frontend
+        tier: frontend
+        environment: production
+        deployment: aks
+        strategy: blue-green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: ms5-frontend-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: ms5-frontend
+        image: ms5-frontend:aks
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: API_BASE_URL
+        - name: WS_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: WS_BASE_URL
+        - name: CDN_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: CDN_BASE_URL
+        - name: PWA_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: PWA_ENABLED
+        - name: OFFLINE_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: OFFLINE_MODE
+        - name: FACTORY_NETWORK
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: FACTORY_NETWORK
+        - name: TABLET_OPTIMIZED
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: TABLET_OPTIMIZED
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /live
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: tablet-config
+          mountPath: /etc/nginx/tablet.config
+          subPath: tablet.config
+          readOnly: true
+        - name: factory-config
+          mountPath: /etc/nginx/factory.config
+          subPath: factory.config
+          readOnly: true
+        - name: pwa-config
+          mountPath: /etc/nginx/pwa.config
+          subPath: pwa.config
+          readOnly: true
+        - name: offline-config
+          mountPath: /etc/nginx/offline.config
+          subPath: offline.config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: var-cache
+          mountPath: /var/cache/nginx
+        - name: var-log
+          mountPath: /var/log/nginx
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: ms5-frontend-config
+      - name: tablet-config
+        configMap:
+          name: ms5-frontend-config
+      - name: factory-config
+        configMap:
+          name: ms5-frontend-config
+      - name: pwa-config
+        configMap:
+          name: ms5-frontend-config
+      - name: offline-config
+        configMap:
+          name: ms5-frontend-config
+      - name: tmp
+        emptyDir: {}
+      - name: var-cache
+        emptyDir: {}
+      - name: var-log
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-frontend
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-frontend-active
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: frontend
+    tier: frontend
+    environment: production
+    deployment: aks
+    service-type: active
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: ms5-frontend
+    component: frontend
+    service-type: active
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-frontend-preview
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: frontend
+    tier: frontend
+    environment: production
+    deployment: aks
+    service-type: preview
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: ms5-frontend
+    component: frontend
+    service-type: preview
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: analysis
+    tier: frontend
+    environment: production
+    deployment: aks
+spec:
+  args:
+  - name: service-name
+  - name: service-namespace
+  - name: success-rate-threshold
+  metrics:
+  - name: success-rate
+    successCondition: result[0] >= {{ .Args.success-rate-threshold }}
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(istio_requests_total{destination_service_name="{{ .Args.service-name }}",destination_service_namespace="{{ .Args.service-namespace }}",response_code!~"5.."}[5m])) / sum(rate(istio_requests_total{destination_service_name="{{ .Args.service-name }}",destination_service_namespace="{{ .Args.service-namespace }}"}[5m])) * 100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: analysis
+    tier: frontend
+    environment: production
+    deployment: aks
+spec:
+  args:
+  - name: service-name
+  - name: service-namespace
+  - name: error-rate-threshold
+  metrics:
+  - name: error-rate
+    successCondition: result[0] <= {{ .Args.error-rate-threshold }}
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(istio_requests_total{destination_service_name="{{ .Args.service-name }}",destination_service_namespace="{{ .Args.service-namespace }}",response_code=~"5.."}[5m])) / sum(rate(istio_requests_total{destination_service_name="{{ .Args.service-name }}",destination_service_namespace="{{ .Args.service-namespace }}"}[5m])) * 100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: analysis
+    tier: frontend
+    environment: production
+    deployment: aks
+spec:
+  args:
+  - name: service-name
+  - name: service-namespace
+  - name: latency-threshold
+  metrics:
+  - name: latency
+    successCondition: result[0] <= {{ .Args.latency-threshold }}
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name="{{ .Args.service-name }}",destination_service_namespace="{{ .Args.service-namespace }}"}[5m])) by (le))

@@ -1,0 +1,483 @@
+---
+# MS5.0 Floor Dashboard - TLS Encryption Configuration
+# Phase 7A: Core Security Implementation
+#
+# This manifest implements comprehensive TLS encryption for all service
+# communication with end-to-end encryption, certificate management,
+# and secure communication protocols.
+#
+# Security Architecture:
+# - Service-to-Service TLS: mTLS between all services
+# - Ingress TLS: TLS 1.3 for external access
+# - Database Encryption: Encrypted database connections
+# - Certificate Management: Automated certificate rotation
+# - Cipher Suites: Strong encryption algorithms only
+
+# TLS Certificate Authority Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tls-ca-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  ca-config.yaml: |
+    # Certificate Authority Configuration
+    # Internal CA for service-to-service communication
+    
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ca-config
+    data:
+      ca.crt: |
+        -----BEGIN CERTIFICATE-----
+        # Internal CA certificate for MS5.0 services
+        # This will be replaced with actual CA certificate
+        -----END CERTIFICATE-----
+      ca.key: |
+        -----BEGIN PRIVATE KEY-----
+        # Internal CA private key for MS5.0 services
+        # This will be replaced with actual CA private key
+        -----END PRIVATE KEY-----
+---
+# Service-to-Service TLS Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-tls-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  # Backend service TLS configuration
+  backend-tls.yaml: |
+    # Backend service TLS configuration
+    tls:
+      enabled: true
+      version: "TLSv1.3"
+      cipherSuites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+        - "TLS_AES_128_GCM_SHA256"
+      minVersion: "TLSv1.2"
+      maxVersion: "TLSv1.3"
+      certificate:
+        secretName: "backend-tls-cert"
+        key: "tls.crt"
+      privateKey:
+        secretName: "backend-tls-cert"
+        key: "tls.key"
+      caCertificate:
+        secretName: "ca-cert"
+        key: "ca.crt"
+  
+  # Database TLS configuration
+  database-tls.yaml: |
+    # Database service TLS configuration
+    tls:
+      enabled: true
+      version: "TLSv1.3"
+      cipherSuites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+      minVersion: "TLSv1.2"
+      maxVersion: "TLSv1.3"
+      certificate:
+        secretName: "database-tls-cert"
+        key: "tls.crt"
+      privateKey:
+        secretName: "database-tls-cert"
+        key: "tls.key"
+      caCertificate:
+        secretName: "ca-cert"
+        key: "ca.crt"
+      # PostgreSQL specific TLS settings
+      postgresql:
+        ssl: "require"
+        sslmode: "require"
+        sslcert: "/etc/ssl/certs/tls.crt"
+        sslkey: "/etc/ssl/private/tls.key"
+        sslrootcert: "/etc/ssl/certs/ca.crt"
+  
+  # Redis TLS configuration
+  redis-tls.yaml: |
+    # Redis service TLS configuration
+    tls:
+      enabled: true
+      version: "TLSv1.3"
+      cipherSuites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+      minVersion: "TLSv1.2"
+      maxVersion: "TLSv1.3"
+      certificate:
+        secretName: "redis-tls-cert"
+        key: "tls.crt"
+      privateKey:
+        secretName: "redis-tls-cert"
+        key: "tls.key"
+      caCertificate:
+        secretName: "ca-cert"
+        key: "ca.crt"
+      # Redis specific TLS settings
+      redis:
+        tls-port: 6380
+        tls-cert-file: "/etc/ssl/certs/tls.crt"
+        tls-key-file: "/etc/ssl/private/tls.key"
+        tls-ca-cert-file: "/etc/ssl/certs/ca.crt"
+        tls-auth-clients: "yes"
+  
+  # MinIO TLS configuration
+  minio-tls.yaml: |
+    # MinIO service TLS configuration
+    tls:
+      enabled: true
+      version: "TLSv1.3"
+      cipherSuites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+      minVersion: "TLSv1.2"
+      maxVersion: "TLSv1.3"
+      certificate:
+        secretName: "minio-tls-cert"
+        key: "tls.crt"
+      privateKey:
+        secretName: "minio-tls-cert"
+        key: "tls.key"
+      caCertificate:
+        secretName: "ca-cert"
+        key: "ca.crt"
+      # MinIO specific TLS settings
+      minio:
+        tls-port: 9443
+        tls-cert-file: "/etc/ssl/certs/tls.crt"
+        tls-key-file: "/etc/ssl/private/tls.key"
+        tls-ca-cert-file: "/etc/ssl/certs/ca.crt"
+---
+# TLS Certificate Secrets (Placeholder - to be replaced with actual certificates)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ca-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+type: kubernetes.io/tls
+data:
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==  # Base64 encoded CA certificate
+  ca.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==  # Base64 encoded CA private key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-tls-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    security-level: "restricted"
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==  # Base64 encoded backend certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==  # Base64 encoded backend private key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-tls-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    security-level: "restricted"
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==  # Base64 encoded database certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==  # Base64 encoded database private key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-tls-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: redis
+    security-level: "restricted"
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==  # Base64 encoded Redis certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==  # Base64 encoded Redis private key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-tls-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+    security-level: "restricted"
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==  # Base64 encoded MinIO certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==  # Base64 encoded MinIO private key
+---
+# Certificate Management Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certificate-management-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  cert-manager.yaml: |
+    # Certificate Manager Configuration
+    # Automated certificate issuance and renewal
+    
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: ms5-ca-issuer
+    spec:
+      selfSigned:
+        crt: |
+          -----BEGIN CERTIFICATE-----
+          # Self-signed CA certificate for internal services
+          -----END CERTIFICATE-----
+    
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: backend-tls-cert
+      namespace: ms5-production
+    spec:
+      secretName: backend-tls-cert
+      issuerRef:
+        name: ms5-ca-issuer
+        kind: ClusterIssuer
+      dnsNames:
+      - backend.ms5-production.svc.cluster.local
+      - ms5-backend.ms5-production.svc.cluster.local
+      duration: 8760h  # 1 year
+      renewBefore: 720h  # 30 days before expiry
+    
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: database-tls-cert
+      namespace: ms5-production
+    spec:
+      secretName: database-tls-cert
+      issuerRef:
+        name: ms5-ca-issuer
+        kind: ClusterIssuer
+      dnsNames:
+      - postgres-primary.ms5-production.svc.cluster.local
+      - postgres-replica.ms5-production.svc.cluster.local
+      duration: 8760h  # 1 year
+      renewBefore: 720h  # 30 days before expiry
+    
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: redis-tls-cert
+      namespace: ms5-production
+    spec:
+      secretName: redis-tls-cert
+      issuerRef:
+        name: ms5-ca-issuer
+        kind: ClusterIssuer
+      dnsNames:
+      - redis-primary.ms5-production.svc.cluster.local
+      - redis-replica.ms5-production.svc.cluster.local
+      duration: 8760h  # 1 year
+      renewBefore: 720h  # 30 days before expiry
+    
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: minio-tls-cert
+      namespace: ms5-production
+    spec:
+      secretName: minio-tls-cert
+      issuerRef:
+        name: ms5-ca-issuer
+        kind: ClusterIssuer
+      dnsNames:
+      - minio-primary.ms5-production.svc.cluster.local
+      - minio-console.ms5-production.svc.cluster.local
+      duration: 8760h  # 1 year
+      renewBefore: 720h  # 30 days before expiry
+---
+# Ingress TLS Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-tls-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  ingress-tls.yaml: |
+    # Ingress TLS Configuration
+    # External access with TLS 1.3 and strong cipher suites
+    
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: ms5-tls-ingress
+      namespace: ms5-production
+      annotations:
+        # TLS 1.3 configuration
+        nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+        nginx.ingress.kubernetes.io/ssl-ciphers: "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256"
+        nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"
+        # HSTS headers
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/hsts: "true"
+        nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+        nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+        nginx.ingress.kubernetes.io/hsts-preload: "true"
+        # Security headers
+        nginx.ingress.kubernetes.io/configuration-snippet: |
+          add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+          add_header X-Frame-Options "DENY" always;
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header X-XSS-Protection "1; mode=block" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+          add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss:; frame-ancestors 'none';" always;
+    spec:
+      tls:
+      - hosts:
+        - ms5.company.com
+        - api.ms5.company.com
+        - grafana.ms5.company.com
+        - flower.ms5.company.com
+        secretName: ms5-tls-secret
+      rules:
+      - host: ms5.company.com
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ms5-backend
+                port:
+                  number: 8000
+      - host: api.ms5.company.com
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ms5-backend
+                port:
+                  number: 8000
+      - host: grafana.ms5.company.com
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ms5-grafana
+                port:
+                  number: 3000
+      - host: flower.ms5.company.com
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ms5-flower
+                port:
+                  number: 5555
+---
+# TLS Monitoring and Alerting Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tls-monitoring-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  tls-alerts.yaml: |
+    # TLS monitoring alerts
+    
+    groups:
+    - name: tls-security-monitoring
+      rules:
+      - alert: TLSCertificateExpiringSoon
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "TLS certificate expiring soon"
+          description: "TLS certificate for {{ $labels.name }} expires in {{ $value }} days"
+      
+      - alert: TLSCertificateExpired
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) < 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "TLS certificate has expired"
+          description: "TLS certificate for {{ $labels.name }} has expired"
+      
+      - alert: TLSConnectionFailure
+        expr: increase(tls_connection_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "TLS connection failures detected"
+          description: "TLS connection failures detected for service {{ $labels.service }}"
+      
+      - alert: WeakTLSCipherSuite
+        expr: tls_cipher_suite_info{strength="weak"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Weak TLS cipher suite detected"
+          description: "Weak TLS cipher suite {{ $labels.cipher_suite }} detected for service {{ $labels.service }}"
+      
+      - alert: TLSVersionDowngrade
+        expr: tls_version_info{version!="TLSv1.3"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Non-TLS 1.3 connection detected"
+          description: "TLS connection using {{ $labels.version }} detected for service {{ $labels.service }}"

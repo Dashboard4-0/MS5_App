@@ -1,0 +1,185 @@
+# MS5.0 ArgoCD Project Configuration
+# Defines project-level policies and access controls for MS5.0 applications
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ms5-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ms5-project
+    app.kubernetes.io/part-of: ms5-dashboard
+    environment: production
+  annotations:
+    description: "MS5.0 Floor Dashboard Production Environment"
+    version: "1.0.0"
+spec:
+  description: MS5.0 Floor Dashboard Production Environment
+  
+  # Source repositories allowed for this project
+  sourceRepos:
+  - 'https://github.com/your-org/ms5-k8s-manifests'
+  - 'https://github.com/your-org/MS5.0_App'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://prometheus-community.github.io/helm-charts'
+  - 'https://grafana.github.io/helm-charts'
+  
+  # Destination clusters and namespaces
+  destinations:
+  - namespace: 'ms5-production'
+    server: https://kubernetes.default.svc
+  - namespace: 'ms5-staging'
+    server: https://kubernetes.default.svc
+  - namespace: 'monitoring'
+    server: https://kubernetes.default.svc
+  
+  # Cluster-scoped resources allowed
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  - group: 'networking.k8s.io'
+    kind: NetworkPolicy
+  - group: 'policy'
+    kind: PodSecurityPolicy
+  - group: 'security.istio.io'
+    kind: PeerAuthentication
+  
+  # Namespace-scoped resources allowed
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: ''
+    kind: PersistentVolumeClaim
+  - group: 'apps'
+    kind: Deployment
+  - group: 'apps'
+    kind: StatefulSet
+  - group: 'apps'
+    kind: DaemonSet
+  - group: 'batch'
+    kind: Job
+  - group: 'batch'
+    kind: CronJob
+  - group: 'networking.k8s.io'
+    kind: Ingress
+  - group: 'autoscaling'
+    kind: HorizontalPodAutoscaler
+  - group: 'policy'
+    kind: PodDisruptionBudget
+  - group: 'monitoring.coreos.com'
+    kind: ServiceMonitor
+  - group: 'monitoring.coreos.com'
+    kind: PrometheusRule
+  
+  # Project roles and permissions
+  roles:
+  - name: admin
+    description: Admin role for MS5.0 production
+    policies:
+    - p, proj:ms5-production:admin, applications, *, ms5-production/*, allow
+    - p, proj:ms5-production:admin, repositories, *, *, allow
+    - p, proj:ms5-production:admin, certificates, *, *, allow
+    - p, proj:ms5-production:admin, clusters, *, *, allow
+    - p, proj:ms5-production:admin, exec, *, *, allow
+    groups:
+    - ms5-admin
+    - devops-team
+  
+  - name: developer
+    description: Developer role for MS5.0 production
+    policies:
+    - p, proj:ms5-production:developer, applications, get, ms5-production/*, allow
+    - p, proj:ms5-production:developer, applications, sync, ms5-production/*, allow
+    - p, proj:ms5-production:developer, repositories, get, *, allow
+    - p, proj:ms5-production:developer, logs, get, ms5-production/*, allow
+    groups:
+    - ms5-developers
+    - backend-team
+    - frontend-team
+  
+  - name: readonly
+    description: Read-only role for MS5.0 production
+    policies:
+    - p, proj:ms5-production:readonly, applications, get, ms5-production/*, allow
+    - p, proj:ms5-production:readonly, repositories, get, *, allow
+    - p, proj:ms5-production:readonly, logs, get, ms5-production/*, allow
+    groups:
+    - ms5-viewers
+    - qa-team
+  
+  # Sync windows for controlled deployments
+  syncWindows:
+  - kind: allow
+    schedule: '0 9-17 * * 1-5'  # Business hours Monday-Friday
+    duration: 8h
+    applications:
+    - '*'
+    manualSync: true
+  - kind: deny
+    schedule: '0 18-8 * * *'     # Outside business hours
+    duration: 14h
+    applications:
+    - 'ms5-backend'
+    - 'ms5-database'
+    manualSync: false
+  
+  # Signature keys for signed commits (optional)
+  signatureKeys:
+  - keyID: ABCDEF1234567890
+---
+# MS5.0 Staging Project
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ms5-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ms5-staging-project
+    app.kubernetes.io/part-of: ms5-dashboard
+    environment: staging
+spec:
+  description: MS5.0 Floor Dashboard Staging Environment
+  
+  sourceRepos:
+  - 'https://github.com/your-org/ms5-k8s-manifests'
+  - 'https://github.com/your-org/MS5.0_App'
+  - 'https://charts.bitnami.com/bitnami'
+  - 'https://prometheus-community.github.io/helm-charts'
+  
+  destinations:
+  - namespace: 'ms5-staging'
+    server: https://kubernetes.default.svc
+  - namespace: 'monitoring-staging'
+    server: https://kubernetes.default.svc
+  
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  
+  roles:
+  - name: admin
+    description: Admin role for MS5.0 staging
+    policies:
+    - p, proj:ms5-staging:admin, applications, *, ms5-staging/*, allow
+    - p, proj:ms5-staging:admin, repositories, *, *, allow
+    groups:
+    - ms5-admin
+    - devops-team
+    - ms5-developers

@@ -1,0 +1,127 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: primary
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database
+    role: primary
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary-headless
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: primary
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database
+    role: primary
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: replica
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database
+    role: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica-headless
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: replica
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database
+    role: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-readonly
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: readonly
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database
+    role: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: ms5-dashboard
+    component: database

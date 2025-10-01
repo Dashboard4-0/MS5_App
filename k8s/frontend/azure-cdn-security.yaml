@@ -1,0 +1,228 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-security
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Security Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Security configuration
+  cdn-security.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-security
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Security Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      security-policy.json: |
+        {
+          "securityPolicies": [
+            {
+              "name": "WAFPolicy",
+              "type": "WebApplicationFirewall",
+              "parameters": {
+                "wafPolicy": {
+                  "name": "ms5-waf-policy",
+                  "resourceGroup": "ms5-rg",
+                  "location": "Global",
+                  "sku": {
+                    "name": "Premium_AzureFrontDoor"
+                  },
+                  "properties": {
+                    "policySettings": {
+                      "enabledState": "Enabled",
+                      "mode": "Prevention",
+                      "requestBodyCheck": "Enabled",
+                      "maxRequestBodySizeInKb": 128,
+                      "fileUploadLimitInMb": 100
+                    },
+                    "managedRules": {
+                      "managedRuleSets": [
+                        {
+                          "ruleSetType": "Microsoft_DefaultRuleSet",
+                          "ruleSetVersion": "2.1",
+                          "ruleSetAction": "Block"
+                        },
+                        {
+                          "ruleSetType": "Microsoft_BotManagerRuleSet",
+                          "ruleSetVersion": "1.0",
+                          "ruleSetAction": "Block"
+                        }
+                      ]
+                    },
+                    "customRules": {
+                      "rules": [
+                        {
+                          "name": "BlockSuspiciousRequests",
+                          "priority": 1,
+                          "ruleType": "MatchRule",
+                          "action": "Block",
+                          "matchConditions": [
+                            {
+                              "matchVariable": "RequestUri",
+                              "operator": "Contains",
+                              "matchValue": ["../", "..\\", "script", "alert", "document.cookie"]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+  
+  # Azure CDN Security monitoring
+  cdn-security-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-security-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Security Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      monitoring-config.json: |
+        {
+          "monitoring": {
+            "security": "ms5-cdn-security",
+            "wafPolicy": "ms5-waf-policy",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "WAFBlockedRequests",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of requests blocked by WAF"
+              },
+              {
+                "name": "WAFAllowedRequests",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of requests allowed by WAF"
+              },
+              {
+                "name": "WAFLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average latency added by WAF processing"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighWAFBlockRate",
+                "condition": "waf_block_rate > 10%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "WAF block rate is above 10%"
+              },
+              {
+                "name": "HighWAFLatency",
+                "condition": "waf_latency > 50ms",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "WAF latency is above 50ms"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Security rules
+  cdn-security-rules.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-security-rules
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Security Rules Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      security-rules.json: |
+        {
+          "securityRules": [
+            {
+              "name": "BlockSuspiciousRequests",
+              "order": 1,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "Contains",
+                    "values": ["../", "..\\", "script", "alert", "document.cookie"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "UrlRedirect",
+                  "parameters": {
+                    "redirectType": "Found",
+                    "destination": "/blocked.html"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "BlockBotTraffic",
+              "order": 2,
+              "conditions": [
+                {
+                  "name": "RequestHeader",
+                  "parameters": {
+                    "headerName": "User-Agent",
+                    "operator": "Contains",
+                    "values": ["bot", "crawler", "spider", "scraper"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "UrlRedirect",
+                  "parameters": {
+                    "redirectType": "Found",
+                    "destination": "/blocked.html"
+                  }
+                }
+              ]
+            }
+          ]
+        }

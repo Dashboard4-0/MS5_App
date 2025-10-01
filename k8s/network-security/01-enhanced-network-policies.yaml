@@ -1,0 +1,457 @@
+---
+# Ingress Controller Network Policy
+# Controls traffic to and from NGINX Ingress Controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-nginx-network-policy
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: ingress-nginx
+  annotations:
+    description: "Network policy for NGINX Ingress Controller"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/component: controller
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow external traffic on HTTP and HTTPS ports
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow metrics scraping from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 10254
+  # Allow admission webhook traffic
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8443
+  egress:
+  # Allow traffic to application namespaces
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-frontend
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9090
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for Let's Encrypt ACME challenges
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow NTP for time synchronization
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 123
+---
+# cert-manager Network Policy
+# Controls traffic to and from cert-manager components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-network-policy
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: cert-manager
+  annotations:
+    description: "Network policy for cert-manager components"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow metrics scraping from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9402
+  # Allow webhook traffic from API server
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 10250
+  egress:
+  # Allow HTTPS for Let's Encrypt ACME API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Allow Kubernetes API server access
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 6443
+  # Allow Azure DNS API access
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# Frontend Namespace Network Policy
+# Enhanced network policy for frontend namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-frontend-enhanced-network-policy
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: network-policy
+    tier: frontend
+    environment: production
+  annotations:
+    description: "Enhanced network policy for MS5.0 Frontend namespace"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from NGINX Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+          app.kubernetes.io/component: controller
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow metrics scraping from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow health checks from load balancer
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  # Allow traffic to backend API
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow WebSocket connections to backend
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for external API calls
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow NTP for time synchronization
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 123
+---
+# Production Namespace Enhanced Network Policy
+# Enhanced network policy for production namespace with ingress access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-production-ingress-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: network-policy
+    tier: backend
+    environment: production
+  annotations:
+    description: "Enhanced network policy for MS5.0 Production namespace with ingress access"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from NGINX Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+          app.kubernetes.io/component: controller
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  # Allow traffic from frontend namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow internal communication within namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  # Allow metrics scraping from monitoring components
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+      podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow database connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Redis connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow MinIO connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    ports:
+    - protocol: TCP
+      port: 9000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for external API calls
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# Default Deny All Network Policy
+# Denies all traffic by default for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress-egress
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    tier: infrastructure
+  annotations:
+    description: "Default deny all network policy for enhanced security"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# Monitoring Network Policy
+# Enhanced network policy for monitoring components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-monitoring-enhanced-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+    tier: infrastructure
+  annotations:
+    description: "Enhanced network policy for monitoring components"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from NGINX Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+          app.kubernetes.io/component: controller
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow internal monitoring traffic
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: grafana
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: alertmanager
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow scraping all application metrics
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 8000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for external monitoring
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443

@@ -1,0 +1,243 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-cost-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cost-monitoring
+data:
+  cost-monitoring.yml: |
+    # MS5.0 Floor Dashboard - Cost Monitoring Configuration
+    
+    # Azure Cost Monitoring
+    azure_cost_metrics:
+      # AKS Cluster Costs
+      aks_cluster_cost:
+        metric: "azure_aks_cluster_cost_per_hour"
+        target: 2.0
+        unit: "USD/hour"
+        description: "AKS cluster cost should be under $2/hour"
+        alert_threshold: 3.0
+        alert_window: "1h"
+      
+      # Node Pool Costs
+      node_pool_cost:
+        metric: "azure_aks_node_pool_cost_per_hour"
+        target: 1.5
+        unit: "USD/hour"
+        description: "Node pool cost should be under $1.5/hour"
+        alert_threshold: 2.0
+        alert_window: "1h"
+      
+      # Storage Costs
+      storage_cost:
+        metric: "azure_storage_cost_per_gb_month"
+        target: 0.1
+        unit: "USD/GB/month"
+        description: "Storage cost should be under $0.1/GB/month"
+        alert_threshold: 0.15
+        alert_window: "24h"
+      
+      # Network Costs
+      network_cost:
+        metric: "azure_network_cost_per_gb"
+        target: 0.05
+        unit: "USD/GB"
+        description: "Network cost should be under $0.05/GB"
+        alert_threshold: 0.08
+        alert_window: "24h"
+      
+      # Load Balancer Costs
+      load_balancer_cost:
+        metric: "azure_load_balancer_cost_per_hour"
+        target: 0.1
+        unit: "USD/hour"
+        description: "Load balancer cost should be under $0.1/hour"
+        alert_threshold: 0.15
+        alert_window: "1h"
+    
+    # Resource Utilization Cost Optimization
+    resource_optimization:
+      # CPU Cost Efficiency
+      cpu_cost_efficiency:
+        metric: "cpu_cost_per_core_hour"
+        target: 0.05
+        unit: "USD/core/hour"
+        description: "CPU cost efficiency should be under $0.05/core/hour"
+        alert_threshold: 0.08
+        alert_window: "1h"
+      
+      # Memory Cost Efficiency
+      memory_cost_efficiency:
+        metric: "memory_cost_per_gb_hour"
+        target: 0.02
+        unit: "USD/GB/hour"
+        description: "Memory cost efficiency should be under $0.02/GB/hour"
+        alert_threshold: 0.03
+        alert_window: "1h"
+      
+      # Storage Cost Efficiency
+      storage_cost_efficiency:
+        metric: "storage_cost_per_gb_month"
+        target: 0.1
+        unit: "USD/GB/month"
+        description: "Storage cost efficiency should be under $0.1/GB/month"
+        alert_threshold: 0.15
+        alert_window: "24h"
+    
+    # Cost Allocation by Service
+    service_cost_allocation:
+      # Backend Service Costs
+      backend_cost:
+        metric: "service_cost_backend_per_hour"
+        target: 0.5
+        unit: "USD/hour"
+        description: "Backend service cost should be under $0.5/hour"
+        alert_threshold: 0.8
+        alert_window: "1h"
+      
+      # Database Service Costs
+      database_cost:
+        metric: "service_cost_database_per_hour"
+        target: 0.3
+        unit: "USD/hour"
+        description: "Database service cost should be under $0.3/hour"
+        alert_threshold: 0.5
+        alert_window: "1h"
+      
+      # Cache Service Costs
+      cache_cost:
+        metric: "service_cost_cache_per_hour"
+        target: 0.1
+        unit: "USD/hour"
+        description: "Cache service cost should be under $0.1/hour"
+        alert_threshold: 0.15
+        alert_window: "1h"
+      
+      # Storage Service Costs
+      storage_service_cost:
+        metric: "service_cost_storage_per_hour"
+        target: 0.2
+        unit: "USD/hour"
+        description: "Storage service cost should be under $0.2/hour"
+        alert_threshold: 0.3
+        alert_window: "1h"
+      
+      # Monitoring Service Costs
+      monitoring_cost:
+        metric: "service_cost_monitoring_per_hour"
+        target: 0.1
+        unit: "USD/hour"
+        description: "Monitoring service cost should be under $0.1/hour"
+        alert_threshold: 0.15
+        alert_window: "1h"
+    
+    # Cost Optimization Targets
+    cost_optimization_targets:
+      # Overall Cost Reduction
+      overall_cost_reduction:
+        metric: "cost_reduction_percentage"
+        target: 20
+        unit: "percent"
+        description: "Overall cost reduction should be above 20%"
+        alert_threshold: 10
+        alert_window: "7d"
+      
+      # Reserved Instance Utilization
+      reserved_instance_utilization:
+        metric: "reserved_instance_utilization_percentage"
+        target: 80
+        unit: "percent"
+        description: "Reserved instance utilization should be above 80%"
+        alert_threshold: 60
+        alert_window: "24h"
+      
+      # Spot Instance Utilization
+      spot_instance_utilization:
+        metric: "spot_instance_utilization_percentage"
+        target: 30
+        unit: "percent"
+        description: "Spot instance utilization should be above 30%"
+        alert_threshold: 20
+        alert_window: "24h"
+      
+      # Resource Right-sizing
+      resource_rightsizing:
+        metric: "resource_rightsizing_savings_percentage"
+        target: 15
+        unit: "percent"
+        description: "Resource right-sizing savings should be above 15%"
+        alert_threshold: 10
+        alert_window: "7d"
+    
+    # Cost Alerting Rules
+    cost_alerting_rules:
+      # High Cost Alerts
+      high_daily_cost:
+        metric: "daily_cost_total"
+        threshold: 50
+        unit: "USD/day"
+        description: "Daily cost exceeds $50"
+        severity: "warning"
+        window: "24h"
+      
+      high_monthly_cost:
+        metric: "monthly_cost_total"
+        threshold: 1500
+        unit: "USD/month"
+        description: "Monthly cost exceeds $1500"
+        severity: "critical"
+        window: "30d"
+      
+      # Cost Spike Alerts
+      cost_spike:
+        metric: "cost_spike_percentage"
+        threshold: 50
+        unit: "percent"
+        description: "Cost spike exceeds 50%"
+        severity: "warning"
+        window: "1h"
+      
+      # Resource Waste Alerts
+      resource_waste:
+        metric: "resource_waste_percentage"
+        threshold: 30
+        unit: "percent"
+        description: "Resource waste exceeds 30%"
+        severity: "warning"
+        window: "24h"
+      
+      # Budget Exceeded Alerts
+      budget_exceeded:
+        metric: "budget_utilization_percentage"
+        threshold: 90
+        unit: "percent"
+        description: "Budget utilization exceeds 90%"
+        severity: "critical"
+        window: "1d"
+    
+    # Cost Reporting
+    cost_reporting:
+      # Daily Cost Reports
+      daily_cost_report:
+        schedule: "0 9 * * *"
+        recipients: ["devops@company.com", "finance@company.com"]
+        format: "html"
+        include_charts: true
+      
+      # Weekly Cost Reports
+      weekly_cost_report:
+        schedule: "0 9 * * 1"
+        recipients: ["devops@company.com", "finance@company.com", "management@company.com"]
+        format: "pdf"
+        include_charts: true
+      
+      # Monthly Cost Reports
+      monthly_cost_report:
+        schedule: "0 9 1 * *"
+        recipients: ["devops@company.com", "finance@company.com", "management@company.com"]
+        format: "pdf"
+        include_charts: true
+        include_recommendations: true

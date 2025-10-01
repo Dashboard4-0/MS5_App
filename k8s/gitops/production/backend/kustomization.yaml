@@ -1,0 +1,134 @@
+# Kustomization for MS5.0 Backend Production Environment
+# Manages production-specific configurations and overlays
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ms5-backend-production
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Base resources from the main k8s directory
+resources:
+- ../../../12-backend-deployment.yaml
+- ../../../13-backend-services.yaml
+- ../../../14-backend-hpa.yaml
+- ../../../15-celery-worker-deployment.yaml
+- ../../../16-celery-beat-deployment.yaml
+- ../../../17-flower-deployment.yaml
+
+# Namespace for production environment
+namespace: ms5-production
+
+# Common labels applied to all resources
+commonLabels:
+  environment: production
+  app.kubernetes.io/part-of: ms5-dashboard
+  app.kubernetes.io/managed-by: argocd
+
+# Common annotations
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "2"
+  config.kubernetes.io/origin: |
+    path: k8s/gitops/production/backend/kustomization.yaml
+
+# Image transformations for production
+images:
+- name: ms5acrprod.azurecr.io/ms5-backend
+  newTag: production-v1.0.0
+- name: ms5acrprod.azurecr.io/ms5-celery
+  newTag: production-v1.0.0
+
+# Resource patches for production environment
+patches:
+- target:
+    kind: Deployment
+    name: ms5-backend
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "500m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "1Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "2000m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "2Gi"
+    - op: add
+      path: /spec/template/spec/containers/0/env/-
+      value:
+        name: ENVIRONMENT
+        value: "production"
+
+- target:
+    kind: Deployment
+    name: ms5-celery-worker
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "200m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "1000m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
+
+- target:
+    kind: HorizontalPodAutoscaler
+    name: ms5-backend-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 3
+    - op: replace
+      path: /spec/maxReplicas
+      value: 10
+    - op: replace
+      path: /spec/targetCPUUtilizationPercentage
+      value: 70
+
+# ConfigMap generator for production-specific configuration
+configMapGenerator:
+- name: ms5-backend-production-config
+  literals:
+  - ENVIRONMENT=production
+  - DEBUG=false
+  - LOG_LEVEL=info
+  - DATABASE_URL=postgresql://postgres:password@postgres-primary.ms5-production.svc.cluster.local:5432/ms5_production
+  - REDIS_URL=redis://redis-primary.ms5-production.svc.cluster.local:6379/0
+  - CELERY_BROKER_URL=redis://redis-primary.ms5-production.svc.cluster.local:6379/1
+  - CELERY_RESULT_BACKEND=redis://redis-primary.ms5-production.svc.cluster.local:6379/2
+  - PROMETHEUS_METRICS_ENABLED=true
+  - JAEGER_TRACING_ENABLED=true
+
+# Production secrets are managed via Azure Key Vault
+# This is a placeholder for the secret structure
+secretGenerator:
+- name: ms5-backend-production-secrets-placeholder
+  literals:
+  - placeholder=managed_by_azure_keyvault
+  type: Opaque
+
+# Replica count for production environment
+replicas:
+- name: ms5-backend
+  count: 3
+- name: ms5-celery-worker
+  count: 3
+- name: ms5-celery-beat
+  count: 1
+- name: ms5-flower
+  count: 1

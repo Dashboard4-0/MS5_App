@@ -1,0 +1,445 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-cdn-config
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard CDN Optimization Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Premium configuration
+  azure-cdn-config.json: |
+    {
+      "profileName": "ms5-cdn-profile",
+      "resourceGroup": "ms5-rg",
+      "location": "Global",
+      "sku": {
+        "name": "Premium_Verizon"
+      },
+      "tags": {
+        "environment": "production",
+        "application": "ms5-dashboard",
+        "deployment": "aks"
+      },
+      "endpoints": [
+        {
+          "name": "ms5-cdn-endpoint",
+          "originHostHeader": "ms5floor.com",
+          "originPath": "/static",
+          "isHttpsAllowed": true,
+          "isHttpAllowed": false,
+          "queryStringCachingBehavior": "BypassCaching",
+          "contentTypesToCompress": [
+            "application/javascript",
+            "application/json",
+            "application/x-javascript",
+            "application/xml",
+            "text/css",
+            "text/html",
+            "text/javascript",
+            "text/plain",
+            "text/xml"
+          ],
+          "isCompressionEnabled": true,
+          "optimizationType": "GeneralWebDelivery",
+          "probePath": "/health",
+          "geoFilters": [],
+          "deliveryPolicy": {
+            "description": "MS5.0 Dashboard CDN Delivery Policy",
+            "rules": [
+              {
+                "name": "StaticAssets",
+                "order": 1,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "BeginsWith",
+                      "values": ["/static/", "/assets/", "/images/", "/icons/"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "CacheExpiration",
+                    "parameters": {
+                      "cacheBehavior": "Override",
+                      "cacheDuration": "365.00:00:00"
+                    }
+                  },
+                  {
+                    "name": "ModifyResponseHeader",
+                    "parameters": {
+                      "headerAction": "Append",
+                      "headerName": "Cache-Control",
+                      "value": "public, max-age=31536000, immutable"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "APIRequests",
+                "order": 2,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "BeginsWith",
+                      "values": ["/api/"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "CacheExpiration",
+                    "parameters": {
+                      "cacheBehavior": "Override",
+                      "cacheDuration": "00:05:00"
+                    }
+                  },
+                  {
+                    "name": "ModifyResponseHeader",
+                    "parameters": {
+                      "headerAction": "Append",
+                      "headerName": "Cache-Control",
+                      "value": "no-cache, no-store, must-revalidate"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "WebSocketRequests",
+                "order": 3,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "BeginsWith",
+                      "values": ["/ws"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "CacheExpiration",
+                    "parameters": {
+                      "cacheBehavior": "Override",
+                      "cacheDuration": "00:00:00"
+                    }
+                  },
+                  {
+                    "name": "ModifyResponseHeader",
+                    "parameters": {
+                      "headerAction": "Append",
+                      "headerName": "Cache-Control",
+                      "value": "no-cache, no-store, must-revalidate"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  
+  # CDN optimization rules
+  cdn-rules.conf: |
+    # CDN optimization rules for MS5.0 Dashboard
+    
+    # Static assets optimization
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico|webp|avif)$ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header Vary "Accept-Encoding";
+        add_header X-Content-DPR "2.0" always;
+        
+        # Enable compression
+        gzip_static on;
+        brotli_static on;
+        
+        # CDN headers
+        add_header X-CDN-Cache "HIT" always;
+        add_header X-CDN-Server "nginx" always;
+        add_header X-CDN-Optimized "true" always;
+        
+        # Fallback for missing files
+        try_files $uri =404;
+    }
+    
+    # API requests - no caching
+    location /api/ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        add_header X-CDN-Cache "BYPASS" always;
+        
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # WebSocket requests - no caching
+    location /ws {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        add_header X-CDN-Cache "BYPASS" always;
+        
+        proxy_pass http://websocket_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # PWA assets optimization
+    location = /manifest.json {
+        expires 1d;
+        add_header Cache-Control "public, max-age=86400";
+        add_header Content-Type "application/manifest+json";
+        add_header X-CDN-Optimized "true" always;
+    }
+    
+    location = /sw.js {
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+        add_header Content-Type "application/javascript";
+        add_header X-CDN-Optimized "true" always;
+    }
+    
+    # Service worker optimization
+    location ~* /sw\.js$ {
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+        add_header Content-Type "application/javascript";
+        add_header X-CDN-Optimized "true" always;
+    }
+  
+  # CDN monitoring configuration
+  cdn-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cdn-monitoring-config
+      namespace: ms5-frontend
+    data:
+      cdn-monitor.py: |
+        #!/usr/bin/env python3
+        """
+        CDN monitoring script for MS5.0 Dashboard
+        """
+        import json
+        import requests
+        import time
+        from datetime import datetime
+        
+        def get_cdn_metrics():
+            """Get CDN metrics from Azure"""
+            try:
+                # Azure CDN metrics endpoint
+                cdn_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/metrics"
+                
+                headers = {
+                    "Authorization": "Bearer {access-token}",
+                    "Content-Type": "application/json"
+                }
+                
+                params = {
+                    "api-version": "2021-06-01",
+                    "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                    "aggregation": "Total",
+                    "interval": "PT1H",
+                    "startTime": "2023-01-01T00:00:00Z",
+                    "endTime": "2023-01-02T00:00:00Z"
+                }
+                
+                response = requests.get(cdn_url, headers=headers, params=params, timeout=30)
+                if response.status_code == 200:
+                    metrics = response.json()
+                    
+                    return {
+                        "request_count": metrics.get("RequestCount", 0),
+                        "bytes_sent": metrics.get("BytesSent", 0),
+                        "cache_hit_ratio": metrics.get("CacheHitRatio", 0),
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as e:
+                print(f"Error getting CDN metrics: {e}")
+                return None
+        
+        def send_metrics_to_prometheus(metrics):
+            """Send CDN metrics to Prometheus"""
+            try:
+                prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+                
+                payload = {
+                    "metric": "cdn_request_count",
+                    "value": metrics["request_count"],
+                    "labels": {
+                        "cdn_profile": "ms5-cdn-profile",
+                        "endpoint": "ms5-cdn-endpoint"
+                    }
+                }
+                
+                response = requests.post(prometheus_url, json=payload, timeout=5)
+                if response.status_code == 200:
+                    print("CDN metrics sent to Prometheus successfully")
+                else:
+                    print(f"Failed to send CDN metrics to Prometheus: {response.status_code}")
+            except Exception as e:
+                print(f"Error sending CDN metrics to Prometheus: {e}")
+        
+        def main():
+            """Main monitoring loop"""
+            while True:
+                metrics = get_cdn_metrics()
+                if metrics:
+                    print(json.dumps(metrics, indent=2))
+                    send_metrics_to_prometheus(metrics)
+                
+                time.sleep(3600)  # Check every hour
+        
+        if __name__ == "__main__":
+            main()
+      
+      cdn-monitor.yaml: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: cdn-monitor
+          namespace: ms5-frontend
+          labels:
+            app: cdn-monitor
+            component: monitoring
+            tier: frontend
+            environment: production
+            deployment: aks
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: cdn-monitor
+          template:
+            metadata:
+              labels:
+                app: cdn-monitor
+            spec:
+              containers:
+              - name: cdn-monitor
+                image: python:3.9-alpine
+                command: ["python3", "/scripts/cdn-monitor.py"]
+                volumeMounts:
+                - name: cdn-script
+                  mountPath: /scripts
+                env:
+                - name: AZURE_SUBSCRIPTION_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: azure-credentials
+                      key: subscription-id
+                - name: AZURE_RESOURCE_GROUP
+                  valueFrom:
+                    secretKeyRef:
+                      name: azure-credentials
+                      key: resource-group
+                - name: AZURE_ACCESS_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: azure-credentials
+                      key: access-token
+                resources:
+                  requests:
+                    cpu: "10m"
+                    memory: "32Mi"
+                  limits:
+                    cpu: "50m"
+                    memory: "64Mi"
+              volumes:
+              - name: cdn-script
+                configMap:
+                  name: cdn-monitoring-config
+                  defaultMode: 0755
+  
+  # CDN performance optimization
+  cdn-performance.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cdn-performance-config
+      namespace: ms5-frontend
+    data:
+      performance-optimization.conf: |
+        # CDN performance optimization for MS5.0 Dashboard
+        
+        # Image optimization
+        location ~* \.(png|jpg|jpeg|gif|svg|webp|avif)$ {
+            # Enable image optimization
+            image_filter on;
+            image_filter_jpeg_quality 85;
+            image_filter_sharpen 0;
+            image_filter_buffer 1M;
+            
+            # Enable WebP conversion
+            location ~* \.(png|jpg|jpeg)$ {
+                add_header Vary "Accept";
+                try_files $uri$webp_suffix $uri =404;
+            }
+            
+            # Enable AVIF conversion
+            location ~* \.(png|jpg|jpeg)$ {
+                add_header Vary "Accept";
+                try_files $uri$avif_suffix $uri =404;
+            }
+        }
+        
+        # JavaScript optimization
+        location ~* \.js$ {
+            # Enable JavaScript minification
+            sub_filter ';' ';';
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types application/javascript;
+        }
+        
+        # CSS optimization
+        location ~* \.css$ {
+            # Enable CSS minification
+            sub_filter ';' ';';
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types text/css;
+        }
+        
+        # Font optimization
+        location ~* \.(woff|woff2|ttf|eot)$ {
+            # Enable font optimization
+            expires 1y;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, OPTIONS";
+            add_header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept";
+        }
+        
+        # HTML optimization
+        location ~* \.html$ {
+            # Enable HTML minification
+            sub_filter '  ' ' ';
+            sub_filter '\n' ' ';
+            sub_filter_once on;
+            sub_filter_types text/html;
+        }

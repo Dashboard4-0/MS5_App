@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-traffic-management
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Traffic Management Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Traffic Management configuration
+  cdn-traffic-management.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-traffic-management
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Traffic Management Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      traffic-management-config.json: |
+        {
+          "trafficManagement": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "trafficManagementTypes": [
+              {
+                "name": "Traffic Management Technology",
+                "description": "Traffic management technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Traffic Management Process",
+                "description": "Traffic management process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Traffic Management Automation",
+                "description": "Traffic management automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Traffic Management Monitoring",
+                "description": "Traffic management monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Traffic Management monitoring
+  cdn-traffic-management-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-traffic-management-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Traffic Management Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      traffic-management-monitoring.json: |
+        {
+          "monitoring": {
+            "trafficManagement": "ms5-cdn-traffic-management",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "TrafficManagementTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average traffic management technology performance"
+              },
+              {
+                "name": "TrafficManagementProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average traffic management process performance"
+              },
+              {
+                "name": "TrafficManagementAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average traffic management automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowTrafficManagementTechnologyPerformance",
+                "condition": "traffic_management_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Traffic management technology performance is below 80%"
+              },
+              {
+                "name": "LowTrafficManagementProcessPerformance",
+                "condition": "traffic_management_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Traffic management process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Traffic Management script
+  cdn-traffic-management.py: |
+    #!/usr/bin/env python3
+    """
+    CDN traffic management script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_traffic_management():
+        """Get CDN traffic management from Azure"""
+        try:
+            # Azure CDN traffic management endpoint
+            traffic_management_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/traffic-management"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(traffic_management_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                traffic_management = response.json()
+                
+                return {
+                    "request_count": traffic_management.get("RequestCount", 0),
+                    "bytes_sent": traffic_management.get("BytesSent", 0),
+                    "cache_hit_ratio": traffic_management.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN traffic management: {e}")
+            return None
+    
+    def send_traffic_management_to_prometheus(traffic_management):
+        """Send CDN traffic management to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_traffic_management",
+                "value": traffic_management["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN traffic management sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN traffic management to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN traffic management to Prometheus: {e}")
+    
+    def main():
+        """Main traffic management loop"""
+        while True:
+            traffic_management = get_cdn_traffic_management()
+            if traffic_management:
+                print(json.dumps(traffic_management, indent=2))
+                send_traffic_management_to_prometheus(traffic_management)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Traffic Management deployment
+  cdn-traffic-management-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-traffic-management
+      namespace: ms5-frontend
+      labels:
+        app: cdn-traffic-management
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-traffic-management
+      template:
+        metadata:
+          labels:
+            app: cdn-traffic-management
+        spec:
+          containers:
+          - name: cdn-traffic-management
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-traffic-management.py"]
+            volumeMounts:
+            - name: traffic-management-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: traffic-management-script
+            configMap:
+              name: cdn-traffic-management-config
+              defaultMode: 0755

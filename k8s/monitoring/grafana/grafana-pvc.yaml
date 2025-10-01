@@ -1,0 +1,122 @@
+---
+# MS5.0 Floor Dashboard - Grafana Persistent Volume Claims
+# Separate PVCs for different data types with appropriate storage classes
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-dashboard-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    storage-tier: premium
+    data-type: dashboards
+  annotations:
+    description: "Primary storage for Grafana dashboards and configuration"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-premium"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi  # Dashboard storage
+  storageClassName: managed-premium
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-database-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    storage-tier: premium
+    data-type: database
+  annotations:
+    description: "Storage for Grafana SQLite database"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-premium"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi  # Database storage
+  storageClassName: managed-premium
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-backup-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+    storage-tier: standard
+    data-type: backup
+  annotations:
+    description: "Storage for Grafana backup data and snapshots"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-standard"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Backup storage
+  storageClassName: managed-standard
+---
+# Storage class for Grafana if not using managed-premium
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: grafana-storage
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+  annotations:
+    description: "Custom storage class optimized for Grafana workloads"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # Premium SSD for high performance
+  cachingmode: ReadOnly  # Read-only caching for better performance
+  kind: managed
+  storageaccounttype: Premium_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+  availabilityZone: "1,2,3"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Storage class for Grafana backup data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: grafana-backup-storage
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    environment: production
+  annotations:
+    description: "Storage class for Grafana backup data with cost optimization"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Standard_LRS  # Standard SSD for backup data
+  cachingmode: None  # No caching for backup data
+  kind: managed
+  storageaccounttype: Standard_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

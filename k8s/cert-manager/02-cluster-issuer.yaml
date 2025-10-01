@@ -1,0 +1,181 @@
+---
+# Let's Encrypt Production ClusterIssuer
+# Provides automated SSL/TLS certificate issuance from Let's Encrypt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: cluster-issuer
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "Let's Encrypt production cluster issuer for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  acme:
+    # Let's Encrypt production server
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Email address for ACME registration
+    email: team@ms5floor.com
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-prod-private-key
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    # HTTP-01 challenge solver using NGINX Ingress Controller
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            metadata:
+              labels:
+                app.kubernetes.io/name: cert-manager-acme-http-solver
+                app.kubernetes.io/instance: cert-manager
+                app.kubernetes.io/component: acme-http-solver
+            spec:
+              # Security context for ACME solver pods
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65534
+                runAsGroup: 65534
+                fsGroup: 65534
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+              - name: acme-http-solver
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  readOnlyRootFilesystem: true
+                  runAsNonRoot: true
+                  runAsUser: 65534
+                  seccompProfile:
+                    type: RuntimeDefault
+              nodeSelector:
+                kubernetes.io/os: linux
+      # DNS-01 challenge solver using Azure DNS (optional)
+      selector:
+        dnsNames:
+        - "ms5floor.com"
+        - "*.ms5floor.com"
+    - dns01:
+        azureDNS:
+          clientID: "${AZURE_CLIENT_ID}"
+          clientSecretSecretRef:
+            name: azuredns-config
+            key: client-secret
+          subscriptionID: "${AZURE_SUBSCRIPTION_ID}"
+          tenantID: "${AZURE_TENANT_ID}"
+          resourceGroupName: "${AZURE_RESOURCE_GROUP}"
+          hostedZoneName: "ms5floor.com"
+          environment: AzurePublicCloud
+      selector:
+        dnsNames:
+        - "*.ms5floor.com"
+---
+# Let's Encrypt Staging ClusterIssuer
+# Provides staging SSL/TLS certificates for testing
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: cluster-issuer
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "Let's Encrypt staging cluster issuer for testing"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  acme:
+    # Let's Encrypt staging server
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    # Email address for ACME registration
+    email: team@ms5floor.com
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    # HTTP-01 challenge solver using NGINX Ingress Controller
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            metadata:
+              labels:
+                app.kubernetes.io/name: cert-manager-acme-http-solver
+                app.kubernetes.io/instance: cert-manager
+                app.kubernetes.io/component: acme-http-solver
+            spec:
+              # Security context for ACME solver pods
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65534
+                runAsGroup: 65534
+                fsGroup: 65534
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+              - name: acme-http-solver
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  readOnlyRootFilesystem: true
+                  runAsNonRoot: true
+                  runAsUser: 65534
+                  seccompProfile:
+                    type: RuntimeDefault
+              nodeSelector:
+                kubernetes.io/os: linux
+      # DNS-01 challenge solver using Azure DNS (optional)
+      selector:
+        dnsNames:
+        - "ms5floor.com"
+        - "*.ms5floor.com"
+    - dns01:
+        azureDNS:
+          clientID: "${AZURE_CLIENT_ID}"
+          clientSecretSecretRef:
+            name: azuredns-config
+            key: client-secret
+          subscriptionID: "${AZURE_SUBSCRIPTION_ID}"
+          tenantID: "${AZURE_TENANT_ID}"
+          resourceGroupName: "${AZURE_RESOURCE_GROUP}"
+          hostedZoneName: "ms5floor.com"
+          environment: AzurePublicCloud
+      selector:
+        dnsNames:
+        - "*.ms5floor.com"
+---
+# Azure DNS Configuration Secret
+# Contains Azure service principal credentials for DNS-01 challenges
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azuredns-config
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: dns-solver
+    app.kubernetes.io/part-of: cert-manager
+  annotations:
+    description: "Azure DNS configuration for cert-manager DNS-01 challenges"
+    azure.workload.identity/use: "true"
+type: Opaque
+data:
+  # Azure service principal client secret (base64 encoded)
+  # This should be populated from Azure Key Vault in production
+  client-secret: "${AZURE_CLIENT_SECRET_B64}"

@@ -1,0 +1,102 @@
+---
+# NGINX Ingress Controller Service
+# LoadBalancer service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "NGINX Ingress Controller LoadBalancer service"
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /healthz
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    service.beta.kubernetes.io/azure-pip-name: "ms5-ingress-public-ip"
+    service.beta.kubernetes.io/azure-dns-label-name: "ms5floor"
+    service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout: "30"
+    service.beta.kubernetes.io/azure-load-balancer-enable-high-availability-ports: "true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ipFamilyPolicy: SingleStack
+  ipFamilies:
+  - IPv4
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+    appProtocol: http
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+    appProtocol: https
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+---
+# NGINX Ingress Controller Metrics Service
+# ClusterIP service for Prometheus metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller-metrics
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "NGINX Ingress Controller metrics service"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 10254
+    protocol: TCP
+    targetPort: metrics
+    appProtocol: http
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+---
+# NGINX Ingress Controller Admission Service
+# ClusterIP service for admission webhook
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller-admission
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "NGINX Ingress Controller admission webhook service"
+spec:
+  type: ClusterIP
+  ports:
+  - name: https-webhook
+    port: 443
+    protocol: TCP
+    targetPort: webhook
+    appProtocol: https
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller

@@ -1,0 +1,302 @@
+---
+# MS5.0 Floor Dashboard - Prometheus RBAC Configuration
+# Enhanced RBAC with Azure Key Vault integration and monitoring permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    version: "v2.45.0"
+  annotations:
+    description: "Service account for Prometheus with comprehensive Kubernetes API access"
+    managed-by: "ms5-devops-team"
+    azure.workload.identity/client-id: ""  # Azure AD client ID for workload identity
+automountServiceAccountToken: true
+---
+# ClusterRole for Prometheus with comprehensive permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    version: "v2.45.0"
+  annotations:
+    description: "ClusterRole for Prometheus with comprehensive Kubernetes API access"
+    managed-by: "ms5-devops-team"
+rules:
+# Core Kubernetes API access for service discovery
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - nodes/metrics
+  - services
+  - endpoints
+  - pods
+  - configmaps
+  - secrets
+  - persistentvolumes
+  - persistentvolumeclaims
+  verbs: ["get", "list", "watch"]
+# Extensions and apps API access
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - deployments
+  - replicasets
+  - daemonsets
+  - statefulsets
+  verbs: ["get", "list", "watch"]
+# Batch API access for jobs and cronjobs
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  - cronjobs
+  verbs: ["get", "list", "watch"]
+# Networking API access
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses
+  - networkpolicies
+  verbs: ["get", "list", "watch"]
+# Storage API access
+- apiGroups: ["storage.k8s.io"]
+  resources:
+  - storageclasses
+  - volumeattachments
+  verbs: ["get", "list", "watch"]
+# Custom Resource Definitions (CRDs) access
+- apiGroups: ["monitoring.coreos.com"]
+  resources:
+  - servicemonitors
+  - podmonitors
+  - prometheusrules
+  - alertmanagers
+  - prometheuses
+  verbs: ["get", "list", "watch"]
+# Azure-specific CRDs
+- apiGroups: ["aadpodidentity.k8s.io"]
+  resources:
+  - azureidentities
+  - azureidentitybindings
+  verbs: ["get", "list", "watch"]
+# Non-resource URLs for metrics endpoints
+- nonResourceURLs: 
+  - "/metrics"
+  - "/stats"
+  - "/stats/prometheus"
+  - "/api/v1/nodes/*/proxy/metrics"
+  - "/api/v1/nodes/*/proxy/metrics/cadvisor"
+  - "/api/v1/nodes/*/proxy/metrics/probes"
+  verbs: ["get"]
+---
+# ClusterRoleBinding to bind the ServiceAccount to the ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    version: "v2.45.0"
+  annotations:
+    description: "ClusterRoleBinding for Prometheus service account"
+    managed-by: "ms5-devops-team"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring
+---
+# Role for Prometheus within the monitoring namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "Role for Prometheus within the monitoring namespace"
+    managed-by: "ms5-devops-team"
+rules:
+# Namespace-specific resources
+- apiGroups: [""]
+  resources:
+  - configmaps
+  - secrets
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# ConfigMap updates for dynamic configuration
+- apiGroups: [""]
+  resources:
+  - configmaps
+  resourceNames:
+  - prometheus-config
+  - prometheus-rules
+  verbs: ["get", "update", "patch"]
+---
+# RoleBinding for Prometheus within the monitoring namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "RoleBinding for Prometheus within the monitoring namespace"
+    managed-by: "ms5-devops-team"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring
+---
+# Azure Key Vault RBAC configuration
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-azure-keyvault
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    azure-integration: "keyvault"
+  annotations:
+    description: "ClusterRole for Prometheus Azure Key Vault access"
+    managed-by: "ms5-devops-team"
+rules:
+# Azure Key Vault secrets access
+- apiGroups: ["external-secrets.io"]
+  resources:
+  - secretstores
+  - externalsecrets
+  - clustersecretstores
+  verbs: ["get", "list", "watch"]
+# Azure-specific resources
+- apiGroups: ["aadpodidentity.k8s.io"]
+  resources:
+  - azureidentities
+  - azureidentitybindings
+  verbs: ["get", "list", "watch"]
+---
+# Azure Key Vault ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-azure-keyvault
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    azure-integration: "keyvault"
+  annotations:
+    description: "ClusterRoleBinding for Prometheus Azure Key Vault access"
+    managed-by: "ms5-devops-team"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-azure-keyvault
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring
+---
+# Pod Security Policy for Prometheus (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: prometheus-psp
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "Pod Security Policy for Prometheus containers"
+    managed-by: "ms5-devops-team"
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts:
+  - min: 9090
+    max: 9091
+---
+# ClusterRole for Pod Security Policy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-psp
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "ClusterRole for Prometheus Pod Security Policy"
+    managed-by: "ms5-devops-team"
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - prometheus-psp
+---
+# ClusterRoleBinding for Pod Security Policy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-psp
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "ClusterRoleBinding for Prometheus Pod Security Policy"
+    managed-by: "ms5-devops-team"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-psp
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring

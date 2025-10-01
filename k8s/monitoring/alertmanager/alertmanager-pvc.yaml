@@ -1,0 +1,122 @@
+---
+# MS5.0 Floor Dashboard - AlertManager Persistent Volume Claims
+# Separate PVCs for different data types with appropriate storage classes
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-alerts-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    storage-tier: premium
+    data-type: alerts
+  annotations:
+    description: "Primary storage for AlertManager alerts data and state"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-premium"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi  # Alerts data storage
+  storageClassName: managed-premium
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-silences-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    storage-tier: premium
+    data-type: silences
+  annotations:
+    description: "Storage for AlertManager silences and maintenance windows"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-premium"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi  # Silences data storage
+  storageClassName: managed-premium
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-backup-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+    storage-tier: standard
+    data-type: backup
+  annotations:
+    description: "Storage for AlertManager backup data and snapshots"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-standard"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi  # Backup storage
+  storageClassName: managed-standard
+---
+# Storage class for AlertManager if not using managed-premium
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: alertmanager-storage
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+  annotations:
+    description: "Custom storage class optimized for AlertManager workloads"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # Premium SSD for high performance
+  cachingmode: ReadOnly  # Read-only caching for better performance
+  kind: managed
+  storageaccounttype: Premium_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+  availabilityZone: "1,2,3"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Storage class for AlertManager backup data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: alertmanager-backup-storage
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    environment: production
+  annotations:
+    description: "Storage class for AlertManager backup data with cost optimization"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Standard_LRS  # Standard SSD for backup data
+  cachingmode: None  # No caching for backup data
+  kind: managed
+  storageaccounttype: Standard_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

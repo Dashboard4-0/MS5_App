@@ -1,0 +1,185 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data-pvc
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: managed-premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+spec:
+  serviceName: minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: minio
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: minio
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        command:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-minio-config
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-minio-secrets
+              key: MINIO_ROOT_PASSWORD
+        - name: MINIO_CONSOLE_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-minio-config
+              key: MINIO_CONSOLE_ADDRESS
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
+        - name: minio-config
+          mountPath: /etc/minio
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: minio-data
+        persistentVolumeClaim:
+          claimName: minio-data-pvc
+      - name: minio-config
+        configMap:
+          name: ms5-minio-config
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: managed-premium
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-setup
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: minio-setup
+        image: minio/mc:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for MinIO to be ready
+          until mc alias set minio http://minio.ms5-production.svc.cluster.local:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do
+            echo "Waiting for MinIO..."
+            sleep 5
+          done
+          
+          # Create buckets
+          mc mb minio/ms5-uploads --ignore-existing
+          mc mb minio/ms5-reports --ignore-existing
+          mc mb minio/ms5-backups --ignore-existing
+          mc mb minio/ms5-temp --ignore-existing
+          
+          # Set bucket policies
+          mc policy set public minio/ms5-uploads
+          mc policy set private minio/ms5-reports
+          mc policy set private minio/ms5-backups
+          mc policy set private minio/ms5-temp
+          
+          echo "MinIO setup completed!"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-minio-config
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-minio-secrets
+              key: MINIO_ROOT_PASSWORD
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"

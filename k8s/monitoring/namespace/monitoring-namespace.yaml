@@ -1,0 +1,107 @@
+---
+# MS5.0 Floor Dashboard - Monitoring Namespace Configuration
+# Dedicated namespace for monitoring components with resource quotas and security policies
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    app: ms5-dashboard
+    component: monitoring
+    environment: production
+    tier: monitoring
+  annotations:
+    description: "MS5.0 Floor Dashboard monitoring namespace for Prometheus, Grafana, and AlertManager"
+    managed-by: "ms5-devops-team"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-resource-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    requests.storage: 1Ti
+    limits.cpu: "12"
+    limits.memory: 24Gi
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+    configmaps: "20"
+    secrets: "10"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limit-range
+  namespace: monitoring
+spec:
+  limits:
+  - default:
+      cpu: "2"
+      memory: 4Gi
+    defaultRequest:
+      cpu: "100m"
+      memory: 128Mi
+    type: Container
+  - default:
+      storage: 100Gi
+    type: PersistentVolumeClaim
+---
+apiVersion: v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-staging
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus
+    - protocol: TCP
+      port: 3000  # Grafana
+    - protocol: TCP
+      port: 9093  # AlertManager
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-staging
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 80    # HTTP
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 8000  # Backend API
+    - protocol: TCP
+      port: 9090  # Prometheus
+    - protocol: TCP
+      port: 9093  # AlertManager

@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-innovation
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Innovation Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Innovation configuration
+  cdn-innovation.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-innovation
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Innovation Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      innovation-config.json: |
+        {
+          "innovation": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "innovationTypes": [
+              {
+                "name": "Innovation Technology",
+                "description": "Innovation technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Innovation Process",
+                "description": "Innovation process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Innovation Automation",
+                "description": "Innovation automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Innovation Monitoring",
+                "description": "Innovation monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Innovation monitoring
+  cdn-innovation-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-innovation-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Innovation Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      innovation-monitoring.json: |
+        {
+          "monitoring": {
+            "innovation": "ms5-cdn-innovation",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "InnovationTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average innovation technology performance"
+              },
+              {
+                "name": "InnovationProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average innovation process performance"
+              },
+              {
+                "name": "InnovationAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average innovation automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowInnovationTechnologyPerformance",
+                "condition": "innovation_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Innovation technology performance is below 80%"
+              },
+              {
+                "name": "LowInnovationProcessPerformance",
+                "condition": "innovation_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Innovation process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Innovation script
+  cdn-innovation.py: |
+    #!/usr/bin/env python3
+    """
+    CDN innovation script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_innovation():
+        """Get CDN innovation from Azure"""
+        try:
+            # Azure CDN innovation endpoint
+            innovation_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/innovation"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(innovation_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                innovation = response.json()
+                
+                return {
+                    "request_count": innovation.get("RequestCount", 0),
+                    "bytes_sent": innovation.get("BytesSent", 0),
+                    "cache_hit_ratio": innovation.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN innovation: {e}")
+            return None
+    
+    def send_innovation_to_prometheus(innovation):
+        """Send CDN innovation to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_innovation",
+                "value": innovation["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN innovation sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN innovation to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN innovation to Prometheus: {e}")
+    
+    def main():
+        """Main innovation loop"""
+        while True:
+            innovation = get_cdn_innovation()
+            if innovation:
+                print(json.dumps(innovation, indent=2))
+                send_innovation_to_prometheus(innovation)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Innovation deployment
+  cdn-innovation-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-innovation
+      namespace: ms5-frontend
+      labels:
+        app: cdn-innovation
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-innovation
+      template:
+        metadata:
+          labels:
+            app: cdn-innovation
+        spec:
+          containers:
+          - name: cdn-innovation
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-innovation.py"]
+            volumeMounts:
+            - name: innovation-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: innovation-script
+            configMap:
+              name: cdn-innovation-config
+              defaultMode: 0755

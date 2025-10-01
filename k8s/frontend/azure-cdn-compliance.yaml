@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-compliance
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Compliance Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Compliance configuration
+  cdn-compliance.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-compliance
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Compliance Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      compliance-config.json: |
+        {
+          "compliance": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "complianceTypes": [
+              {
+                "name": "Compliance Technology",
+                "description": "Compliance technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Compliance Process",
+                "description": "Compliance process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Compliance Automation",
+                "description": "Compliance automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Compliance Monitoring",
+                "description": "Compliance monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Compliance monitoring
+  cdn-compliance-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-compliance-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Compliance Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      compliance-monitoring.json: |
+        {
+          "monitoring": {
+            "compliance": "ms5-cdn-compliance",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "ComplianceTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average compliance technology performance"
+              },
+              {
+                "name": "ComplianceProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average compliance process performance"
+              },
+              {
+                "name": "ComplianceAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average compliance automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowComplianceTechnologyPerformance",
+                "condition": "compliance_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Compliance technology performance is below 80%"
+              },
+              {
+                "name": "LowComplianceProcessPerformance",
+                "condition": "compliance_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Compliance process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Compliance script
+  cdn-compliance.py: |
+    #!/usr/bin/env python3
+    """
+    CDN compliance script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_compliance():
+        """Get CDN compliance from Azure"""
+        try:
+            # Azure CDN compliance endpoint
+            compliance_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/compliance"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(compliance_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                compliance = response.json()
+                
+                return {
+                    "request_count": compliance.get("RequestCount", 0),
+                    "bytes_sent": compliance.get("BytesSent", 0),
+                    "cache_hit_ratio": compliance.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN compliance: {e}")
+            return None
+    
+    def send_compliance_to_prometheus(compliance):
+        """Send CDN compliance to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_compliance",
+                "value": compliance["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN compliance sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN compliance to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN compliance to Prometheus: {e}")
+    
+    def main():
+        """Main compliance loop"""
+        while True:
+            compliance = get_cdn_compliance()
+            if compliance:
+                print(json.dumps(compliance, indent=2))
+                send_compliance_to_prometheus(compliance)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Compliance deployment
+  cdn-compliance-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-compliance
+      namespace: ms5-frontend
+      labels:
+        app: cdn-compliance
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-compliance
+      template:
+        metadata:
+          labels:
+            app: cdn-compliance
+        spec:
+          containers:
+          - name: cdn-compliance
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-compliance.py"]
+            volumeMounts:
+            - name: compliance-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: compliance-script
+            configMap:
+              name: cdn-compliance-config
+              defaultMode: 0755

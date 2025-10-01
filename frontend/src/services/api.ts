@@ -533,6 +533,10 @@ class ApiService {
     return this.post(`/api/v1/production/job-assignments/${assignmentId}/complete`);
   }
 
+  async cancelJob(assignmentId: string): Promise<ApiResponse<any>> {
+    return this.post(`/api/v1/production/job-assignments/${assignmentId}/cancel`);
+  }
+
   // ============================================================================
   // DASHBOARD API
   // ============================================================================
@@ -541,8 +545,14 @@ class ApiService {
     return this.get(`/api/v1/dashboard/lines/${lineId}/status`);
   }
 
-  async getEquipmentStatus(equipmentCode: string): Promise<ApiResponse<any>> {
-    return this.get(`/api/v1/dashboard/equipment/${equipmentCode}/status`);
+  async getEquipmentStatus(lineId?: string): Promise<ApiResponse<any[]>> {
+    const url = lineId ? `/api/v1/dashboard/equipment/status?line_id=${lineId}` : '/api/v1/dashboard/equipment/status';
+    return this.get(url);
+  }
+
+  async getProductionMetrics(lineId?: string): Promise<ApiResponse<any[]>> {
+    const url = lineId ? `/api/v1/dashboard/production-metrics?line_id=${lineId}` : '/api/v1/dashboard/production-metrics';
+    return this.get(url);
   }
 
   async getDashboardMetrics(filters?: { lineId?: string; period?: string }): Promise<ApiResponse<any>> {
@@ -593,16 +603,91 @@ class ApiService {
     return this.post(`/api/v1/andon/events/${eventId}/resolve`, { resolution_notes: resolutionNotes });
   }
 
+  async escalateAndonEvent(eventId: string, escalationLevel: number): Promise<ApiResponse<any>> {
+    return this.post(`/api/v1/andon/events/${eventId}/escalate`, { escalation_level: escalationLevel });
+  }
+
+  async getAndonEscalations(filters?: { status?: string; priority?: string }): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.priority) params.append('priority', filters.priority);
+    
+    return this.get(`/api/v1/andon/escalations?${params.toString()}`);
+  }
+
+  async getAndonEscalation(escalationId: string): Promise<ApiResponse<any>> {
+    return this.get(`/api/v1/andon/escalations/${escalationId}`);
+  }
+
+  async acknowledgeEscalation(escalationId: string): Promise<ApiResponse<any>> {
+    return this.post(`/api/v1/andon/escalations/${escalationId}/acknowledge`);
+  }
+
+  async resolveEscalation(escalationId: string, resolutionNotes: string): Promise<ApiResponse<any>> {
+    return this.post(`/api/v1/andon/escalations/${escalationId}/resolve`, { resolution_notes: resolutionNotes });
+  }
+
   // ============================================================================
   // OEE API
   // ============================================================================
 
-  async getOEEData(lineId: string, filters?: { period?: string; granularity?: string }): Promise<ApiResponse<any>> {
+  async getOEEData(lineId?: string, filters?: { period?: string; granularity?: string }): Promise<ApiResponse<any>> {
     const params = new URLSearchParams();
     if (filters?.period) params.append('period', filters.period);
     if (filters?.granularity) params.append('granularity', filters.granularity);
     
-    return this.get(`/api/v1/oee/lines/${lineId}?${params.toString()}`);
+    const url = lineId ? `/api/v1/oee/lines/${lineId}?${params.toString()}` : `/api/v1/oee?${params.toString()}`;
+    return this.get(url);
+  }
+
+  async getCurrentOEE(lineId?: string): Promise<ApiResponse<any[]>> {
+    const url = lineId ? `/api/v1/oee/current?line_id=${lineId}` : '/api/v1/oee/current';
+    return this.get(url);
+  }
+
+  async getOEECalculations(filters?: { lineId?: string; equipmentCode?: string; startTime?: string; endTime?: string }): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filters?.lineId) params.append('line_id', filters.lineId);
+    if (filters?.equipmentCode) params.append('equipment_code', filters.equipmentCode);
+    if (filters?.startTime) params.append('start_time', filters.startTime);
+    if (filters?.endTime) params.append('end_time', filters.endTime);
+    
+    return this.get(`/api/v1/oee/calculations?${params.toString()}`);
+  }
+
+  async getOEETrends(filters?: { lineId?: string; equipmentCode?: string; startTime?: string; endTime?: string; aggregationLevel?: string }): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filters?.lineId) params.append('line_id', filters.lineId);
+    if (filters?.equipmentCode) params.append('equipment_code', filters.equipmentCode);
+    if (filters?.startTime) params.append('start_time', filters.startTime);
+    if (filters?.endTime) params.append('end_time', filters.endTime);
+    if (filters?.aggregationLevel) params.append('aggregation_level', filters.aggregationLevel);
+    
+    return this.get(`/api/v1/oee/trends?${params.toString()}`);
+  }
+
+  async getOEELosses(filters?: { lineId?: string; equipmentCode?: string; startTime?: string; endTime?: string }): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams();
+    if (filters?.lineId) params.append('line_id', filters.lineId);
+    if (filters?.equipmentCode) params.append('equipment_code', filters.equipmentCode);
+    if (filters?.startTime) params.append('start_time', filters.startTime);
+    if (filters?.endTime) params.append('end_time', filters.endTime);
+    
+    return this.get(`/api/v1/oee/losses?${params.toString()}`);
+  }
+
+  async calculateOEE(params: { lineId: string; equipmentCode?: string; startTime: string; endTime: string }): Promise<ApiResponse<any[]>> {
+    return this.post('/api/v1/oee/calculate', params);
+  }
+
+  async getOEEAnalytics(filters?: { lineId?: string; equipmentCode?: string; startTime?: string; endTime?: string }): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (filters?.lineId) params.append('line_id', filters.lineId);
+    if (filters?.equipmentCode) params.append('equipment_code', filters.equipmentCode);
+    if (filters?.startTime) params.append('start_time', filters.startTime);
+    if (filters?.endTime) params.append('end_time', filters.endTime);
+    
+    return this.get(`/api/v1/oee/analytics?${params.toString()}`);
   }
 
   async getOEEHistory(lineId: string, filters?: { startDate: string; endDate: string; granularity?: string }): Promise<ApiResponse<any[]>> {

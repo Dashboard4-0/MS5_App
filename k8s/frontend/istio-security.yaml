@@ -1,0 +1,193 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: ms5-frontend-authz
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: security
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Istio Authorization Policy for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-frontend
+  rules:
+  # Allow ingress gateway access
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+  # Allow health checks
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/health", "/ready", "/live"]
+  # Allow API access
+  - to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+  # Allow WebSocket access
+  - to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/ws", "/ws/*"]
+  # Allow static assets
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/static/*", "/assets/*", "/*.js", "/*.css", "/*.png", "/*.jpg", "/*.jpeg", "/*.gif", "/*.svg", "/*.woff", "/*.woff2", "/*.ttf", "/*.eot", "/*.ico"]
+  # Allow PWA assets
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/manifest.json", "/sw.js", "/offline.html", "/maintenance.html"]
+  # Allow SPA routing
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: ms5-frontend-peer-auth
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: security
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Istio Peer Authentication for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-frontend
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    80:
+      mode: PERMISSIVE  # Allow HTTP for health checks
+    9090:
+      mode: STRICT      # Require mTLS for metrics
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: ms5-frontend-request-auth
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: security
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Istio Request Authentication for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-frontend
+  jwtRules:
+  - issuer: "https://login.microsoftonline.com/{tenant-id}/v2.0"
+    audiences: ["api://ms5-floor-dashboard"]
+    jwksUri: "https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys"
+    jwtHeaders:
+    - name: "Authorization"
+      prefix: "Bearer "
+    jwtParams:
+    - name: "access_token"
+    forwardOriginalToken: true
+    outputPayloadToHeader: "x-jwt-payload"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: ms5-frontend-sidecar
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: sidecar
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Istio Sidecar Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  workloadSelector:
+    labels:
+      app: ms5-frontend
+  ingress:
+  - port:
+      number: 80
+      protocol: HTTP
+      name: http
+    defaultEndpoint: 127.0.0.1:80
+  - port:
+      number: 9090
+      protocol: HTTP
+      name: metrics
+    defaultEndpoint: 127.0.0.1:9090
+  egress:
+  # Allow access to backend services
+  - hosts:
+    - "ms5-backend-service.ms5-backend.svc.cluster.local"
+    - "ms5-backend-service.ms5-backend.svc.cluster.local:8000"
+    port:
+      number: 8000
+      protocol: HTTP
+  # Allow access to monitoring services
+  - hosts:
+    - "prometheus.monitoring.svc.cluster.local"
+    - "grafana.monitoring.svc.cluster.local"
+    - "jaeger.monitoring.svc.cluster.local"
+    port:
+      number: 9090
+      protocol: HTTP
+  # Allow access to external services
+  - hosts:
+    - "*.ms5floor.com"
+    - "*.azure.com"
+    - "*.microsoftonline.com"
+    port:
+      number: 443
+      protocol: HTTPS
+  # Allow access to DNS
+  - hosts:
+    - "kube-dns.kube-system.svc.cluster.local"
+    - "coredns.kube-system.svc.cluster.local"
+    port:
+      number: 53
+      protocol: UDP
+  # Allow access to Istio services
+  - hosts:
+    - "istiod.istio-system.svc.cluster.local"
+    port:
+      number: 15012
+      protocol: HTTPS
+  - hosts:
+    - "istiod.istio-system.svc.cluster.local"
+    port:
+      number: 15010
+      protocol: HTTP
+  # Allow access to Kubernetes API
+  - hosts:
+    - "kubernetes.default.svc.cluster.local"
+    port:
+      number: 443
+      protocol: HTTPS
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY

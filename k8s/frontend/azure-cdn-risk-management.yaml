@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-risk-management
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Risk Management Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Risk Management configuration
+  cdn-risk-management.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-risk-management
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Risk Management Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      risk-management-config.json: |
+        {
+          "riskManagement": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "riskManagementTypes": [
+              {
+                "name": "Risk Management Technology",
+                "description": "Risk management technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Risk Management Process",
+                "description": "Risk management process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Risk Management Automation",
+                "description": "Risk management automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Risk Management Monitoring",
+                "description": "Risk management monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Risk Management monitoring
+  cdn-risk-management-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-risk-management-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Risk Management Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      risk-management-monitoring.json: |
+        {
+          "monitoring": {
+            "riskManagement": "ms5-cdn-risk-management",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "RiskManagementTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average risk management technology performance"
+              },
+              {
+                "name": "RiskManagementProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average risk management process performance"
+              },
+              {
+                "name": "RiskManagementAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average risk management automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowRiskManagementTechnologyPerformance",
+                "condition": "risk_management_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Risk management technology performance is below 80%"
+              },
+              {
+                "name": "LowRiskManagementProcessPerformance",
+                "condition": "risk_management_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Risk management process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Risk Management script
+  cdn-risk-management.py: |
+    #!/usr/bin/env python3
+    """
+    CDN risk management script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_risk_management():
+        """Get CDN risk management from Azure"""
+        try:
+            # Azure CDN risk management endpoint
+            risk_management_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/risk-management"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(risk_management_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                risk_management = response.json()
+                
+                return {
+                    "request_count": risk_management.get("RequestCount", 0),
+                    "bytes_sent": risk_management.get("BytesSent", 0),
+                    "cache_hit_ratio": risk_management.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN risk management: {e}")
+            return None
+    
+    def send_risk_management_to_prometheus(risk_management):
+        """Send CDN risk management to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_risk_management",
+                "value": risk_management["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN risk management sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN risk management to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN risk management to Prometheus: {e}")
+    
+    def main():
+        """Main risk management loop"""
+        while True:
+            risk_management = get_cdn_risk_management()
+            if risk_management:
+                print(json.dumps(risk_management, indent=2))
+                send_risk_management_to_prometheus(risk_management)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Risk Management deployment
+  cdn-risk-management-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-risk-management
+      namespace: ms5-frontend
+      labels:
+        app: cdn-risk-management
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-risk-management
+      template:
+        metadata:
+          labels:
+            app: cdn-risk-management
+        spec:
+          containers:
+          - name: cdn-risk-management
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-risk-management.py"]
+            volumeMounts:
+            - name: risk-management-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: risk-management-script
+            configMap:
+              name: cdn-risk-management-config
+              defaultMode: 0755

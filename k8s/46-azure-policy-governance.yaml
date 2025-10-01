@@ -1,0 +1,584 @@
+---
+# MS5.0 Floor Dashboard - Azure Policy Governance
+# Phase 7B: Advanced Security & Compliance
+#
+# This manifest implements comprehensive Azure Policy governance
+# with policy definition creation, governance policies, and
+# compliance monitoring.
+#
+# Governance Architecture:
+# - Policy Definition Creation: Custom Azure policies for MS5.0
+# - Governance Policies: Resource naming, tagging, and compliance
+# - Compliance Monitoring: Policy compliance reporting and alerting
+# - Remediation: Automated policy violation remediation
+
+# Azure Policy Definition Creation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-policy-definitions
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  azure-policy-definitions.yaml: |
+    # Azure Policy Definitions for MS5.0
+    # Comprehensive governance and compliance policies
+    
+    apiVersion: policy.azure.com/v1
+    kind: PolicyDefinition
+    metadata:
+      name: ms5-security-baseline
+      namespace: ms5-production
+    spec:
+      # Security Baseline Policy
+      displayName: "MS5.0 Security Baseline"
+      description: "Security baseline policy for MS5.0 deployment"
+      policyType: "Custom"
+      mode: "All"
+      
+      # Policy rules
+      policyRule:
+        if:
+          allOf:
+          - field: "type"
+            equals: "Microsoft.ContainerService/managedClusters"
+          - field: "properties.kubernetesVersion"
+            notEquals: "1.24"
+        then:
+          effect: "Deny"
+          details:
+            message: "AKS cluster must use Kubernetes version 1.24 or higher"
+      
+      # Policy parameters
+      parameters:
+        kubernetesVersion:
+          type: "String"
+          defaultValue: "1.24"
+          metadata:
+            displayName: "Minimum Kubernetes Version"
+            description: "Minimum required Kubernetes version"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyDefinition
+    metadata:
+      name: ms5-resource-naming
+      namespace: ms5-production
+    spec:
+      # Resource Naming Policy
+      displayName: "MS5.0 Resource Naming Convention"
+      description: "Enforce resource naming conventions for MS5.0"
+      policyType: "Custom"
+      mode: "All"
+      
+      # Policy rules
+      policyRule:
+        if:
+          allOf:
+          - field: "type"
+            in: ["Microsoft.ContainerService/managedClusters", "Microsoft.Storage/storageAccounts", "Microsoft.KeyVault/vaults"]
+          - field: "name"
+            notLike: "ms5-*"
+        then:
+          effect: "Deny"
+          details:
+            message: "Resource name must start with 'ms5-' prefix"
+      
+      # Policy parameters
+      parameters:
+        resourcePrefix:
+          type: "String"
+          defaultValue: "ms5-"
+          metadata:
+            displayName: "Resource Prefix"
+            description: "Required prefix for resource names"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyDefinition
+    metadata:
+      name: ms5-resource-tagging
+      namespace: ms5-production
+    spec:
+      # Resource Tagging Policy
+      displayName: "MS5.0 Resource Tagging Requirements"
+      description: "Enforce required tags for MS5.0 resources"
+      policyType: "Custom"
+      mode: "All"
+      
+      # Policy rules
+      policyRule:
+        if:
+          allOf:
+          - field: "type"
+            in: ["Microsoft.ContainerService/managedClusters", "Microsoft.Storage/storageAccounts", "Microsoft.KeyVault/vaults"]
+          - field: "tags.environment"
+            notEquals: "production"
+          - field: "tags.application"
+            notEquals: "ms5-dashboard"
+          - field: "tags.owner"
+            notEquals: "devops-team"
+        then:
+          effect: "Deny"
+          details:
+            message: "Resource must have required tags: environment, application, owner"
+      
+      # Policy parameters
+      parameters:
+        requiredTags:
+          type: "Array"
+          defaultValue: ["environment", "application", "owner"]
+          metadata:
+            displayName: "Required Tags"
+            description: "List of required tags"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyDefinition
+    metadata:
+      name: ms5-location-restriction
+      namespace: ms5-production
+    spec:
+      # Location Restriction Policy
+      displayName: "MS5.0 Location Restriction"
+      description: "Restrict resource deployment to approved locations"
+      policyType: "Custom"
+      mode: "All"
+      
+      # Policy rules
+      policyRule:
+        if:
+          allOf:
+          - field: "location"
+            notIn: ["UK South", "UK West", "West Europe"]
+        then:
+          effect: "Deny"
+          details:
+            message: "Resource must be deployed in approved locations: UK South, UK West, West Europe"
+      
+      # Policy parameters
+      parameters:
+        allowedLocations:
+          type: "Array"
+          defaultValue: ["UK South", "UK West", "West Europe"]
+          metadata:
+            displayName: "Allowed Locations"
+            description: "List of approved deployment locations"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyDefinition
+    metadata:
+      name: ms5-cost-management
+      namespace: ms5-production
+    spec:
+      # Cost Management Policy
+      displayName: "MS5.0 Cost Management"
+      description: "Enforce cost management policies for MS5.0"
+      policyType: "Custom"
+      mode: "All"
+      
+      # Policy rules
+      policyRule:
+        if:
+          allOf:
+          - field: "type"
+            equals: "Microsoft.ContainerService/managedClusters"
+          - field: "properties.agentPoolProfiles[0].vmSize"
+            notIn: ["Standard_D2s_v3", "Standard_D4s_v3", "Standard_D8s_v3"]
+        then:
+          effect: "Deny"
+          details:
+            message: "AKS cluster must use approved VM sizes: Standard_D2s_v3, Standard_D4s_v3, Standard_D8s_v3"
+      
+      # Policy parameters
+      parameters:
+        allowedVMSizes:
+          type: "Array"
+          defaultValue: ["Standard_D2s_v3", "Standard_D4s_v3", "Standard_D8s_v3"]
+          metadata:
+            displayName: "Allowed VM Sizes"
+            description: "List of approved VM sizes for cost management"
+---
+# Azure Policy Assignments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-policy-assignments
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  azure-policy-assignments.yaml: |
+    # Azure Policy Assignments for MS5.0
+    # Policy assignments to enforce governance
+    
+    apiVersion: policy.azure.com/v1
+    kind: PolicyAssignment
+    metadata:
+      name: ms5-security-baseline-assignment
+      namespace: ms5-production
+    spec:
+      # Security Baseline Assignment
+      displayName: "MS5.0 Security Baseline Assignment"
+      description: "Assign security baseline policy to MS5.0 resource group"
+      policyDefinitionId: "/subscriptions/{subscription-id}/providers/Microsoft.Authorization/policyDefinitions/ms5-security-baseline"
+      scope: "/subscriptions/{subscription-id}/resourceGroups/ms5-production"
+      enforcementMode: "Default"
+      
+      # Assignment parameters
+      parameters:
+        kubernetesVersion:
+          value: "1.24"
+      
+      # Assignment metadata
+      metadata:
+        assignedBy: "DevOps Team"
+        createdOn: "2024-01-01T00:00:00Z"
+        updatedOn: "2024-01-01T00:00:00Z"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyAssignment
+    metadata:
+      name: ms5-resource-naming-assignment
+      namespace: ms5-production
+    spec:
+      # Resource Naming Assignment
+      displayName: "MS5.0 Resource Naming Assignment"
+      description: "Assign resource naming policy to MS5.0 resource group"
+      policyDefinitionId: "/subscriptions/{subscription-id}/providers/Microsoft.Authorization/policyDefinitions/ms5-resource-naming"
+      scope: "/subscriptions/{subscription-id}/resourceGroups/ms5-production"
+      enforcementMode: "Default"
+      
+      # Assignment parameters
+      parameters:
+        resourcePrefix:
+          value: "ms5-"
+      
+      # Assignment metadata
+      metadata:
+        assignedBy: "DevOps Team"
+        createdOn: "2024-01-01T00:00:00Z"
+        updatedOn: "2024-01-01T00:00:00Z"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyAssignment
+    metadata:
+      name: ms5-resource-tagging-assignment
+      namespace: ms5-production
+    spec:
+      # Resource Tagging Assignment
+      displayName: "MS5.0 Resource Tagging Assignment"
+      description: "Assign resource tagging policy to MS5.0 resource group"
+      policyDefinitionId: "/subscriptions/{subscription-id}/providers/Microsoft.Authorization/policyDefinitions/ms5-resource-tagging"
+      scope: "/subscriptions/{subscription-id}/resourceGroups/ms5-production"
+      enforcementMode: "Default"
+      
+      # Assignment parameters
+      parameters:
+        requiredTags:
+          value: ["environment", "application", "owner"]
+      
+      # Assignment metadata
+      metadata:
+        assignedBy: "DevOps Team"
+        createdOn: "2024-01-01T00:00:00Z"
+        updatedOn: "2024-01-01T00:00:00Z"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyAssignment
+    metadata:
+      name: ms5-location-restriction-assignment
+      namespace: ms5-production
+    spec:
+      # Location Restriction Assignment
+      displayName: "MS5.0 Location Restriction Assignment"
+      description: "Assign location restriction policy to MS5.0 resource group"
+      policyDefinitionId: "/subscriptions/{subscription-id}/providers/Microsoft.Authorization/policyDefinitions/ms5-location-restriction"
+      scope: "/subscriptions/{subscription-id}/resourceGroups/ms5-production"
+      enforcementMode: "Default"
+      
+      # Assignment parameters
+      parameters:
+        allowedLocations:
+          value: ["UK South", "UK West", "West Europe"]
+      
+      # Assignment metadata
+      metadata:
+        assignedBy: "DevOps Team"
+        createdOn: "2024-01-01T00:00:00Z"
+        updatedOn: "2024-01-01T00:00:00Z"
+    
+    ---
+    apiVersion: policy.azure.com/v1
+    kind: PolicyAssignment
+    metadata:
+      name: ms5-cost-management-assignment
+      namespace: ms5-production
+    spec:
+      # Cost Management Assignment
+      displayName: "MS5.0 Cost Management Assignment"
+      description: "Assign cost management policy to MS5.0 resource group"
+      policyDefinitionId: "/subscriptions/{subscription-id}/providers/Microsoft.Authorization/policyDefinitions/ms5-cost-management"
+      scope: "/subscriptions/{subscription-id}/resourceGroups/ms5-production"
+      enforcementMode: "Default"
+      
+      # Assignment parameters
+      parameters:
+        allowedVMSizes:
+          value: ["Standard_D2s_v3", "Standard_D4s_v3", "Standard_D8s_v3"]
+      
+      # Assignment metadata
+      metadata:
+        assignedBy: "DevOps Team"
+        createdOn: "2024-01-01T00:00:00Z"
+        updatedOn: "2024-01-01T00:00:00Z"
+---
+# Azure Policy Compliance Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-policy-compliance-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  azure-policy-compliance.yaml: |
+    # Azure Policy Compliance Monitoring
+    # Comprehensive policy compliance monitoring and reporting
+    
+    apiVersion: policy.azure.com/v1
+    kind: PolicyComplianceMonitoring
+    metadata:
+      name: ms5-policy-compliance-monitoring
+      namespace: ms5-production
+    spec:
+      # Compliance monitoring configuration
+      monitoring:
+        enabled: true
+        scanSchedule: "0 1 * * *"  # Daily at 1 AM
+        reportSchedule: "0 6 * * 1"  # Weekly on Monday at 6 AM
+        
+        # Monitoring targets
+        targets:
+          - "resourceGroup:ms5-production"
+          - "subscription:{subscription-id}"
+        
+        # Compliance thresholds
+        thresholds:
+          critical: 0
+          high: 5
+          medium: 10
+          low: 20
+      
+      # Compliance reporting
+      reporting:
+        enabled: true
+        reportFormats:
+          - "pdf"
+          - "json"
+          - "csv"
+        reportRecipients:
+          - "compliance-team@company.com"
+          - "security-team@company.com"
+          - "management@company.com"
+      
+      # Compliance alerting
+      alerting:
+        enabled: true
+        alertChannels:
+          - "slack"
+          - "email"
+          - "webhook"
+        alertThresholds:
+          critical: 0
+          high: 5
+          medium: 10
+          low: 20
+      
+      # Policy categories
+      policyCategories:
+        - "security"
+        - "governance"
+        - "cost-management"
+        - "compliance"
+        - "naming-conventions"
+        - "tagging"
+        - "location-restrictions"
+---
+# Azure Policy Remediation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-policy-remediation
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  azure-policy-remediation.yaml: |
+    # Azure Policy Remediation
+    # Automated policy violation remediation
+    
+    apiVersion: policy.azure.com/v1
+    kind: PolicyRemediation
+    metadata:
+      name: ms5-policy-remediation
+      namespace: ms5-production
+    spec:
+      # Remediation configuration
+      remediation:
+        enabled: true
+        autoRemediation: true
+        remediationTimeout: "300s"
+        
+        # Remediation methods
+        methods:
+          - "auto-fix"
+          - "notification"
+          - "escalation"
+        
+        # Remediation targets
+        targets:
+          - "resourceGroup:ms5-production"
+          - "subscription:{subscription-id}"
+      
+      # Remediation procedures
+      procedures:
+        # Resource naming remediation
+        resourceNaming:
+          enabled: true
+          action: "rename-resource"
+          timeout: "60s"
+          notification: true
+        
+        # Resource tagging remediation
+        resourceTagging:
+          enabled: true
+          action: "add-missing-tags"
+          timeout: "30s"
+          notification: true
+        
+        # Location restriction remediation
+        locationRestriction:
+          enabled: true
+          action: "move-resource"
+          timeout: "300s"
+          notification: true
+        
+        # Cost management remediation
+        costManagement:
+          enabled: true
+          action: "resize-resource"
+          timeout: "120s"
+          notification: true
+      
+      # Remediation notification
+      notification:
+        enabled: true
+        channels:
+          - "slack"
+          - "email"
+          - "webhook"
+        recipients:
+          - "devops-team@company.com"
+          - "compliance-team@company.com"
+---
+# Azure Policy Monitoring Alerts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-policy-monitoring-alerts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  azure-policy-alerts.yaml: |
+    # Azure Policy Monitoring Alerts
+    # Comprehensive policy monitoring and alerting
+    
+    groups:
+    - name: azure-policy-monitoring
+      rules:
+      - alert: PolicyViolationDetected
+        expr: azure_policy_violations_total > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: governance
+        annotations:
+          summary: "Azure Policy violation detected"
+          description: "Policy violation detected for {{ $labels.policy_name }}: {{ $labels.violation_details }}"
+      
+      - alert: PolicyComplianceScoreLow
+        expr: azure_policy_compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          component: governance
+        annotations:
+          summary: "Azure Policy compliance score low"
+          description: "Policy compliance score is {{ $value }}%, below 90% threshold"
+      
+      - alert: PolicyRemediationFailure
+        expr: azure_policy_remediation_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: governance
+        annotations:
+          summary: "Azure Policy remediation failed"
+          description: "Policy remediation failed for {{ $labels.policy_name }}: {{ $labels.error_message }}"
+      
+      - alert: PolicyAssignmentFailure
+        expr: azure_policy_assignment_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: governance
+        annotations:
+          summary: "Azure Policy assignment failed"
+          description: "Policy assignment failed for {{ $labels.policy_name }}: {{ $labels.error_message }}"
+      
+      - alert: PolicyDefinitionFailure
+        expr: azure_policy_definition_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: governance
+        annotations:
+          summary: "Azure Policy definition failed"
+          description: "Policy definition failed for {{ $labels.policy_name }}: {{ $labels.error_message }}"
+      
+      - alert: PolicyComplianceDrift
+        expr: increase(azure_policy_compliance_drift_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: governance
+        annotations:
+          summary: "Azure Policy compliance drift detected"
+          description: "Policy compliance drift detected for {{ $labels.policy_name }}: {{ $labels.drift_details }}"
+      
+      - alert: PolicyEnforcementFailure
+        expr: azure_policy_enforcement_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: governance
+        annotations:
+          summary: "Azure Policy enforcement failed"
+          description: "Policy enforcement failed for {{ $labels.policy_name }}: {{ $labels.error_message }}"

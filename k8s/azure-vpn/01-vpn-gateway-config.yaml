@@ -1,0 +1,448 @@
+---
+# Azure VPN Gateway Configuration
+# Provides secure VPN access for MS5.0 Floor Dashboard administration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-vpn-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: vpn
+    tier: security
+    environment: production
+  annotations:
+    description: "Azure VPN Gateway configuration for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # VPN Gateway Configuration
+  vpn-gateway-config.json: |
+    {
+      "properties": {
+        "sku": {
+          "name": "VpnGw2",
+          "tier": "VpnGw2"
+        },
+        "gatewayType": "Vpn",
+        "vpnType": "RouteBased",
+        "enableBgp": false,
+        "activeActive": false,
+        "gatewayDefaultSite": null,
+        "vpnClientConfiguration": {
+          "vpnClientAddressPool": {
+            "addressPrefixes": [
+              "172.16.201.0/24"
+            ]
+          },
+          "vpnClientRootCertificates": [],
+          "vpnClientRevokedCertificates": [],
+          "vpnClientProtocols": [
+            "OpenVPN"
+          ],
+          "vpnClientIpsecPolicies": [],
+          "radiusServers": [],
+          "aadTenant": "${AZURE_TENANT_ID}",
+          "aadAudience": "41b23e61-6c1e-4545-b367-cd054e0ed4b4",
+          "aadIssuer": "https://sts.windows.net/${AZURE_TENANT_ID}/"
+        },
+        "vpnClientConfiguration": {
+          "vpnClientAddressPool": {
+            "addressPrefixes": [
+              "172.16.201.0/24"
+            ]
+          },
+          "vpnClientRootCertificates": [],
+          "vpnClientRevokedCertificates": [],
+          "vpnClientProtocols": [
+            "OpenVPN"
+          ],
+          "vpnClientIpsecPolicies": [],
+          "radiusServers": [],
+          "aadTenant": "${AZURE_TENANT_ID}",
+          "aadAudience": "41b23e61-6c1e-4545-b367-cd054e0ed4b4",
+          "aadIssuer": "https://sts.windows.net/${AZURE_TENANT_ID}/"
+        }
+      },
+      "location": "${AZURE_LOCATION}",
+      "tags": {
+        "Environment": "Production",
+        "Application": "MS5.0 Floor Dashboard",
+        "Owner": "Manufacturing Systems Team",
+        "CostCenter": "Manufacturing Operations",
+        "SecurityLevel": "High"
+      }
+    }
+  
+  # Point-to-Site VPN Configuration
+  p2s-vpn-config.json: |
+    {
+      "properties": {
+        "vpnClientAddressPool": {
+          "addressPrefixes": [
+            "172.16.201.0/24"
+          ]
+        },
+        "vpnClientRootCertificates": [
+          {
+            "name": "ms5-root-certificate",
+            "publicCertData": "${VPN_ROOT_CERTIFICATE_DATA}"
+          }
+        ],
+        "vpnClientRevokedCertificates": [],
+        "vpnClientProtocols": [
+          "OpenVPN"
+        ],
+        "vpnClientIpsecPolicies": [
+          {
+            "saLifeTimeSeconds": 28800,
+            "saDataSizeKilobytes": 102400000,
+            "ipsecEncryption": "AES256",
+            "ipsecIntegrity": "SHA256",
+            "ikeEncryption": "AES256",
+            "ikeIntegrity": "SHA384",
+            "dhGroup": "DHGroup24",
+            "pfsGroup": "PFS24"
+          }
+        ],
+        "radiusServers": [],
+        "aadTenant": "${AZURE_TENANT_ID}",
+        "aadAudience": "41b23e61-6c1e-4545-b367-cd054e0ed4b4",
+        "aadIssuer": "https://sts.windows.net/${AZURE_TENANT_ID}/"
+      }
+    }
+  
+  # Site-to-Site VPN Configuration
+  s2s-vpn-config.json: |
+    {
+      "localNetworkGateways": [
+        {
+          "name": "ms5-factory-gateway",
+          "properties": {
+            "localNetworkAddressSpace": {
+              "addressPrefixes": [
+                "192.168.100.0/24",
+                "192.168.101.0/24"
+              ]
+            },
+            "gatewayIpAddress": "${FACTORY_GATEWAY_IP}",
+            "bgpSettings": {
+              "asn": 65001,
+              "bgpPeeringAddress": "192.168.100.1",
+              "peerWeight": 0
+            }
+          },
+          "location": "${AZURE_LOCATION}",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Location": "Factory"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "name": "ms5-factory-connection",
+          "properties": {
+            "virtualNetworkGateway1": {
+              "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworkGateways/ms5-vpn-gateway"
+            },
+            "localNetworkGateway2": {
+              "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/localNetworkGateways/ms5-factory-gateway"
+            },
+            "connectionType": "IPsec",
+            "routingWeight": 10,
+            "sharedKey": "${VPN_SHARED_KEY}",
+            "enableBgp": false,
+            "usePolicyBasedTrafficSelectors": false,
+            "ipsecPolicies": [
+              {
+                "saLifeTimeSeconds": 28800,
+                "saDataSizeKilobytes": 102400000,
+                "ipsecEncryption": "AES256",
+                "ipsecIntegrity": "SHA256",
+                "ikeEncryption": "AES256",
+                "ikeIntegrity": "SHA384",
+                "dhGroup": "DHGroup24",
+                "pfsGroup": "PFS24"
+              }
+            ]
+          }
+        }
+      ]
+    }
+---
+# Private Endpoints Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-private-endpoints-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: private-endpoints
+    tier: security
+    environment: production
+  annotations:
+    description: "Azure Private Endpoints configuration for MS5.0 Floor Dashboard"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Private Endpoints Configuration
+  private-endpoints-config.json: |
+    {
+      "privateEndpoints": [
+        {
+          "name": "ms5-keyvault-private-endpoint",
+          "properties": {
+            "subnet": {
+              "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+            },
+            "privateLinkServiceConnections": [
+              {
+                "name": "ms5-keyvault-connection",
+                "properties": {
+                  "privateLinkServiceId": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.KeyVault/vaults/${AZURE_KEYVAULT_NAME}",
+                  "groupIds": ["vault"]
+                }
+              }
+            ],
+            "manualPrivateLinkServiceConnections": [],
+            "customDnsConfigs": [
+              {
+                "fqdn": "${AZURE_KEYVAULT_NAME}.vault.azure.net",
+                "ipAddresses": ["10.0.1.10"]
+              }
+            ]
+          },
+          "location": "${AZURE_LOCATION}",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "KeyVault"
+          }
+        },
+        {
+          "name": "ms5-storage-private-endpoint",
+          "properties": {
+            "subnet": {
+              "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+            },
+            "privateLinkServiceConnections": [
+              {
+                "name": "ms5-storage-connection",
+                "properties": {
+                  "privateLinkServiceId": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Storage/storageAccounts/${AZURE_STORAGE_ACCOUNT}",
+                  "groupIds": ["blob"]
+                }
+              }
+            ],
+            "customDnsConfigs": [
+              {
+                "fqdn": "${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
+                "ipAddresses": ["10.0.1.11"]
+              }
+            ]
+          },
+          "location": "${AZURE_LOCATION}",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "Storage"
+          }
+        },
+        {
+          "name": "ms5-container-registry-private-endpoint",
+          "properties": {
+            "subnet": {
+              "id": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+            },
+            "privateLinkServiceConnections": [
+              {
+                "name": "ms5-acr-connection",
+                "properties": {
+                  "privateLinkServiceId": "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.ContainerRegistry/registries/${AZURE_CONTAINER_REGISTRY}",
+                  "groupIds": ["registry"]
+                }
+              }
+            ],
+            "customDnsConfigs": [
+              {
+                "fqdn": "${AZURE_CONTAINER_REGISTRY}.azurecr.io",
+                "ipAddresses": ["10.0.1.12"]
+              }
+            ]
+          },
+          "location": "${AZURE_LOCATION}",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "ContainerRegistry"
+          }
+        }
+      ]
+    }
+  
+  # Private DNS Zones Configuration
+  private-dns-zones-config.json: |
+    {
+      "privateDnsZones": [
+        {
+          "name": "privatelink.vaultcore.azure.net",
+          "properties": {
+            "maxNumberOfRecordSets": 25000,
+            "maxNumberOfVirtualNetworkLinks": 1000,
+            "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+            "numberOfVirtualNetworks": 0,
+            "numberOfRecordSets": 0
+          },
+          "location": "global",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "KeyVault"
+          }
+        },
+        {
+          "name": "privatelink.blob.core.windows.net",
+          "properties": {
+            "maxNumberOfRecordSets": 25000,
+            "maxNumberOfVirtualNetworkLinks": 1000,
+            "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+            "numberOfVirtualNetworks": 0,
+            "numberOfRecordSets": 0
+          },
+          "location": "global",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "Storage"
+          }
+        },
+        {
+          "name": "privatelink.azurecr.io",
+          "properties": {
+            "maxNumberOfRecordSets": 25000,
+            "maxNumberOfVirtualNetworkLinks": 1000,
+            "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+            "numberOfVirtualNetworks": 0,
+            "numberOfRecordSets": 0
+          },
+          "location": "global",
+          "tags": {
+            "Environment": "Production",
+            "Application": "MS5.0 Floor Dashboard",
+            "Service": "ContainerRegistry"
+          }
+        }
+      ]
+    }
+---
+# VPN Client Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vpn-client-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: vpn-client
+    tier: security
+  annotations:
+    description: "VPN client configuration for MS5.0 Floor Dashboard"
+data:
+  vpn-client-config.ovpn: |
+    # OpenVPN Client Configuration for MS5.0 Floor Dashboard
+    client
+    dev tun
+    proto udp
+    remote ${VPN_GATEWAY_PUBLIC_IP} 1194
+    resolv-retry infinite
+    nobind
+    persist-key
+    persist-tun
+    cipher AES-256-GCM
+    auth SHA256
+    verb 3
+    remote-cert-tls server
+    auth-user-pass
+    auth-nocache
+    script-security 2
+    up /etc/openvpn/update-resolv-conf
+    down /etc/openvpn/update-resolv-conf
+    
+    # MS5.0 specific routes
+    route 10.0.0.0/8
+    route 172.16.0.0/12
+    route 192.168.0.0/16
+    
+    # DNS servers
+    dhcp-option DNS 10.0.0.4
+    dhcp-option DNS 10.0.0.5
+    
+    # Security settings
+    tls-version-min 1.2
+    tls-cipher TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256
+    
+    # Compression
+    comp-lzo adaptive
+    
+    # Logging
+    log-append /var/log/openvpn-client.log
+    status /var/log/openvpn-status.log 10
+  
+  vpn-setup-instructions.md: |
+    # VPN Setup Instructions for MS5.0 Floor Dashboard
+    
+    ## Prerequisites
+    - OpenVPN client installed
+    - Valid Azure AD credentials
+    - VPN client certificate (if using certificate-based authentication)
+    
+    ## Installation Steps
+    
+    ### 1. Download OpenVPN Client
+    - Windows: Download from https://openvpn.net/client-connect-vpn-for-windows-os/
+    - macOS: Download from https://openvpn.net/client-connect-vpn-for-mac-os/
+    - Linux: Install via package manager (apt, yum, etc.)
+    
+    ### 2. Import Configuration
+    1. Copy the VPN configuration file to your OpenVPN client
+    2. Import the configuration in your OpenVPN client
+    3. Enter your Azure AD credentials when prompted
+    
+    ### 3. Connect to VPN
+    1. Launch OpenVPN client
+    2. Select MS5.0 VPN configuration
+    3. Click Connect
+    4. Enter your Azure AD credentials
+    5. Wait for connection to establish
+    
+    ## Troubleshooting
+    
+    ### Connection Issues
+    - Verify VPN gateway public IP is correct
+    - Check firewall settings
+    - Ensure Azure AD credentials are valid
+    - Check VPN client logs for errors
+    
+    ### DNS Issues
+    - Verify DNS server settings
+    - Check private DNS zone configuration
+    - Ensure DNS resolution is working
+    
+    ### Performance Issues
+    - Check network latency
+    - Verify bandwidth allocation
+    - Monitor VPN gateway metrics
+    
+    ## Security Considerations
+    - Always use strong passwords
+    - Enable MFA for Azure AD accounts
+    - Regularly rotate VPN certificates
+    - Monitor VPN access logs
+    - Use least privilege access principles
+    
+    ## Support
+    - Contact: team@ms5floor.com
+    - Emergency: Available 24/7 for production issues

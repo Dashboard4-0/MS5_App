@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-maintenance
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Maintenance Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Maintenance configuration
+  cdn-maintenance.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-maintenance
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Maintenance Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      maintenance-config.json: |
+        {
+          "maintenance": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "maintenanceTypes": [
+              {
+                "name": "Maintenance Technology",
+                "description": "Maintenance technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Maintenance Process",
+                "description": "Maintenance process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Maintenance Automation",
+                "description": "Maintenance automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Maintenance Monitoring",
+                "description": "Maintenance monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Maintenance monitoring
+  cdn-maintenance-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-maintenance-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Maintenance Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      maintenance-monitoring.json: |
+        {
+          "monitoring": {
+            "maintenance": "ms5-cdn-maintenance",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "MaintenanceTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average maintenance technology performance"
+              },
+              {
+                "name": "MaintenanceProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average maintenance process performance"
+              },
+              {
+                "name": "MaintenanceAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average maintenance automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowMaintenanceTechnologyPerformance",
+                "condition": "maintenance_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Maintenance technology performance is below 80%"
+              },
+              {
+                "name": "LowMaintenanceProcessPerformance",
+                "condition": "maintenance_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Maintenance process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Maintenance script
+  cdn-maintenance.py: |
+    #!/usr/bin/env python3
+    """
+    CDN maintenance script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_maintenance():
+        """Get CDN maintenance from Azure"""
+        try:
+            # Azure CDN maintenance endpoint
+            maintenance_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/maintenance"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(maintenance_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                maintenance = response.json()
+                
+                return {
+                    "request_count": maintenance.get("RequestCount", 0),
+                    "bytes_sent": maintenance.get("BytesSent", 0),
+                    "cache_hit_ratio": maintenance.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN maintenance: {e}")
+            return None
+    
+    def send_maintenance_to_prometheus(maintenance):
+        """Send CDN maintenance to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_maintenance",
+                "value": maintenance["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN maintenance sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN maintenance to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN maintenance to Prometheus: {e}")
+    
+    def main():
+        """Main maintenance loop"""
+        while True:
+            maintenance = get_cdn_maintenance()
+            if maintenance:
+                print(json.dumps(maintenance, indent=2))
+                send_maintenance_to_prometheus(maintenance)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Maintenance deployment
+  cdn-maintenance-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-maintenance
+      namespace: ms5-frontend
+      labels:
+        app: cdn-maintenance
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-maintenance
+      template:
+        metadata:
+          labels:
+            app: cdn-maintenance
+        spec:
+          containers:
+          - name: cdn-maintenance
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-maintenance.py"]
+            volumeMounts:
+            - name: maintenance-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: maintenance-script
+            configMap:
+              name: cdn-maintenance-config
+              defaultMode: 0755

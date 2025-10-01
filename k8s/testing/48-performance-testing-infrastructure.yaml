@@ -1,0 +1,655 @@
+# MS5.0 Floor Dashboard - Phase 8A: Performance Testing Infrastructure
+# Comprehensive performance testing framework for AKS deployment validation
+# 
+# This manifest deploys a complete performance testing infrastructure including:
+# - k6 load testing platform with custom test scenarios
+# - Artillery load testing for API endpoints
+# - Custom performance monitoring and metrics collection
+# - Automated performance baseline establishment
+# - Performance regression testing capabilities
+#
+# Architecture: Starship-grade testing infrastructure designed for cosmic-scale validation
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    phase: "8a"
+    purpose: performance-validation
+  annotations:
+    description: "Performance testing namespace for MS5.0 Floor Dashboard AKS validation"
+    testing-phase: "8a"
+    testing-type: "performance-validation"
+
+---
+# Performance Testing ConfigMap - Central configuration for all performance tests
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-test-config
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-type: performance
+data:
+  # k6 Load Testing Configuration
+  k6-config.js: |
+    import http from 'k6/http';
+    import { check, sleep, group } from 'k6';
+    import { Rate, Trend, Counter } from 'k6/metrics';
+    
+    // Custom metrics for MS5.0 specific performance tracking
+    const apiResponseTime = new Trend('ms5_api_response_time');
+    const databaseQueryTime = new Trend('ms5_database_query_time');
+    const websocketLatency = new Trend('ms5_websocket_latency');
+    const errorRate = new Rate('ms5_error_rate');
+    const throughput = new Counter('ms5_throughput');
+    
+    // Test configuration - Production-like load patterns
+    export let options = {
+      stages: [
+        // Warm-up phase - Gradual load increase
+        { duration: '2m', target: 50 },
+        { duration: '3m', target: 50 },
+        
+        // Ramp-up phase - Production load simulation
+        { duration: '2m', target: 100 },
+        { duration: '5m', target: 100 },
+        
+        // Peak load phase - Stress testing
+        { duration: '2m', target: 200 },
+        { duration: '5m', target: 200 },
+        
+        // Sustained load phase - Endurance testing
+        { duration: '10m', target: 150 },
+        
+        // Cool-down phase
+        { duration: '2m', target: 0 },
+      ],
+      thresholds: {
+        // Performance thresholds - Starship-grade requirements
+        'ms5_api_response_time': ['p95<200', 'p99<500'],
+        'ms5_database_query_time': ['p95<100', 'p99<200'],
+        'ms5_websocket_latency': ['p95<50', 'p99<100'],
+        'ms5_error_rate': ['rate<0.001'], // Less than 0.1% error rate
+        'http_req_duration': ['p95<200', 'p99<500'],
+        'http_req_failed': ['rate<0.001'],
+      },
+      ext: {
+        loadimpact: {
+          projectID: 'ms5-performance-testing',
+          name: 'MS5.0 Floor Dashboard Performance Test'
+        }
+      }
+    };
+    
+    // Base URL configuration
+    const BASE_URL = __ENV.BASE_URL || 'https://ms5floor.com';
+    const API_BASE = `${BASE_URL}/api/v1`;
+    
+    // Test scenarios - Comprehensive API coverage
+    export default function() {
+      group('MS5.0 API Performance Tests', function() {
+        // Health check endpoint - Basic connectivity validation
+        group('Health Check', function() {
+          let response = http.get(`${API_BASE}/health`);
+          check(response, {
+            'health check status is 200': (r) => r.status === 200,
+            'health check response time < 100ms': (r) => r.timings.duration < 100,
+            'health check contains expected data': (r) => r.json('status') === 'healthy'
+          });
+          apiResponseTime.add(response.timings.duration);
+          errorRate.add(response.status !== 200);
+          throughput.add(1);
+        });
+        
+        // Authentication endpoint - Critical security path
+        group('Authentication', function() {
+          let authResponse = http.post(`${API_BASE}/auth/login`, {
+            username: 'test_user',
+            password: 'test_password'
+          });
+          check(authResponse, {
+            'auth response time < 200ms': (r) => r.timings.duration < 200,
+            'auth returns token': (r) => r.json('access_token') !== undefined
+          });
+          apiResponseTime.add(authResponse.timings.duration);
+          errorRate.add(authResponse.status !== 200);
+        });
+        
+        // Production data endpoints - Core business logic
+        group('Production Data', function() {
+          let prodResponse = http.get(`${API_BASE}/production/status`);
+          check(prodResponse, {
+            'production data response time < 200ms': (r) => r.timings.duration < 200,
+            'production data is valid': (r) => r.json('production_lines') !== undefined
+          });
+          apiResponseTime.add(prodResponse.timings.duration);
+          errorRate.add(prodResponse.status !== 200);
+        });
+        
+        // Telemetry endpoints - High-frequency data
+        group('Telemetry Data', function() {
+          let telemetryResponse = http.get(`${API_BASE}/telemetry/latest`);
+          check(telemetryResponse, {
+            'telemetry response time < 150ms': (r) => r.timings.duration < 150,
+            'telemetry data is valid': (r) => r.json('sensors') !== undefined
+          });
+          apiResponseTime.add(telemetryResponse.timings.duration);
+          errorRate.add(telemetryResponse.status !== 200);
+        });
+        
+        // Database-intensive operations
+        group('Database Operations', function() {
+          let dbResponse = http.get(`${API_BASE}/reports/production-summary`);
+          check(dbResponse, {
+            'database query time < 100ms': (r) => r.timings.duration < 100,
+            'database response is valid': (r) => r.json('summary') !== undefined
+          });
+          databaseQueryTime.add(dbResponse.timings.duration);
+          errorRate.add(dbResponse.status !== 200);
+        });
+      });
+      
+      // Realistic user behavior simulation
+      sleep(Math.random() * 2 + 1); // 1-3 second pause between requests
+    }
+    
+    // WebSocket performance testing
+    export function wsTest() {
+      const ws = new WebSocket('wss://ms5floor.com/ws');
+      const startTime = Date.now();
+      
+      ws.onopen = function() {
+        const latency = Date.now() - startTime;
+        websocketLatency.add(latency);
+        ws.close();
+      };
+    }
+
+  # Artillery Load Testing Configuration
+  artillery-config.yml: |
+    config:
+      target: 'https://ms5floor.com'
+      phases:
+        # Warm-up phase
+        - duration: 120
+          arrivalRate: 10
+          name: "Warm-up"
+        # Ramp-up phase
+        - duration: 300
+          arrivalRate: 20
+          name: "Ramp-up"
+        # Peak load phase
+        - duration: 600
+          arrivalRate: 50
+          name: "Peak Load"
+        # Sustained load phase
+        - duration: 900
+          arrivalRate: 30
+          name: "Sustained Load"
+        # Cool-down phase
+        - duration: 120
+          arrivalRate: 5
+          name: "Cool-down"
+      
+      # Performance thresholds
+      ensure:
+        p95: 200
+        p99: 500
+        maxErrorRate: 0.001
+      
+      # Plugin configuration
+      plugins:
+        metrics-by-endpoint:
+          useOnlyRequestNames: true
+        publish-metrics:
+          - type: prometheus
+            host: prometheus.ms5-production.svc.cluster.local
+            port: 9090
+            path: /metrics
+    
+    scenarios:
+      # Health check scenario
+      - name: "Health Check"
+        weight: 20
+        flow:
+          - get:
+              url: "/api/v1/health"
+              expect:
+                - statusCode: 200
+                - hasHeader: "content-type"
+      
+      # Authentication scenario
+      - name: "Authentication Flow"
+        weight: 15
+        flow:
+          - post:
+              url: "/api/v1/auth/login"
+              json:
+                username: "test_user"
+                password: "test_password"
+              expect:
+                - statusCode: 200
+                - hasProperty: "access_token"
+      
+      # Production data scenario
+      - name: "Production Data Access"
+        weight: 30
+        flow:
+          - get:
+              url: "/api/v1/production/status"
+              expect:
+                - statusCode: 200
+                - hasProperty: "production_lines"
+      
+      # Telemetry data scenario
+      - name: "Telemetry Data Access"
+        weight: 25
+        flow:
+          - get:
+              url: "/api/v1/telemetry/latest"
+              expect:
+                - statusCode: 200
+                - hasProperty: "sensors"
+      
+      # Database-intensive scenario
+      - name: "Database Operations"
+        weight: 10
+        flow:
+          - get:
+              url: "/api/v1/reports/production-summary"
+              expect:
+                - statusCode: 200
+                - hasProperty: "summary"
+
+  # Performance Monitoring Configuration
+  performance-monitoring.yaml: |
+    # Performance monitoring configuration for MS5.0 Floor Dashboard
+    # Comprehensive metrics collection and analysis
+    
+    monitoring:
+      # Metrics collection intervals
+      collection_interval: 30s
+      retention_period: 30d
+      
+      # Performance thresholds
+      thresholds:
+        api_response_time:
+          p95: 200ms
+          p99: 500ms
+        database_query_time:
+          p95: 100ms
+          p99: 200ms
+        websocket_latency:
+          p95: 50ms
+          p99: 100ms
+        error_rate:
+          max: 0.001 # 0.1%
+        throughput:
+          min: 1000 # requests per minute
+      
+      # Alerting configuration
+      alerts:
+        performance_degradation:
+          condition: "response_time_p95 > 200ms"
+          severity: "warning"
+          duration: "5m"
+        critical_performance_issue:
+          condition: "response_time_p99 > 500ms"
+          severity: "critical"
+          duration: "2m"
+        high_error_rate:
+          condition: "error_rate > 0.001"
+          severity: "critical"
+          duration: "1m"
+      
+      # Reporting configuration
+      reports:
+        daily_performance_report:
+          schedule: "0 6 * * *" # 6 AM daily
+          recipients: ["devops@ms5floor.com"]
+        weekly_performance_summary:
+          schedule: "0 9 * * 1" # 9 AM Monday
+          recipients: ["management@ms5floor.com"]
+
+---
+# k6 Load Testing Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k6-load-tester
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-tool: k6
+    testing-type: performance
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: testing
+      testing-tool: k6
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: testing
+        testing-tool: k6
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: k6
+        image: grafana/k6:latest
+        command: ["k6", "run", "--out", "prometheus=http://prometheus.ms5-production.svc.cluster.local:9090/api/v1/write", "/config/k6-config.js"]
+        env:
+        - name: BASE_URL
+          value: "https://ms5floor.com"
+        - name: K6_PROMETHEUS_RW_SERVER_URL
+          value: "http://prometheus.ms5-production.svc.cluster.local:9090/api/v1/write"
+        - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
+          value: "true"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: test-config
+          mountPath: /config
+        - name: test-results
+          mountPath: /results
+        ports:
+        - containerPort: 8080
+          name: metrics
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: test-config
+        configMap:
+          name: performance-test-config
+      - name: test-results
+        persistentVolumeClaim:
+          claimName: test-results-pvc
+      restartPolicy: Always
+
+---
+# Artillery Load Testing Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artillery-load-tester
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-tool: artillery
+    testing-type: performance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: testing
+      testing-tool: artillery
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: testing
+        testing-tool: artillery
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: artillery
+        image: artilleryio/artillery:latest
+        command: ["artillery", "run", "--output", "/results/artillery-report.json", "/config/artillery-config.yml"]
+        env:
+        - name: ARTILLERY_PROMETHEUS_ENABLED
+          value: "true"
+        - name: ARTILLERY_PROMETHEUS_ENDPOINT
+          value: "http://prometheus.ms5-production.svc.cluster.local:9090/api/v1/write"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: test-config
+          mountPath: /config
+        - name: test-results
+          mountPath: /results
+        ports:
+        - containerPort: 8080
+          name: metrics
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: test-config
+        configMap:
+          name: performance-test-config
+      - name: test-results
+        persistentVolumeClaim:
+          claimName: test-results-pvc
+      restartPolicy: Always
+
+---
+# Performance Monitoring Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: performance-monitoring
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-type: performance-monitoring
+spec:
+  selector:
+    app: ms5-dashboard
+    component: testing
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: api
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Test Results Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-results-pvc
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    purpose: test-results-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: azurefile-premium
+
+---
+# Performance Testing CronJob - Automated Performance Testing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: automated-performance-testing
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-type: automated-performance
+spec:
+  schedule: "0 2 * * *" # Run daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: ms5-dashboard
+            component: testing
+            testing-type: automated-performance
+        spec:
+          containers:
+          - name: performance-test-runner
+            image: grafana/k6:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Automated performance testing script
+              echo "Starting automated performance testing..."
+              
+              # Run k6 performance tests
+              k6 run --out prometheus=http://prometheus.ms5-production.svc.cluster.local:9090/api/v1/write /config/k6-config.js
+              
+              # Generate performance report
+              echo "Generating performance report..."
+              
+              # Check performance thresholds
+              echo "Checking performance thresholds..."
+              
+              echo "Automated performance testing completed"
+            env:
+            - name: BASE_URL
+              value: "https://ms5floor.com"
+            - name: TEST_ENVIRONMENT
+              value: "production"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "1Gi"
+                cpu: "1000m"
+            volumeMounts:
+            - name: test-config
+              mountPath: /config
+            - name: test-results
+              mountPath: /results
+          volumes:
+          - name: test-config
+            configMap:
+              name: performance-test-config
+          - name: test-results
+            persistentVolumeClaim:
+              claimName: test-results-pvc
+          restartPolicy: OnFailure
+
+---
+# Performance Testing Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: performance-testing-network-policy
+  namespace: ms5-testing
+  labels:
+    app: ms5-dashboard
+    component: testing
+    testing-type: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: testing
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow ingress from production namespace for testing
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow egress to production services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+  # Allow egress to monitoring services
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

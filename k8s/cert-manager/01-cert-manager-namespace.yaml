@@ -1,0 +1,85 @@
+---
+# cert-manager Namespace
+# Provides isolated namespace for certificate management components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    name: cert-manager
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/version: "v1.13.2"
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+    # Security and compliance labels
+    security.kubernetes.io/enforce-pod-security-standards: "restricted"
+    compliance.kubernetes.io/audit-level: "high"
+    environment: production
+    tier: infrastructure
+    # Disable resource validation for cert-manager CRDs
+    cert-manager.io/disable-validation: "true"
+  annotations:
+    description: "cert-manager namespace for automated SSL/TLS certificate management"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # Resource quotas and limits
+    scheduler.alpha.kubernetes.io/critical-pod: "true"
+    # Monitoring and observability
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9402"
+    prometheus.io/path: "/metrics"
+---
+# cert-manager ServiceAccount
+# Provides RBAC permissions for cert-manager operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "Service account for cert-manager controller"
+    azure.workload.identity/client-id: "${AZURE_CLIENT_ID}"
+    azure.workload.identity/tenant-id: "${AZURE_TENANT_ID}"
+automountServiceAccountToken: true
+---
+# cert-manager-cainjector ServiceAccount
+# Provides RBAC permissions for CA injector operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager-cainjector
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cainjector
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: cainjector
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "Service account for cert-manager CA injector"
+automountServiceAccountToken: true
+---
+# cert-manager-webhook ServiceAccount
+# Provides RBAC permissions for webhook operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager-webhook
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: webhook
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "Service account for cert-manager webhook"
+automountServiceAccountToken: true

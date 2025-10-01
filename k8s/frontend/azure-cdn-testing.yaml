@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-testing
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Testing Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Testing configuration
+  cdn-testing.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-testing
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Testing Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      testing-config.json: |
+        {
+          "testing": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "testingTypes": [
+              {
+                "name": "Testing Technology",
+                "description": "Testing technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Testing Process",
+                "description": "Testing process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Testing Automation",
+                "description": "Testing automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Testing Monitoring",
+                "description": "Testing monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Testing monitoring
+  cdn-testing-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-testing-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Testing Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      testing-monitoring.json: |
+        {
+          "monitoring": {
+            "testing": "ms5-cdn-testing",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "TestingTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average testing technology performance"
+              },
+              {
+                "name": "TestingProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average testing process performance"
+              },
+              {
+                "name": "TestingAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average testing automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowTestingTechnologyPerformance",
+                "condition": "testing_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Testing technology performance is below 80%"
+              },
+              {
+                "name": "LowTestingProcessPerformance",
+                "condition": "testing_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Testing process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Testing script
+  cdn-testing.py: |
+    #!/usr/bin/env python3
+    """
+    CDN testing script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_testing():
+        """Get CDN testing from Azure"""
+        try:
+            # Azure CDN testing endpoint
+            testing_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/testing"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(testing_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                testing = response.json()
+                
+                return {
+                    "request_count": testing.get("RequestCount", 0),
+                    "bytes_sent": testing.get("BytesSent", 0),
+                    "cache_hit_ratio": testing.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN testing: {e}")
+            return None
+    
+    def send_testing_to_prometheus(testing):
+        """Send CDN testing to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_testing",
+                "value": testing["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN testing sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN testing to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN testing to Prometheus: {e}")
+    
+    def main():
+        """Main testing loop"""
+        while True:
+            testing = get_cdn_testing()
+            if testing:
+                print(json.dumps(testing, indent=2))
+                send_testing_to_prometheus(testing)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Testing deployment
+  cdn-testing-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-testing
+      namespace: ms5-frontend
+      labels:
+        app: cdn-testing
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-testing
+      template:
+        metadata:
+          labels:
+            app: cdn-testing
+        spec:
+          containers:
+          - name: cdn-testing
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-testing.py"]
+            volumeMounts:
+            - name: testing-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: testing-script
+            configMap:
+              name: cdn-testing-config
+              defaultMode: 0755

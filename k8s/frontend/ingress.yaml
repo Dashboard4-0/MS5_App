@@ -1,0 +1,192 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-frontend-ingress
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: frontend
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Frontend Ingress for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+    nginx.ingress.kubernetes.io/client-max-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Authorization, Upgrade, Connection"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-WebSocket-Version: 13";
+      more_set_headers "X-WebSocket-Protocol: ms5-factory";
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; manifest-src 'self';";
+    # Tablet optimizations
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Device-Type: tablet";
+      more_set_headers "X-Optimization: tablet";
+    # Factory network optimizations
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Network-Type: factory";
+      more_set_headers "X-Factory-Network: enabled";
+    # PWA support
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-PWA-Enabled: true";
+      more_set_headers "X-Offline-Support: enabled";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ms5floor.com
+    - www.ms5floor.com
+    - api.ms5floor.com
+    - cdn.ms5floor.com
+    - status.ms5floor.com
+    secretName: ms5-tls-secret
+  rules:
+  # Main application
+  - host: ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  - host: www.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  # API proxy
+  - host: api.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  # CDN proxy
+  - host: cdn.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  # Status page
+  - host: status.ms5floor.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ms5-websocket-ingress
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: websocket
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard WebSocket Ingress for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+    # NGINX Ingress Controller WebSocket annotations
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "4k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/client-max-body-size: "0"
+    nginx.ingress.kubernetes.io/rate-limit: "10"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Origin, X-Requested-With, Content-Type, Accept, Authorization, Upgrade, Connection"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # WebSocket specific configuration
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-WebSocket-Version: 13";
+      more_set_headers "X-WebSocket-Protocol: ms5-factory";
+      more_set_headers "X-WebSocket-Security: enabled";
+    # Certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ws.ms5floor.com
+    - wss.ms5floor.com
+    secretName: ms5-websocket-tls-secret
+  rules:
+  # WebSocket endpoint
+  - host: ws.ms5floor.com
+    http:
+      paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80
+  - host: wss.ms5floor.com
+    http:
+      paths:
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: ms5-frontend-service
+            port:
+              number: 80

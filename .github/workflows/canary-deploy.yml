@@ -1,0 +1,130 @@
+name: MS5.0 AKS Canary Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_image:
+        description: 'Backend image to deploy'
+        required: true
+        default: 'ms5acrprod.azurecr.io/ms5-backend:latest-production'
+      frontend_image:
+        description: 'Frontend image to deploy'
+        required: true
+        default: 'ms5acrprod.azurecr.io/ms5-frontend:latest-production'
+      namespace:
+        description: 'Target namespace'
+        required: true
+        default: 'ms5-production'
+      canary_percentage:
+        description: 'Initial canary traffic percentage'
+        required: false
+        default: '10'
+      max_canary_percentage:
+        description: 'Maximum canary traffic percentage'
+        required: false
+        default: '50'
+      promotion_threshold:
+        description: 'Error rate threshold for promotion (percentage)'
+        required: false
+        default: '1'
+      timeout:
+        description: 'Deployment timeout in seconds'
+        required: false
+        default: '1800'
+      auto_promote:
+        description: 'Automatically promote canary on success'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  # Azure Configuration
+  AKS_CLUSTER_NAME: ms5-aks-cluster
+  AKS_RESOURCE_GROUP: ms5-rg
+  DEFAULT_TIMEOUT: 1800s
+
+jobs:
+  # Canary Deployment
+  canary-deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Azure CLI
+        uses: azure/setup-azcli@v1
+        with:
+          azcliversion: '2.50.0'
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
+          kubectl version --client
+
+      - name: Execute Canary Deployment
+        run: |
+          # Execute canary deployment script
+          chmod +x ./scripts/canary-deploy.sh
+          ./scripts/canary-deploy.sh \
+            --backend-image="${{ github.event.inputs.backend_image }}" \
+            --frontend-image="${{ github.event.inputs.frontend_image }}" \
+            --namespace="${{ github.event.inputs.namespace }}" \
+            --canary-percentage="${{ github.event.inputs.canary_percentage }}" \
+            --max-canary-percentage="${{ github.event.inputs.max_canary_percentage }}" \
+            --promotion-threshold="${{ github.event.inputs.promotion_threshold }}" \
+            --timeout="${{ github.event.inputs.timeout }}" \
+            --auto-promote="${{ github.event.inputs.auto_promote }}"
+
+      - name: Monitor Canary Deployment
+        run: |
+          # Monitor canary deployment
+          chmod +x ./scripts/monitor-canary.sh
+          ./scripts/monitor-canary.sh \
+            --namespace="${{ github.event.inputs.namespace }}" \
+            --canary-percentage="${{ github.event.inputs.canary_percentage }}" \
+            --max-canary-percentage="${{ github.event.inputs.max_canary_percentage }}" \
+            --promotion-threshold="${{ github.event.inputs.promotion_threshold }}" \
+            --timeout="${{ github.event.inputs.timeout }}"
+
+      - name: Promote Canary to Full Deployment
+        if: github.event.inputs.auto_promote == 'true'
+        run: |
+          # Promote canary to full deployment
+          chmod +x ./scripts/promote-canary.sh
+          ./scripts/promote-canary.sh \
+            --namespace="${{ github.event.inputs.namespace }}" \
+            --timeout="${{ github.event.inputs.timeout }}"
+
+      - name: Verify Canary Deployment
+        run: |
+          # Verify all services are running
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+          kubectl get services -n ${{ github.event.inputs.namespace }}
+          
+          # Run health checks
+          chmod +x ./scripts/test_smoke.sh
+          ./scripts/test_smoke.sh production
+
+      - name: Notify Canary Success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          text: 'MS5.0 Floor Dashboard successfully deployed to production via canary deployment!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+
+      - name: Notify Canary Failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: failure
+          text: 'MS5.0 Floor Dashboard canary deployment to production failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}

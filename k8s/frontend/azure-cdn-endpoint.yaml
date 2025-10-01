@@ -1,0 +1,263 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-endpoint
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Endpoint Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Endpoint configuration
+  cdn-endpoint.yaml: |
+    apiVersion: cdn.azure.com/v1api20210601
+    kind: Endpoint
+    metadata:
+      name: ms5-cdn-endpoint
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Endpoint for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    spec:
+      location: "Global"
+      owner:
+        name: ms5-cdn-profile
+      profile:
+        name: ms5-cdn-profile
+      isHttpsEnabled: true
+      isHttpAllowed: false
+      originHostHeader: "ms5floor.com"
+      origins:
+      - name: ms5-frontend-origin
+        hostName: "ms5-frontend-ingress.ms5-frontend.svc.cluster.local"
+        httpPort: 80
+        httpsPort: 443
+        originPath: "/static"
+        priority: 1
+        weight: 100
+      deliveryPolicy:
+        description: "CDN Delivery Policy for MS5.0 Dashboard"
+        rules:
+        - name: "StaticAssets"
+          order: 1
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/static/", "/assets/", "/images/", "/icons/"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "365.00:00:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "public, max-age=31536000, immutable"
+        - name: "APIRequests"
+          order: 2
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/api/"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "00:05:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "no-cache, no-store, must-revalidate"
+        - name: "WebSocketRequests"
+          order: 3
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/ws"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "00:00:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "no-cache, no-store, must-revalidate"
+  
+  # Azure CDN Endpoint monitoring
+  cdn-endpoint-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-endpoint-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Endpoint Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      monitoring-config.json: |
+        {
+          "monitoring": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "RequestCount",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of requests served by the CDN endpoint"
+              },
+              {
+                "name": "BytesSent",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of bytes sent by the CDN endpoint"
+              },
+              {
+                "name": "CacheHitRatio",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Percentage of requests served from cache"
+              },
+              {
+                "name": "OriginLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average latency to origin server"
+              },
+              {
+                "name": "OriginBandwidth",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total bandwidth consumed from origin"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighErrorRate",
+                "condition": "error_rate > 5%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "CDN endpoint error rate is above 5%"
+              },
+              {
+                "name": "LowCacheHitRatio",
+                "condition": "cache_hit_ratio < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "CDN cache hit ratio is below 80%"
+              },
+              {
+                "name": "HighOriginLatency",
+                "condition": "origin_latency > 1000ms",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "CDN origin latency is above 1000ms"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Endpoint security
+  cdn-endpoint-security.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-endpoint-security
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Endpoint Security Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      security-config.json: |
+        {
+          "security": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "wafPolicy": {
+              "name": "ms5-waf-policy",
+              "resourceGroup": "ms5-rg",
+              "location": "Global",
+              "sku": {
+                "name": "Premium_AzureFrontDoor"
+              },
+              "properties": {
+                "policySettings": {
+                  "enabledState": "Enabled",
+                  "mode": "Prevention",
+                  "requestBodyCheck": "Enabled",
+                  "maxRequestBodySizeInKb": 128,
+                  "fileUploadLimitInMb": 100
+                },
+                "managedRules": {
+                  "managedRuleSets": [
+                    {
+                      "ruleSetType": "Microsoft_DefaultRuleSet",
+                      "ruleSetVersion": "2.1",
+                      "ruleSetAction": "Block"
+                    },
+                    {
+                      "ruleSetType": "Microsoft_BotManagerRuleSet",
+                      "ruleSetVersion": "1.0",
+                      "ruleSetAction": "Block"
+                    }
+                  ]
+                },
+                "customRules": {
+                  "rules": [
+                    {
+                      "name": "BlockSuspiciousRequests",
+                      "priority": 1,
+                      "ruleType": "MatchRule",
+                      "action": "Block",
+                      "matchConditions": [
+                        {
+                          "matchVariable": "RequestUri",
+                          "operator": "Contains",
+                          "matchValue": ["../", "..\\", "script", "alert", "document.cookie"]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }

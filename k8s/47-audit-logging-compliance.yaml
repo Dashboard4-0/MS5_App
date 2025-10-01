@@ -1,0 +1,555 @@
+---
+# MS5.0 Floor Dashboard - Audit Logging & Compliance
+# Phase 7B: Advanced Security & Compliance
+#
+# This manifest implements comprehensive audit logging
+# with compliance framework integration and audit trail management.
+#
+# Audit Logging Architecture:
+# - Audit Log Configuration: Comprehensive audit logging setup
+# - Compliance Framework Integration: ISO 27001, SOC 2, GDPR, FDA 21 CFR Part 11
+# - Audit Trail Management: Log aggregation, retention, and integrity
+# - Compliance Reporting: Automated compliance reporting and alerting
+
+# Audit Log Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-log-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  audit-log-policy.yaml: |
+    # Kubernetes Audit Policy Configuration
+    # Comprehensive audit logging for compliance and security
+    
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    metadata:
+      name: ms5-audit-policy
+      namespace: ms5-production
+    spec:
+      # Audit policy rules
+      rules:
+        # Audit all API requests
+        - level: Metadata
+          namespaces: ["ms5-production"]
+          resources:
+          - group: ""
+            resources: ["*"]
+          verbs: ["*"]
+        
+        # Audit sensitive operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: ""
+            resources: ["secrets", "configmaps"]
+          verbs: ["create", "update", "patch", "delete"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit RBAC operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "rbac.authorization.k8s.io"
+            resources: ["*"]
+          verbs: ["*"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit network policy operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "networking.k8s.io"
+            resources: ["networkpolicies"]
+          verbs: ["*"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit pod operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: ""
+            resources: ["pods"]
+          verbs: ["create", "update", "patch", "delete"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit service operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: ""
+            resources: ["services"]
+          verbs: ["create", "update", "patch", "delete"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit deployment operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "apps"
+            resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+          verbs: ["create", "update", "patch", "delete"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit certificate operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "cert-manager.io"
+            resources: ["certificates", "issuers", "clusterissuers"]
+          verbs: ["*"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit security operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "security.azure.com"
+            resources: ["*"]
+          verbs: ["*"]
+          omitStages: ["RequestReceived"]
+        
+        # Audit compliance operations
+        - level: RequestResponse
+          namespaces: ["ms5-production"]
+          resources:
+          - group: "compliance.k8s.io"
+            resources: ["*"]
+          verbs: ["*"]
+          omitStages: ["RequestReceived"]
+      
+      # Audit policy configuration
+      omitStages: ["RequestReceived"]
+      omitManagedFields: false
+      omitStages: ["RequestReceived"]
+---
+# Audit Log Backend Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-log-backend-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  audit-log-backend.yaml: |
+    # Audit Log Backend Configuration
+    # Comprehensive audit log storage and processing
+    
+    apiVersion: audit.k8s.io/v1
+    kind: AuditBackend
+    metadata:
+      name: ms5-audit-backend
+      namespace: ms5-production
+    spec:
+      # Audit log storage
+      storage:
+        type: "azure-blob"
+        config:
+          accountName: "ms5auditlogs"
+          containerName: "audit-logs"
+          retentionPeriod: "2555d"  # 7 years
+          encryption: true
+          compression: true
+      
+      # Audit log processing
+      processing:
+        enabled: true
+        batchSize: 1000
+        flushInterval: "30s"
+        maxRetries: 3
+        retryDelay: "5s"
+      
+      # Audit log filtering
+      filtering:
+        enabled: true
+        filters:
+          - name: "sensitive-data"
+            type: "regex"
+            pattern: "(password|secret|key|token)"
+            action: "mask"
+          - name: "pii-data"
+            type: "regex"
+            pattern: "(email|phone|ssn|credit-card)"
+            action: "mask"
+      
+      # Audit log integrity
+      integrity:
+        enabled: true
+        algorithm: "SHA-256"
+        signing: true
+        verification: true
+---
+# Compliance Framework Integration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-framework-integration
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  compliance-framework.yaml: |
+    # Compliance Framework Integration
+    # Integration with regulatory compliance frameworks
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: ComplianceFramework
+    metadata:
+      name: ms5-compliance-framework
+      namespace: ms5-production
+    spec:
+      # ISO 27001 Controls
+      iso27001:
+        enabled: true
+        controls:
+          - id: "A.5.1.1"
+            name: "Policies for information security"
+            auditRequirements:
+              - "Security policy documentation"
+              - "Policy review and approval process"
+              - "Policy communication and training"
+            auditFrequency: "annually"
+          
+          - id: "A.8.1.1"
+            name: "Inventory of assets"
+            auditRequirements:
+              - "Asset discovery and classification"
+              - "Asset ownership assignment"
+              - "Asset lifecycle management"
+            auditFrequency: "quarterly"
+          
+          - id: "A.9.1.1"
+            name: "Access control policy"
+            auditRequirements:
+              - "RBAC implementation"
+              - "Access review process"
+              - "Privileged access management"
+            auditFrequency: "monthly"
+      
+      # SOC 2 Controls
+      soc2:
+        enabled: true
+        controls:
+          - id: "CC6.1"
+            name: "Logical and Physical Access Controls"
+            auditRequirements:
+              - "Logical access controls implemented"
+              - "Physical access controls implemented"
+              - "Access controls monitored"
+            auditFrequency: "monthly"
+          
+          - id: "CC6.2"
+            name: "System Access Controls"
+            auditRequirements:
+              - "User authentication implemented"
+              - "Access authorization defined"
+              - "Access monitoring enabled"
+            auditFrequency: "monthly"
+      
+      # GDPR Controls
+      gdpr:
+        enabled: true
+        controls:
+          - id: "Article 5"
+            name: "Principles of processing"
+            auditRequirements:
+              - "Lawful basis for processing"
+              - "Purpose limitation implemented"
+              - "Data minimization practiced"
+              - "Data accuracy maintained"
+              - "Storage limitation enforced"
+              - "Data integrity and confidentiality"
+            auditFrequency: "monthly"
+          
+          - id: "Article 32"
+            name: "Security of processing"
+            auditRequirements:
+              - "Technical security measures"
+              - "Organizational security measures"
+              - "Security incident procedures"
+            auditFrequency: "monthly"
+      
+      # FDA 21 CFR Part 11 Controls
+      fda21cfr11:
+        enabled: true
+        controls:
+          - id: "11.10"
+            name: "Controls for closed systems"
+            auditRequirements:
+              - "Audit trail for all electronic records"
+              - "Access controls implemented"
+              - "Data integrity verification"
+              - "System validation procedures"
+            auditFrequency: "monthly"
+          
+          - id: "11.30"
+            name: "Controls for open systems"
+            auditRequirements:
+              - "Encryption in transit"
+              - "Digital signatures implemented"
+              - "Access authentication"
+              - "System validation"
+            auditFrequency: "monthly"
+---
+# Audit Trail Management
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-trail-management
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  audit-trail-management.yaml: |
+    # Audit Trail Management Configuration
+    # Comprehensive audit trail management and integrity
+    
+    apiVersion: audit.k8s.io/v1
+    kind: AuditTrailManagement
+    metadata:
+      name: ms5-audit-trail-management
+      namespace: ms5-production
+    spec:
+      # Audit trail storage
+      storage:
+        type: "azure-blob"
+        config:
+          accountName: "ms5audittrails"
+          containerName: "audit-trails"
+          retentionPeriod: "2555d"  # 7 years
+          encryption: true
+          compression: true
+          immutability: true
+      
+      # Audit trail integrity
+      integrity:
+        enabled: true
+        algorithm: "SHA-256"
+        signing: true
+        verification: true
+        tamperDetection: true
+      
+      # Audit trail processing
+      processing:
+        enabled: true
+        batchSize: 1000
+        flushInterval: "30s"
+        maxRetries: 3
+        retryDelay: "5s"
+        deduplication: true
+      
+      # Audit trail filtering
+      filtering:
+        enabled: true
+        filters:
+          - name: "sensitive-data"
+            type: "regex"
+            pattern: "(password|secret|key|token)"
+            action: "mask"
+          - name: "pii-data"
+            type: "regex"
+            pattern: "(email|phone|ssn|credit-card)"
+            action: "mask"
+          - name: "system-events"
+            type: "regex"
+            pattern: "(health-check|liveness-probe|readiness-probe)"
+            action: "exclude"
+      
+      # Audit trail retention
+      retention:
+        enabled: true
+        policies:
+          - name: "critical-events"
+            retentionPeriod: "2555d"  # 7 years
+            events: ["security-violation", "compliance-failure", "data-breach"]
+          - name: "standard-events"
+            retentionPeriod: "365d"   # 1 year
+            events: ["api-request", "resource-creation", "resource-update"]
+          - name: "system-events"
+            retentionPeriod: "90d"    # 3 months
+            events: ["health-check", "liveness-probe", "readiness-probe"]
+---
+# Compliance Reporting Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-reporting-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  compliance-reporting.yaml: |
+    # Compliance Reporting Configuration
+    # Automated compliance reporting and alerting
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: ComplianceReporting
+    metadata:
+      name: ms5-compliance-reporting
+      namespace: ms5-production
+    spec:
+      # Reporting schedule
+      reporting:
+        enabled: true
+        schedule:
+          daily: "0 6 * * *"      # Daily at 6 AM
+          weekly: "0 6 * * 1"     # Weekly on Monday at 6 AM
+          monthly: "0 6 1 * *"    # Monthly on 1st at 6 AM
+          quarterly: "0 6 1 1,4,7,10 *"  # Quarterly
+          annually: "0 6 1 1 *"   # Annually on January 1st
+      
+      # Report formats
+      formats:
+        - "pdf"
+        - "json"
+        - "csv"
+        - "html"
+      
+      # Report recipients
+      recipients:
+        - "compliance-team@company.com"
+        - "security-team@company.com"
+        - "management@company.com"
+        - "audit-team@company.com"
+      
+      # Report content
+      content:
+        executiveSummary: true
+        detailedFindings: true
+        complianceScore: true
+        recommendations: true
+        actionItems: true
+        riskAssessment: true
+      
+      # Compliance frameworks
+      frameworks:
+        - "iso27001"
+        - "soc2"
+        - "gdpr"
+        - "fda21cfr11"
+        - "cis-benchmark"
+      
+      # Alerting
+      alerting:
+        enabled: true
+        channels:
+          - "slack"
+          - "email"
+          - "webhook"
+        thresholds:
+          critical: 0
+          high: 5
+          medium: 10
+          low: 20
+---
+# Audit Log Monitoring and Alerting
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-log-monitoring-alerts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  audit-log-alerts.yaml: |
+    # Audit Log Monitoring Alerts
+    # Comprehensive audit log monitoring and alerting
+    
+    groups:
+    - name: audit-log-monitoring
+      rules:
+      - alert: AuditLogFailure
+        expr: audit_log_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Audit log failure detected"
+          description: "Audit log system failed: {{ $labels.error_message }}"
+      
+      - alert: AuditLogIntegrityViolation
+        expr: audit_log_integrity_violation == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Audit log integrity violation detected"
+          description: "Audit log integrity violation detected: {{ $labels.violation_details }}"
+      
+      - alert: AuditLogTamperingDetected
+        expr: audit_log_tampering_detected == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Audit log tampering detected"
+          description: "Audit log tampering detected: {{ $labels.tampering_details }}"
+      
+      - alert: AuditLogRetentionViolation
+        expr: audit_log_retention_violation == 1
+        for: 0m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Audit log retention violation detected"
+          description: "Audit log retention violation detected: {{ $labels.violation_details }}"
+      
+      - alert: AuditLogStorageFull
+        expr: audit_log_storage_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Audit log storage nearly full"
+          description: "Audit log storage usage is {{ $value }}%, above 90% threshold"
+      
+      - alert: AuditLogProcessingDelay
+        expr: audit_log_processing_delay_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Audit log processing delay"
+          description: "Audit log processing delay is {{ $value }} seconds, above 300 second threshold"
+      
+      - alert: ComplianceReportingFailure
+        expr: compliance_reporting_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Compliance reporting failure"
+          description: "Compliance reporting failed for {{ $labels.framework }}: {{ $labels.error_message }}"
+      
+      - alert: ComplianceScoreLow
+        expr: compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Compliance score low"
+          description: "Compliance score for {{ $labels.framework }} is {{ $value }}%, below 90% threshold"

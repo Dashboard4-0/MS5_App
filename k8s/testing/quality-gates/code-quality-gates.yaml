@@ -1,0 +1,198 @@
+# Code Quality Gates Configuration
+# Defines quality thresholds and validation rules for MS5.0 codebase
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: code-quality-gates
+  namespace: ci-cd
+  labels:
+    app.kubernetes.io/name: quality-gates
+    app.kubernetes.io/part-of: ci-cd-pipeline
+    app.kubernetes.io/component: quality-validation
+data:
+  quality-gates.yaml: |
+    # Code Quality Gates Configuration
+    # Starship-grade quality standards for production deployment
+    
+    quality_gates:
+      # Code Coverage Requirements
+      - name: "unit-test-coverage"
+        description: "Minimum unit test coverage threshold"
+        threshold: 85
+        metric: "coverage_percentage"
+        action: "block"
+        severity: "critical"
+        measurement_window: "current_build"
+        
+      - name: "integration-test-coverage"
+        description: "Minimum integration test coverage"
+        threshold: 75
+        metric: "integration_coverage_percentage"
+        action: "block"
+        severity: "high"
+        measurement_window: "current_build"
+      
+      # Code Complexity Metrics
+      - name: "cyclomatic-complexity"
+        description: "Maximum cyclomatic complexity per function"
+        threshold: 10
+        metric: "cyclomatic_complexity"
+        action: "warn"
+        severity: "medium"
+        measurement_window: "current_build"
+        
+      - name: "cognitive-complexity"
+        description: "Maximum cognitive complexity per function"
+        threshold: 15
+        metric: "cognitive_complexity"
+        action: "warn"
+        severity: "medium"
+        measurement_window: "current_build"
+      
+      # Security Vulnerabilities
+      - name: "critical-vulnerabilities"
+        description: "No critical security vulnerabilities allowed"
+        threshold: 0
+        metric: "critical_vulnerabilities"
+        action: "block"
+        severity: "critical"
+        measurement_window: "current_build"
+        
+      - name: "high-vulnerabilities"
+        description: "Maximum high-severity vulnerabilities"
+        threshold: 2
+        metric: "high_vulnerabilities"
+        action: "warn"
+        severity: "high"
+        measurement_window: "current_build"
+      
+      # Code Quality Metrics
+      - name: "code-duplication"
+        description: "Maximum code duplication percentage"
+        threshold: 5
+        metric: "duplication_percentage"
+        action: "warn"
+        severity: "medium"
+        measurement_window: "current_build"
+        
+      - name: "maintainability-index"
+        description: "Minimum maintainability index"
+        threshold: 70
+        metric: "maintainability_index"
+        action: "warn"
+        severity: "medium"
+        measurement_window: "current_build"
+      
+      # License Compliance
+      - name: "license-compliance"
+        description: "All dependencies must have approved licenses"
+        threshold: 100
+        metric: "license_compliance_percentage"
+        action: "block"
+        severity: "high"
+        measurement_window: "current_build"
+      
+      # Performance Metrics
+      - name: "build-time"
+        description: "Maximum build time in minutes"
+        threshold: 15
+        metric: "build_time_minutes"
+        action: "warn"
+        severity: "low"
+        measurement_window: "current_build"
+        
+      - name: "test-execution-time"
+        description: "Maximum test execution time in minutes"
+        threshold: 10
+        metric: "test_execution_time_minutes"
+        action: "warn"
+        severity: "low"
+        measurement_window: "current_build"
+    
+    # Quality Gate Enforcement Rules
+    enforcement_rules:
+      # Production deployment requirements
+      production:
+        required_gates:
+        - "unit-test-coverage"
+        - "integration-test-coverage"
+        - "critical-vulnerabilities"
+        - "license-compliance"
+        blocking_gates:
+        - "unit-test-coverage"
+        - "critical-vulnerabilities"
+        - "license-compliance"
+        
+      # Staging deployment requirements
+      staging:
+        required_gates:
+        - "unit-test-coverage"
+        - "critical-vulnerabilities"
+        blocking_gates:
+        - "critical-vulnerabilities"
+        
+      # Development branch requirements
+      development:
+        required_gates:
+        - "unit-test-coverage"
+        - "critical-vulnerabilities"
+        blocking_gates: []
+    
+    # Notification Configuration
+    notifications:
+      quality_gate_failure:
+        channels:
+        - slack
+        - email
+        - github_status
+        template: |
+          🚨 Quality Gate Failure: {{ .gate_name }}
+          
+          **Project**: {{ .project_name }}
+          **Branch**: {{ .branch_name }}
+          **Commit**: {{ .commit_sha }}
+          
+          **Failed Gate**: {{ .gate_name }}
+          **Current Value**: {{ .current_value }}
+          **Threshold**: {{ .threshold }}
+          **Action**: {{ .action }}
+          
+          **Details**: {{ .failure_details }}
+          
+          Please fix the quality issues before proceeding with deployment.
+      
+      quality_gate_warning:
+        channels:
+        - slack
+        template: |
+          ⚠️ Quality Gate Warning: {{ .gate_name }}
+          
+          **Project**: {{ .project_name }}
+          **Current Value**: {{ .current_value }}
+          **Threshold**: {{ .threshold }}
+          
+          Consider addressing this issue in future iterations.
+    
+    # Integration Configuration
+    integrations:
+      sonarqube:
+        enabled: true
+        server_url: "https://sonarqube.ms5floor.com"
+        project_key: "ms5-floor-dashboard"
+        
+      codecov:
+        enabled: true
+        token_secret: "codecov-token"
+        
+      snyk:
+        enabled: true
+        token_secret: "snyk-token"
+        
+      github:
+        enabled: true
+        status_context: "quality-gates"
+        
+      slack:
+        enabled: true
+        webhook_secret: "slack-webhook"
+        channel: "#ms5-ci-cd"

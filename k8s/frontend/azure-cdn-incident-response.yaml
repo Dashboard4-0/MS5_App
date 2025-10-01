@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-incident-response
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Incident Response Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Incident Response configuration
+  cdn-incident-response.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-incident-response
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Incident Response Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      incident-response-config.json: |
+        {
+          "incidentResponse": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "incidentResponseTypes": [
+              {
+                "name": "Incident Response Technology",
+                "description": "Incident response technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Incident Response Process",
+                "description": "Incident response process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Incident Response Automation",
+                "description": "Incident response automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Incident Response Monitoring",
+                "description": "Incident response monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Incident Response monitoring
+  cdn-incident-response-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-incident-response-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Incident Response Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      incident-response-monitoring.json: |
+        {
+          "monitoring": {
+            "incidentResponse": "ms5-cdn-incident-response",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "IncidentResponseTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average incident response technology performance"
+              },
+              {
+                "name": "IncidentResponseProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average incident response process performance"
+              },
+              {
+                "name": "IncidentResponseAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average incident response automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowIncidentResponseTechnologyPerformance",
+                "condition": "incident_response_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Incident response technology performance is below 80%"
+              },
+              {
+                "name": "LowIncidentResponseProcessPerformance",
+                "condition": "incident_response_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Incident response process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Incident Response script
+  cdn-incident-response.py: |
+    #!/usr/bin/env python3
+    """
+    CDN incident response script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_incident_response():
+        """Get CDN incident response from Azure"""
+        try:
+            # Azure CDN incident response endpoint
+            incident_response_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/incident-response"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(incident_response_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                incident_response = response.json()
+                
+                return {
+                    "request_count": incident_response.get("RequestCount", 0),
+                    "bytes_sent": incident_response.get("BytesSent", 0),
+                    "cache_hit_ratio": incident_response.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN incident response: {e}")
+            return None
+    
+    def send_incident_response_to_prometheus(incident_response):
+        """Send CDN incident response to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_incident_response",
+                "value": incident_response["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN incident response sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN incident response to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN incident response to Prometheus: {e}")
+    
+    def main():
+        """Main incident response loop"""
+        while True:
+            incident_response = get_cdn_incident_response()
+            if incident_response:
+                print(json.dumps(incident_response, indent=2))
+                send_incident_response_to_prometheus(incident_response)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Incident Response deployment
+  cdn-incident-response-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-incident-response
+      namespace: ms5-frontend
+      labels:
+        app: cdn-incident-response
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-incident-response
+      template:
+        metadata:
+          labels:
+            app: cdn-incident-response
+        spec:
+          containers:
+          - name: cdn-incident-response
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-incident-response.py"]
+            volumeMounts:
+            - name: incident-response-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: incident-response-script
+            configMap:
+              name: cdn-incident-response-config
+              defaultMode: 0755

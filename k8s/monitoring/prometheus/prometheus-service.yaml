@@ -1,0 +1,157 @@
+---
+# MS5.0 Floor Dashboard - Prometheus Services Configuration
+# Service and headless service for Prometheus with federation support
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    version: "v2.45.0"
+  annotations:
+    description: "Prometheus service for internal cluster access"
+    managed-by: "ms5-devops-team"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: federation
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: prometheus
+---
+# Headless service for Prometheus federation and service discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-headless
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    service-type: headless
+  annotations:
+    description: "Headless service for Prometheus federation and service discovery"
+    managed-by: "ms5-devops-team"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: web
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: federation
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: prometheus
+---
+# External service for Prometheus (if needed for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-external
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    service-type: external
+  annotations:
+    description: "External service for Prometheus with load balancer"
+    managed-by: "ms5-devops-team"
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "monitoring-subnet"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: web
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: federation
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  selector:
+    app: ms5-dashboard
+    component: prometheus
+  # Session affinity for consistent connections
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+---
+# ServiceMonitor for Prometheus self-monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus-self
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "ServiceMonitor for Prometheus self-monitoring"
+    managed-by: "ms5-devops-team"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  endpoints:
+  - port: web
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - monitoring
+---
+# PodMonitor for Prometheus pod monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: prometheus-pods
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "PodMonitor for Prometheus pod monitoring"
+    managed-by: "ms5-devops-team"
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  podMetricsEndpoints:
+  - port: web
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - monitoring

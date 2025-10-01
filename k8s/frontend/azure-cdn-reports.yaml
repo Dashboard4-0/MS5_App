@@ -1,0 +1,257 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-reports
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Reports Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Reports configuration
+  cdn-reports.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-reports
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Reports Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      reports-config.json: |
+        {
+          "reports": [
+            {
+              "name": "TrafficReport",
+              "type": "Traffic",
+              "schedule": "Daily",
+              "format": "CSV",
+              "recipients": ["team@ms5floor.com"]
+            },
+            {
+              "name": "PerformanceReport",
+              "type": "Performance",
+              "schedule": "Weekly",
+              "format": "PDF",
+              "recipients": ["team@ms5floor.com"]
+            }
+          ]
+        }
+  
+  # Azure CDN Reports monitoring
+  cdn-reports-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-reports-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Reports Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      reports-monitoring.json: |
+        {
+          "monitoring": {
+            "reports": "ms5-cdn-reports",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "ReportGenerated",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of reports generated"
+              },
+              {
+                "name": "ReportSent",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of reports sent"
+              },
+              {
+                "name": "ReportLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average latency for report generation"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighReportLatency",
+                "condition": "report_latency > 1000ms",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Report generation latency is above 1000ms"
+              },
+              {
+                "name": "HighReportErrorRate",
+                "condition": "report_error_rate > 5%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Report generation error rate is above 5%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Reports script
+  cdn-reports.py: |
+    #!/usr/bin/env python3
+    """
+    CDN reports script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_reports():
+        """Get CDN reports from Azure"""
+        try:
+            # Azure CDN reports endpoint
+            reports_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/reports"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(reports_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                reports = response.json()
+                
+                return {
+                    "request_count": reports.get("RequestCount", 0),
+                    "bytes_sent": reports.get("BytesSent", 0),
+                    "cache_hit_ratio": reports.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN reports: {e}")
+            return None
+    
+    def send_reports_to_prometheus(reports):
+        """Send CDN reports to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_reports",
+                "value": reports["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN reports sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN reports to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN reports to Prometheus: {e}")
+    
+    def main():
+        """Main reports loop"""
+        while True:
+            reports = get_cdn_reports()
+            if reports:
+                print(json.dumps(reports, indent=2))
+                send_reports_to_prometheus(reports)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Reports deployment
+  cdn-reports-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-reports
+      namespace: ms5-frontend
+      labels:
+        app: cdn-reports
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-reports
+      template:
+        metadata:
+          labels:
+            app: cdn-reports
+        spec:
+          containers:
+          - name: cdn-reports
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-reports.py"]
+            volumeMounts:
+            - name: reports-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: reports-script
+            configMap:
+              name: cdn-reports-config
+              defaultMode: 0755

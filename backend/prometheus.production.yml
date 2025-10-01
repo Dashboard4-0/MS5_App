@@ -185,3 +185,58 @@ scrape_configs:
     metrics_path: '/api/v1/metrics/external/services'
     scrape_interval: 60s
     honor_labels: true
+
+  # TimescaleDB Monitoring - Phase 6 Enhancement
+  - job_name: 'timescaledb'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+    metric_relabel_configs:
+      # Add TimescaleDB-specific labels
+      - source_labels: [__name__]
+        regex: 'pg_stat_database_.*'
+        target_label: 'component'
+        replacement: 'timescaledb'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: postgres_exporter:9187
+
+  # TimescaleDB Hypertable Metrics
+  - job_name: 'timescaledb-hypertables'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+    scrape_interval: 60s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    params:
+      format: ['prometheus']
+    honor_labels: true
+
+  # TimescaleDB Compression Metrics
+  - job_name: 'timescaledb-compression'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+    scrape_interval: 300s  # 5 minutes (compression stats change slowly)
+    scrape_timeout: 15s
+    metrics_path: '/metrics'
+    honor_labels: true
+
+  # TimescaleDB Performance Metrics
+  - job_name: 'timescaledb-performance'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    honor_labels: true
+    metric_relabel_configs:
+      # Focus on performance-critical metrics
+      - source_labels: [__name__]
+        regex: 'pg_(stat_statements|stat_bgwriter|stat_database)_.*'
+        action: keep

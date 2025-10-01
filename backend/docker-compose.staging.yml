@@ -3,28 +3,41 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # TimescaleDB Database - Staging Environment
   postgres:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg15
     container_name: ms5_postgres_staging
     environment:
       POSTGRES_DB: factory_telemetry_staging
       POSTGRES_USER: ms5_user_staging
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_STAGING}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      # TimescaleDB optimization parameters
+      TIMESCALEDB_TELEMETRY: "off"
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: "timescaledb"
     volumes:
       - postgres_data_staging:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./scripts/timescaledb-config:/etc/timescaledb:ro
     ports:
       - "5432:5432"
     networks:
       - ms5_network_staging
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ms5_user_staging -d factory_telemetry_staging"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "pg_isready -U ms5_user_staging -d factory_telemetry_staging && psql -U ms5_user_staging -d factory_telemetry_staging -c 'SELECT 1 FROM pg_extension WHERE extname = \\'timescaledb\\';' | grep -q 1"]
+      interval: 15s
+      timeout: 10s
       retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Staging-appropriate resource allocation
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
 
   # Redis Cache
   redis:

@@ -1,0 +1,71 @@
+---
+# Phase 3.1: PostgreSQL Read Replica Configuration
+# This ConfigMap contains initialization scripts for read replicas
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-database-replica-init-scripts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    role: replica
+data:
+  01-replica-setup.sql: |
+    -- Phase 3.1: Read Replica Setup
+    -- This script configures the read replica for PostgreSQL streaming replication
+    
+    -- Create replication slot
+    SELECT pg_create_physical_replication_slot('replica_slot', true);
+    
+    -- Configure streaming replication
+    ALTER SYSTEM SET hot_standby = on;
+    ALTER SYSTEM SET max_standby_streaming_delay = 30s;
+    ALTER SYSTEM SET max_standby_archive_delay = 30s;
+    ALTER SYSTEM SET wal_receiver_status_interval = 10s;
+    ALTER SYSTEM SET hot_standby_feedback = on;
+    
+    -- Create recovery configuration
+    CREATE OR REPLACE FUNCTION pg_reload_conf()
+    RETURNS boolean
+    LANGUAGE sql
+    AS 'SELECT pg_reload_conf();';
+    
+    -- Set up monitoring queries for replica
+    CREATE OR REPLACE VIEW replica_status AS
+    SELECT 
+        client_addr,
+        state,
+        sent_lsn,
+        write_lsn,
+        flush_lsn,
+        replay_lsn,
+        write_lag,
+        flush_lag,
+        replay_lag,
+        sync_priority,
+        sync_state
+    FROM pg_stat_replication;
+    
+    -- Create function to check replica lag
+    CREATE OR REPLACE FUNCTION check_replica_lag()
+    RETURNS TABLE (
+        replica_name text,
+        lag_bytes bigint,
+        lag_time interval
+    )
+    LANGUAGE sql
+    AS $$
+        SELECT 
+            'replica'::text,
+            pg_wal_lsn_diff(pg_current_wal_lsn(), pg_last_wal_receive_lsn()) as lag_bytes,
+            pg_last_wal_receive_lsn() - pg_last_wal_replay_lsn() as lag_time;
+    $$;
+    
+    -- Grant permissions for monitoring
+    GRANT SELECT ON replica_status TO ms5_monitoring_user;
+    GRANT EXECUTE ON FUNCTION check_replica_lag() TO ms5_monitoring_user;
+    
+    -- Reload configuration
+    SELECT pg_reload_conf();

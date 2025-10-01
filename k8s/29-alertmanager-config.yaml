@@ -1,0 +1,153 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-alertmanager-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@ms5-dashboard.company.com'
+      smtp_auth_username: 'alerts@ms5-dashboard.company.com'
+      smtp_auth_password: 'smtp-password'
+    
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+        group_wait: 5s
+        repeat_interval: 30m
+      - match:
+          severity: warning
+        receiver: 'warning-alerts'
+        group_wait: 30s
+        repeat_interval: 2h
+      - match:
+          service: 'ms5-backend'
+        receiver: 'backend-alerts'
+        group_wait: 10s
+        repeat_interval: 1h
+      - match:
+          service: 'postgres'
+        receiver: 'database-alerts'
+        group_wait: 10s
+        repeat_interval: 1h
+      - match:
+          service: 'redis'
+        receiver: 'cache-alerts'
+        group_wait: 10s
+        repeat_interval: 1h
+      - match:
+          service: 'celery'
+        receiver: 'celery-alerts'
+        group_wait: 10s
+        repeat_interval: 1h
+    
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://ms5-backend.ms5-production.svc.cluster.local:8000/webhooks/alerts'
+        send_resolved: true
+    
+    - name: 'critical-alerts'
+      email_configs:
+      - to: 'devops@company.com'
+        subject: '[CRITICAL] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#ms5-alerts'
+        title: 'MS5.0 Critical Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+    
+    - name: 'warning-alerts'
+      email_configs:
+      - to: 'devops@company.com'
+        subject: '[WARNING] MS5.0 Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    
+    - name: 'backend-alerts'
+      email_configs:
+      - to: 'backend-team@company.com'
+        subject: '[MS5.0 Backend] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    
+    - name: 'database-alerts'
+      email_configs:
+      - to: 'dba@company.com'
+        subject: '[MS5.0 Database] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    
+    - name: 'cache-alerts'
+      email_configs:
+      - to: 'devops@company.com'
+        subject: '[MS5.0 Cache] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    
+    - name: 'celery-alerts'
+      email_configs:
+      - to: 'backend-team@company.com'
+        subject: '[MS5.0 Celery] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'cluster', 'service']

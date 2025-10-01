@@ -1,0 +1,365 @@
+# Deployment Monitoring Configuration
+# Comprehensive monitoring for CI/CD deployments and GitOps operations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-monitoring-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: deployment-monitoring
+    app.kubernetes.io/part-of: monitoring-stack
+    app.kubernetes.io/component: deployment-observability
+data:
+  prometheus-rules.yaml: |
+    # Deployment Monitoring Prometheus Rules
+    # Starship-grade monitoring for bulletproof deployments
+    
+    groups:
+    - name: deployment.rules
+      interval: 30s
+      rules:
+      # Deployment Health Metrics
+      - alert: DeploymentReplicasMismatch
+        expr: |
+          (
+            kube_deployment_spec_replicas{namespace=~"ms5-.*"}
+            !=
+            kube_deployment_status_replicas_available{namespace=~"ms5-.*"}
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: deployment
+          team: devops
+        annotations:
+          summary: "Deployment {{ $labels.deployment }} has mismatched replicas"
+          description: |
+            Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }}
+            has {{ $value }} replica(s) mismatch between desired and available.
+            
+            Current state:
+            - Desired: {{ $labels.spec_replicas }}
+            - Available: {{ $labels.status_replicas_available }}
+      
+      - alert: DeploymentRolloutStuck
+        expr: |
+          (
+            kube_deployment_status_condition{condition="Progressing", status="false", namespace=~"ms5-.*"}
+            == 1
+          )
+        for: 10m
+        labels:
+          severity: critical
+          component: deployment
+          team: devops
+        annotations:
+          summary: "Deployment {{ $labels.deployment }} rollout is stuck"
+          description: |
+            Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }}
+            has been stuck in rollout for more than 10 minutes.
+            
+            This indicates a potential issue with the deployment configuration
+            or resource constraints.
+      
+      # Pod Health Metrics
+      - alert: PodCrashLooping
+        expr: |
+          (
+            rate(kube_pod_container_status_restarts_total{namespace=~"ms5-.*"}[15m]) * 60 * 15
+          ) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: pod
+          team: devops
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+            has restarted {{ $value }} times in the last 15 minutes.
+            
+            Container: {{ $labels.container }}
+            
+            This indicates a critical issue with the application or configuration.
+      
+      - alert: PodNotReady
+        expr: |
+          (
+            kube_pod_status_ready{condition="false", namespace=~"ms5-.*"}
+            == 1
+          )
+        for: 5m
+        labels:
+          severity: warning
+          component: pod
+          team: devops
+        annotations:
+          summary: "Pod {{ $labels.pod }} is not ready"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+            has been in not ready state for more than 5 minutes.
+            
+            This may indicate issues with health checks or dependencies.
+      
+      # Resource Utilization Alerts
+      - alert: HighCPUUtilization
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{namespace=~"ms5-.*", container!="POD", container!=""}[5m]) * 100
+          ) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: resource
+          team: devops
+        annotations:
+          summary: "High CPU utilization in {{ $labels.pod }}"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+            has CPU utilization of {{ $value }}% for more than 10 minutes.
+            
+            Container: {{ $labels.container }}
+            
+            Consider scaling up or optimizing the application.
+      
+      - alert: HighMemoryUtilization
+        expr: |
+          (
+            (container_memory_usage_bytes{namespace=~"ms5-.*", container!="POD", container!=""} / container_spec_memory_limit_bytes) * 100
+          ) > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: resource
+          team: devops
+        annotations:
+          summary: "High memory utilization in {{ $labels.pod }}"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+            has memory utilization of {{ $value }}% for more than 10 minutes.
+            
+            Container: {{ $labels.container }}
+            
+            Consider scaling up or optimizing memory usage.
+      
+      # Service and Networking Alerts
+      - alert: ServiceEndpointDown
+        expr: |
+          (
+            kube_endpoint_ready{namespace=~"ms5-.*"}
+            == 0
+          )
+        for: 2m
+        labels:
+          severity: critical
+          component: service
+          team: devops
+        annotations:
+          summary: "Service {{ $labels.service }} has no ready endpoints"
+          description: |
+            Service {{ $labels.service }} in namespace {{ $labels.namespace }}
+            has no ready endpoints for more than 2 minutes.
+            
+            This indicates that the service is completely unavailable.
+      
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{namespace=~"ms5-.*", status=~"5.."}[5m]) /
+            rate(http_requests_total{namespace=~"ms5-.*"}[5m]) * 100
+          ) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: application
+          team: devops
+        annotations:
+          summary: "High error rate in {{ $labels.service }}"
+          description: |
+            Service {{ $labels.service }} in namespace {{ $labels.namespace }}
+            has an error rate of {{ $value }}% for more than 5 minutes.
+            
+            This indicates potential issues with the application or dependencies.
+      
+      # ArgoCD Monitoring
+      - alert: ArgoCDApplicationOutOfSync
+        expr: |
+          (
+            argocd_app_info{sync_status!="Synced", namespace=~"ms5-.*"}
+            == 1
+          )
+        for: 15m
+        labels:
+          severity: warning
+          component: argocd
+          team: devops
+        annotations:
+          summary: "ArgoCD application {{ $labels.name }} is out of sync"
+          description: |
+            ArgoCD application {{ $labels.name }} in project {{ $labels.project }}
+            has been out of sync for more than 15 minutes.
+            
+            Current sync status: {{ $labels.sync_status }}
+            Health status: {{ $labels.health_status }}
+      
+      - alert: ArgoCDApplicationUnhealthy
+        expr: |
+          (
+            argocd_app_info{health_status!="Healthy", namespace=~"ms5-.*"}
+            == 1
+          )
+        for: 10m
+        labels:
+          severity: critical
+          component: argocd
+          team: devops
+        annotations:
+          summary: "ArgoCD application {{ $labels.name }} is unhealthy"
+          description: |
+            ArgoCD application {{ $labels.name }} in project {{ $labels.project }}
+            has been unhealthy for more than 10 minutes.
+            
+            Health status: {{ $labels.health_status }}
+            Sync status: {{ $labels.sync_status }}
+      
+      # Storage Alerts
+      - alert: PersistentVolumeClaimPending
+        expr: |
+          (
+            kube_persistentvolumeclaim_status_phase{phase="Pending", namespace=~"ms5-.*"}
+            == 1
+          )
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+          team: devops
+        annotations:
+          summary: "PVC {{ $labels.persistentvolumeclaim }} is pending"
+          description: |
+            PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }}
+            has been in pending state for more than 5 minutes.
+            
+            This may indicate storage provisioning issues.
+      
+      - alert: PersistentVolumeSpaceRunningLow
+        expr: |
+          (
+            (kubelet_volume_stats_available_bytes{namespace=~"ms5-.*"} / kubelet_volume_stats_capacity_bytes) * 100
+          ) < 20
+        for: 10m
+        labels:
+          severity: warning
+          component: storage
+          team: devops
+        annotations:
+          summary: "Persistent volume {{ $labels.persistentvolumeclaim }} is running low on space"
+          description: |
+            Persistent volume {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }}
+            has less than 20% free space remaining.
+            
+            Available: {{ $value }}%
+            
+            Consider expanding the volume or cleaning up data.
+
+  grafana-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Deployment Monitoring",
+        "tags": ["ms5", "deployment", "monitoring"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Deployment Status Overview",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "kube_deployment_status_replicas_available{namespace=~\"ms5-.*\"}",
+                "legendFormat": "{{ deployment }} - Available Replicas"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "green", "value": 2}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Pod Restart Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(kube_pod_container_status_restarts_total{namespace=~\"ms5-.*\"}[5m])",
+                "legendFormat": "{{ pod }} - {{ container }}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Restarts/sec", "min": 0}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Resource Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{namespace=~\"ms5-.*\", container!=\"POD\"}[5m]) * 100",
+                "legendFormat": "{{ pod }} - CPU %"
+              },
+              {
+                "expr": "(container_memory_usage_bytes{namespace=~\"ms5-.*\", container!=\"POD\"} / container_spec_memory_limit_bytes) * 100",
+                "legendFormat": "{{ pod }} - Memory %"
+              }
+            ],
+            "yAxes": [
+              {"label": "Percentage", "min": 0, "max": 100}
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "ArgoCD Application Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "argocd_app_info{namespace=~\"ms5-.*\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {"Time": true, "Value": true},
+                  "indexByName": {},
+                  "renameByName": {
+                    "name": "Application",
+                    "project": "Project",
+                    "sync_status": "Sync Status",
+                    "health_status": "Health Status"
+                  }
+                }
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "30s"
+      }
+    }

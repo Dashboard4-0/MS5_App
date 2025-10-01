@@ -1,0 +1,686 @@
+---
+# MS5.0 Floor Dashboard - Enhanced Network Security Policies
+# Phase 7A: Core Security Implementation
+#
+# This manifest implements comprehensive network security policies with
+# micro-segmentation, zero-trust networking principles, and defense-in-depth.
+#
+# Security Architecture:
+# - Default Deny All: All traffic blocked by default
+# - Explicit Allow: Only explicitly permitted traffic allowed
+# - Micro-segmentation: Granular network isolation between services
+# - Least Privilege: Minimum required network access only
+# - DNS Resolution: Controlled DNS access for service discovery
+# - External Access: Controlled external network access
+
+# Default Deny All Policy - Blocks all traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-default-deny-all
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  podSelector: {}  # Applies to all pods
+  policyTypes:
+  - Ingress
+  - Egress
+  # No ingress/egress rules = deny all traffic
+---
+# DNS Resolution Policy - Allows DNS queries for service discovery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-dns-resolution
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  podSelector: {}  # Applies to all pods
+  policyTypes:
+  - Egress
+  egress:
+  - to: []  # Allow DNS queries to any destination
+    ports:
+    - protocol: UDP
+      port: 53  # DNS
+    - protocol: TCP
+      port: 53  # DNS over TCP
+---
+# Backend Service Network Policy - Controls access to FastAPI backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-backend-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from ingress controller (external access)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000  # HTTP API
+    - protocol: TCP
+      port: 9090  # Metrics endpoint
+  # Allow ingress from monitoring services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics scraping
+  # Allow ingress from alert manager for webhooks
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: alertmanager
+    ports:
+    - protocol: TCP
+      port: 8000  # Webhook endpoint
+  egress:
+  # Allow access to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: database
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access to Redis cache
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access to MinIO object storage
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    ports:
+    - protocol: TCP
+      port: 9000  # MinIO API
+    - protocol: TCP
+      port: 9001  # MinIO Console
+  # Allow access to Celery workers for task coordination
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5555  # Celery worker port
+  # Allow external HTTPS access for API calls
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+---
+# Database Service Network Policy - Controls access to PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-database-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from backend services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access from Celery workers
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access from Celery beat scheduler
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-beat
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access from Prometheus for metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL metrics
+  egress:
+  # Database can only make DNS queries
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53  # DNS
+    - protocol: TCP
+      port: 53  # DNS over TCP
+---
+# Redis Cache Network Policy - Controls access to Redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-redis-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: redis
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from backend services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access from Celery workers
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access from Celery beat scheduler
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-beat
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access from Flower monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: flower
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  egress:
+  # Redis can only make DNS queries
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53  # DNS
+    - protocol: TCP
+      port: 53  # DNS over TCP
+---
+# MinIO Object Storage Network Policy - Controls access to MinIO
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-minio-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: minio
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from backend services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 9000  # MinIO API
+    - protocol: TCP
+      port: 9001  # MinIO Console
+  # Allow access from Celery workers
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 9000  # MinIO API
+  egress:
+  # MinIO can only make DNS queries
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53  # DNS
+    - protocol: TCP
+      port: 53  # DNS over TCP
+---
+# Celery Worker Network Policy - Controls access to Celery workers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-celery-worker-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery-worker
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: celery-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Flower monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: flower
+    ports:
+    - protocol: TCP
+      port: 5555  # Celery worker port
+  egress:
+  # Allow access to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: database
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access to MinIO
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    ports:
+    - protocol: TCP
+      port: 9000  # MinIO API
+  # Allow access to backend for task coordination
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000  # Backend API
+---
+# Celery Beat Scheduler Network Policy - Controls access to Celery beat
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-celery-beat-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery-beat
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: celery-beat
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  # Allow access to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: database
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  # Allow access to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+---
+# Flower Monitoring Network Policy - Controls access to Flower
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-flower-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: flower
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: flower
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from ingress controller (external access)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 5555  # Flower web interface
+  egress:
+  # Allow access to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+  # Allow access to Celery workers
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5555  # Celery worker port
+---
+# Prometheus Monitoring Network Policy - Controls access to Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-prometheus-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Grafana
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: grafana
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus API
+  # Allow access from AlertManager
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: alertmanager
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus API
+  egress:
+  # Allow scraping of all services
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics endpoints
+    - protocol: TCP
+      port: 8000  # Backend metrics
+    - protocol: TCP
+      port: 5432  # Database metrics
+    - protocol: TCP
+      port: 6379  # Redis metrics
+    - protocol: TCP
+      port: 9000  # MinIO metrics
+  # Allow external access for federation
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+---
+# Grafana Dashboard Network Policy - Controls access to Grafana
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-grafana-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: grafana
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: grafana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from ingress controller (external access)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000  # Grafana web interface
+  egress:
+  # Allow access to Prometheus
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus API
+  # Allow access to AlertManager
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: alertmanager
+    ports:
+    - protocol: TCP
+      port: 9093  # AlertManager API
+  # Allow external access for plugins and updates
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+---
+# AlertManager Network Policy - Controls access to AlertManager
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-alertmanager-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+    security-level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: alertmanager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Prometheus
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9093  # AlertManager API
+  egress:
+  # Allow access to backend for webhooks
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000  # Backend webhook endpoint
+  # Allow external access for notifications
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 587   # SMTP
+    - protocol: TCP
+      port: 443   # HTTPS
+---
+# Network Security Monitoring Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-security-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+data:
+  network-alerts.yaml: |
+    # Network security monitoring alerts
+    
+    groups:
+    - name: network-security-violations
+      rules:
+      - alert: NetworkPolicyViolation
+        expr: increase(kube_networkpolicy_ingress_packets_dropped_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Network policy violation detected"
+          description: "Network packets dropped due to policy violation in namespace {{ $labels.namespace }}"
+      
+      - alert: UnauthorizedNetworkAccess
+        expr: increase(kube_networkpolicy_egress_packets_dropped_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Unauthorized network access attempt"
+          description: "Egress packets dropped due to unauthorized access attempt from pod {{ $labels.pod }}"
+      
+      - alert: DNSResolutionFailure
+        expr: increase(kube_dns_requests_total{result="failure"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "DNS resolution failures detected"
+          description: "Multiple DNS resolution failures detected in namespace {{ $labels.namespace }}"
+      
+      - alert: ExternalNetworkAccessAnomaly
+        expr: increase(kube_networkpolicy_egress_packets_total{destination="external"}[5m]) > 1000
+        for: 5m
+        labels:
+          severity: info
+          component: security
+        annotations:
+          summary: "High external network access detected"
+          description: "Unusual high volume of external network access from pod {{ $labels.pod }}"

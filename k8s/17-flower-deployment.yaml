@@ -1,0 +1,164 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms5-flower
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: flower
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: flower
+    spec:
+      serviceAccountName: ms5-backend-sa
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+      - name: flower
+        image: ms5acrprod.azurecr.io/ms5-backend:latest
+        command:
+        - celery
+        - -A
+        - app.celery
+        - flower
+        - --port=5555
+        - --broker=$(REDIS_URL)
+        ports:
+        - containerPort: 5555
+          name: flower
+        env:
+        # Application Settings
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ENVIRONMENT
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DEBUG
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: LOG_LEVEL
+        # Security Settings
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: SECRET_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: JWT_SECRET
+        # Redis Settings
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-primary.ms5-production.svc.cluster.local:6379/0"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-redis-secrets
+              key: REDIS_PASSWORD
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+      initContainers:
+      - name: wait-for-redis
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z redis-primary.ms5-production.svc.cluster.local 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready!"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-flower
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: flower
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5555
+    targetPort: 5555
+    protocol: TCP
+    name: flower
+  selector:
+    app: ms5-dashboard
+    component: flower
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-flower-loadbalancer
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: flower
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5555
+    targetPort: 5555
+    protocol: TCP
+    name: flower
+  selector:
+    app: ms5-dashboard
+    component: flower
+  loadBalancerSourceRanges:
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16

@@ -1,0 +1,219 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-sli-definitions
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: sli-slo
+data:
+  sli-definitions.yml: |
+    # MS5.0 Floor Dashboard - Service Level Indicators (SLI) Definitions
+    
+    # Backend API SLIs
+    backend_api_availability:
+      description: "Percentage of successful HTTP requests to the backend API"
+      query: "sum(rate(http_requests_total{job=\"ms5-backend\",status!~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"ms5-backend\"}[5m])) * 100"
+      target: 99.9
+      window: "5m"
+    
+    backend_api_response_time_p50:
+      description: "50th percentile response time for backend API requests"
+      query: "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))"
+      target: 0.1
+      window: "5m"
+      unit: "seconds"
+    
+    backend_api_response_time_p95:
+      description: "95th percentile response time for backend API requests"
+      query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))"
+      target: 0.2
+      window: "5m"
+      unit: "seconds"
+    
+    backend_api_response_time_p99:
+      description: "99th percentile response time for backend API requests"
+      query: "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))"
+      target: 0.5
+      window: "5m"
+      unit: "seconds"
+    
+    backend_api_error_rate:
+      description: "Percentage of HTTP requests that result in errors"
+      query: "sum(rate(http_requests_total{job=\"ms5-backend\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"ms5-backend\"}[5m])) * 100"
+      target: 0.1
+      window: "5m"
+    
+    backend_api_throughput:
+      description: "Number of requests per second handled by the backend API"
+      query: "sum(rate(http_requests_total{job=\"ms5-backend\"}[5m]))"
+      target: 100
+      window: "5m"
+      unit: "requests/second"
+    
+    # Database SLIs
+    database_availability:
+      description: "Percentage of successful database connections"
+      query: "up{job=\"postgres\"} * 100"
+      target: 99.9
+      window: "1m"
+    
+    database_query_response_time_p95:
+      description: "95th percentile response time for database queries"
+      query: "histogram_quantile(0.95, rate(pg_stat_database_tup_returned{job=\"postgres\"}[5m]))"
+      target: 0.1
+      window: "5m"
+      unit: "seconds"
+    
+    database_connection_utilization:
+      description: "Percentage of database connections in use"
+      query: "pg_stat_database_numbackends / pg_settings_max_connections * 100"
+      target: 80
+      window: "5m"
+    
+    database_disk_utilization:
+      description: "Percentage of database disk space used"
+      query: "pg_database_size_bytes / pg_database_size_limit_bytes * 100"
+      target: 80
+      window: "5m"
+    
+    # Redis Cache SLIs
+    redis_availability:
+      description: "Percentage of successful Redis operations"
+      query: "up{job=\"redis\"} * 100"
+      target: 99.9
+      window: "1m"
+    
+    redis_response_time_p95:
+      description: "95th percentile response time for Redis operations"
+      query: "histogram_quantile(0.95, rate(redis_commands_duration_seconds_bucket{job=\"redis\"}[5m]))"
+      target: 0.01
+      window: "5m"
+      unit: "seconds"
+    
+    redis_memory_utilization:
+      description: "Percentage of Redis memory used"
+      query: "redis_memory_used_bytes / redis_memory_max_bytes * 100"
+      target: 80
+      window: "5m"
+    
+    redis_hit_ratio:
+      description: "Percentage of Redis cache hits"
+      query: "redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) * 100"
+      target: 95
+      window: "5m"
+    
+    # Celery Worker SLIs
+    celery_worker_availability:
+      description: "Percentage of Celery workers available"
+      query: "up{job=\"celery-workers\"} * 100"
+      target: 99.9
+      window: "1m"
+    
+    celery_queue_length:
+      description: "Number of tasks waiting in Celery queues"
+      query: "celery_queue_length"
+      target: 10
+      window: "5m"
+      unit: "tasks"
+    
+    celery_task_success_rate:
+      description: "Percentage of Celery tasks that complete successfully"
+      query: "sum(rate(celery_tasks_succeeded_total[5m])) / sum(rate(celery_tasks_total[5m])) * 100"
+      target: 99.5
+      window: "5m"
+    
+    celery_task_duration_p95:
+      description: "95th percentile duration for Celery tasks"
+      query: "histogram_quantile(0.95, rate(celery_task_duration_seconds_bucket[5m]))"
+      target: 300
+      window: "5m"
+      unit: "seconds"
+    
+    # MinIO Object Storage SLIs
+    minio_availability:
+      description: "Percentage of successful MinIO operations"
+      query: "up{job=\"minio\"} * 100"
+      target: 99.9
+      window: "1m"
+    
+    minio_response_time_p95:
+      description: "95th percentile response time for MinIO operations"
+      query: "histogram_quantile(0.95, rate(minio_request_duration_seconds_bucket{job=\"minio\"}[5m]))"
+      target: 0.5
+      window: "5m"
+      unit: "seconds"
+    
+    minio_storage_utilization:
+      description: "Percentage of MinIO storage used"
+      query: "minio_disk_usage_bytes / minio_disk_total_bytes * 100"
+      target: 80
+      window: "5m"
+    
+    # WebSocket SLIs
+    websocket_connection_success_rate:
+      description: "Percentage of successful WebSocket connections"
+      query: "sum(rate(websocket_connections_total{status=\"success\"}[5m])) / sum(rate(websocket_connections_total[5m])) * 100"
+      target: 99.5
+      window: "5m"
+    
+    websocket_message_delivery_rate:
+      description: "Percentage of WebSocket messages successfully delivered"
+      query: "sum(rate(websocket_messages_delivered_total[5m])) / sum(rate(websocket_messages_sent_total[5m])) * 100"
+      target: 99.9
+      window: "5m"
+    
+    # Production Metrics SLIs
+    production_line_availability:
+      description: "Percentage of production lines operational"
+      query: "sum(ms5_production_line_status{status=\"operational\"}) / sum(ms5_production_line_status) * 100"
+      target: 95
+      window: "5m"
+    
+    oee_calculation_accuracy:
+      description: "Accuracy of OEE calculations (within 5% of expected)"
+      query: "abs(ms5_oee_calculated - ms5_oee_expected) / ms5_oee_expected * 100"
+      target: 5
+      window: "5m"
+    
+    production_data_freshness:
+      description: "Age of most recent production data in seconds"
+      query: "time() - ms5_production_data_timestamp"
+      target: 60
+      window: "1m"
+      unit: "seconds"
+    
+    # System Resource SLIs
+    cpu_utilization:
+      description: "Average CPU utilization across all pods"
+      query: "avg(rate(container_cpu_usage_seconds_total[5m])) * 100"
+      target: 70
+      window: "5m"
+    
+    memory_utilization:
+      description: "Average memory utilization across all pods"
+      query: "avg(container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100"
+      target: 80
+      window: "5m"
+    
+    disk_utilization:
+      description: "Average disk utilization across all persistent volumes"
+      query: "avg(node_filesystem_usage_percent)"
+      target: 80
+      window: "5m"
+    
+    # Network SLIs
+    network_latency_p95:
+      description: "95th percentile network latency between services"
+      query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))"
+      target: 0.1
+      window: "5m"
+      unit: "seconds"
+    
+    network_throughput:
+      description: "Network throughput in bytes per second"
+      query: "sum(rate(container_network_receive_bytes_total[5m])) + sum(rate(container_network_transmit_bytes_total[5m]))"
+      target: 1000000000
+      window: "5m"
+      unit: "bytes/second"

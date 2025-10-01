@@ -1,0 +1,285 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-rules-engine
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Rules Engine Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Rules Engine configuration
+  cdn-rules-engine.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-rules-engine
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Rules Engine Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      rules-engine.json: |
+        {
+          "rules": [
+            {
+              "name": "StaticAssetsOptimization",
+              "order": 1,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/static/", "/assets/", "/images/", "/icons/"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "365.00:00:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                  }
+                },
+                {
+                  "name": "CompressContent",
+                  "parameters": {
+                    "compressionEnabled": true,
+                    "contentTypes": [
+                      "application/javascript",
+                      "application/json",
+                      "text/css",
+                      "text/html",
+                      "text/javascript",
+                      "text/plain",
+                      "text/xml"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "APIRequestsOptimization",
+              "order": 2,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/api/"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "00:05:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "WebSocketRequestsOptimization",
+              "order": 3,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/ws"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "00:00:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+  
+  # Azure CDN Rules Engine monitoring
+  cdn-rules-engine-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-rules-engine-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Rules Engine Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      monitoring-config.json: |
+        {
+          "monitoring": {
+            "rulesEngine": "ms5-cdn-rules-engine",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "RulesEngineHitCount",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of requests that matched rules engine rules"
+              },
+              {
+                "name": "RulesEngineMissCount",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of requests that did not match any rules engine rules"
+              },
+              {
+                "name": "RulesEngineLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average latency added by rules engine processing"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighRulesEngineMissRate",
+                "condition": "rules_engine_miss_rate > 20%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Rules engine miss rate is above 20%"
+              },
+              {
+                "name": "HighRulesEngineLatency",
+                "condition": "rules_engine_latency > 100ms",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Rules engine latency is above 100ms"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Rules Engine security
+  cdn-rules-engine-security.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-rules-engine-security
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Rules Engine Security Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      security-config.json: |
+        {
+          "security": {
+            "rulesEngine": "ms5-cdn-rules-engine",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "securityRules": [
+              {
+                "name": "BlockSuspiciousRequests",
+                "order": 1,
+                "conditions": [
+                  {
+                    "name": "UrlPath",
+                    "parameters": {
+                      "operator": "Contains",
+                      "values": ["../", "..\\", "script", "alert", "document.cookie"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "UrlRedirect",
+                    "parameters": {
+                      "redirectType": "Found",
+                      "destination": "/blocked.html"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "BlockBotTraffic",
+                "order": 2,
+                "conditions": [
+                  {
+                    "name": "RequestHeader",
+                    "parameters": {
+                      "headerName": "User-Agent",
+                      "operator": "Contains",
+                      "values": ["bot", "crawler", "spider", "scraper"]
+                    }
+                  }
+                ],
+                "actions": [
+                  {
+                    "name": "UrlRedirect",
+                    "parameters": {
+                      "redirectType": "Found",
+                      "destination": "/blocked.html"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }

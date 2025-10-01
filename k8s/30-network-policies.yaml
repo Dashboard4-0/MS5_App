@@ -1,0 +1,417 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-deny-all
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-backend-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    ports:
+    - protocol: TCP
+      port: 9000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-database-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-beat
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-redis-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: redis
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-beat
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: flower
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-minio-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: minio
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-monitoring-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: grafana
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: alertmanager
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: database
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-grafana-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: grafana
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: grafana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ms5-production
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-alertmanager-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: alertmanager
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: alertmanager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: prometheus
+    ports:
+    - protocol: TCP
+      port: 9093
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 587
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ms5-celery-network-policy
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery
+spec:
+  podSelector:
+    matchLabels:
+      app: ms5-dashboard
+      component: celery-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: flower
+    ports:
+    - protocol: TCP
+      port: 5555
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: database
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: redis
+    - podSelector:
+        matchLabels:
+          app: ms5-dashboard
+          component: minio
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 9000
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

@@ -1,0 +1,140 @@
+---
+# NGINX Ingress Controller ConfigMap
+# Global configuration for NGINX ingress controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    description: "NGINX Ingress Controller global configuration"
+data:
+  # SSL/TLS Configuration
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384"
+  ssl-prefer-server-ciphers: "false"
+  ssl-session-cache: "shared:SSL:10m"
+  ssl-session-timeout: "10m"
+  ssl-buffer-size: "4k"
+  ssl-dh-param: "ffdhe2048"
+  
+  # Security Headers
+  add-headers: "ingress-nginx/security-headers"
+  hide-headers: "Server,X-Powered-By"
+  server-tokens: "false"
+  
+  # Performance Configuration
+  worker-processes: "auto"
+  worker-connections: "16384"
+  max-worker-open-files: "65536"
+  worker-rlimit-nofile: "65536"
+  worker-shutdown-timeout: "240s"
+  
+  # Upstream Configuration
+  upstream-keepalive-connections: "320"
+  upstream-keepalive-requests: "10000"
+  upstream-keepalive-timeout: "60s"
+  upstream-hash-by: "$remote_addr consistent"
+  
+  # Proxy Configuration
+  proxy-connect-timeout: "60s"
+  proxy-send-timeout: "60s"
+  proxy-read-timeout: "60s"
+  proxy-next-upstream: "error timeout invalid_header http_502 http_503 http_504"
+  proxy-next-upstream-timeout: "0"
+  proxy-next-upstream-tries: "3"
+  proxy-request-buffering: "on"
+  proxy-buffering: "on"
+  proxy-buffer-size: "8k"
+  proxy-buffers-number: "8"
+  
+  # Client Configuration
+  client-max-body-size: "10m"
+  client-body-buffer-size: "1m"
+  client-body-timeout: "60s"
+  client-header-timeout: "60s"
+  client-header-buffer-size: "1k"
+  large-client-header-buffers: "4 8k"
+  
+  # Compression Configuration
+  enable-brotli: "true"
+  brotli-level: "6"
+  brotli-types: "text/xml image/svg+xml application/x-font-ttf image/vnd.microsoft.icon application/x-font-opentype application/json font/eot application/vnd.ms-fontobject application/javascript font/otf application/xml application/xhtml+xml text/javascript application/x-javascript text/plain application/x-font-truetype application/xml+rss image/x-icon font/opentype text/css image/x-win-bitmap"
+  use-gzip: "true"
+  gzip-level: "6"
+  gzip-types: "text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json"
+  
+  # Rate Limiting
+  rate-limit-rps: "100"
+  rate-limit-rpm: "6000"
+  
+  # Logging Configuration
+  log-format-escape-json: "true"
+  log-format-upstream: '{"time": "$time_iso8601", "remote_addr": "$proxy_protocol_addr", "x_forwarded_for": "$proxy_add_x_forwarded_for", "request_id": "$req_id", "remote_user": "$remote_user", "bytes_sent": $bytes_sent, "request_time": $request_time, "status": $status, "vhost": "$host", "request_proto": "$server_protocol", "path": "$uri", "request_query": "$args", "request_length": $request_length, "duration": $request_time, "method": "$request_method", "http_referrer": "$http_referer", "http_user_agent": "$http_user_agent", "upstream_addr": "$upstream_addr", "upstream_response_time": "$upstream_response_time", "upstream_response_length": "$upstream_response_length", "upstream_status": "$upstream_status"}'
+  
+  # WebSocket Configuration
+  proxy-read-timeout: "86400"
+  proxy-send-timeout: "86400"
+  
+  # Factory Network Optimizations
+  keep-alive: "75"
+  keep-alive-requests: "1000"
+  
+  # Tablet Optimizations
+  server-name-hash-bucket-size: "128"
+  server-name-hash-max-size: "1024"
+  
+  # Custom Error Pages
+  custom-http-errors: "404,503"
+  
+  # Monitoring and Health Checks
+  enable-real-ip: "true"
+  forwarded-for-header: "X-Forwarded-For"
+  compute-full-forwarded-for: "true"
+  use-forwarded-headers: "true"
+  
+  # Azure-specific Configuration
+  use-proxy-protocol: "false"
+  enable-opentracing: "true"
+  
+  # Security Configuration
+  block-cidrs: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  block-user-agents: "~*bot,~*crawler,~*spider"
+  
+  # Performance Monitoring
+  enable-metrics: "true"
+  metrics-per-host: "true"
+---
+# Security Headers ConfigMap
+# Additional security headers for enhanced protection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-headers
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+  annotations:
+    description: "Security headers for NGINX Ingress Controller"
+data:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; manifest-src 'self';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  X-Permitted-Cross-Domain-Policies: "none"
+  X-Download-Options: "noopen"
+  X-DNS-Prefetch-Control: "off"
+  Expect-CT: "max-age=86400, enforce"
+  Feature-Policy: "geolocation 'none'; midi 'none'; notifications 'none'; push 'none'; sync-xhr 'none'; microphone 'none'; camera 'none'; magnetometer 'none'; gyroscope 'none'; speaker 'none'; vibrate 'none'; fullscreen 'self'; payment 'none';"
+  Permissions-Policy: "geolocation=(), midi=(), notifications=(), push=(), sync-xhr=(), microphone=(), camera=(), magnetometer=(), gyroscope=(), speaker=(), vibrate=(), fullscreen=(self), payment=()"

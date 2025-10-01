@@ -1,0 +1,188 @@
+# MS5.0 Floor Dashboard - AKS Production Dockerfile
+# 
+# This multi-stage Dockerfile optimizes React Native Web for AKS deployment with:
+# - Production-grade optimization
+# - Tablet-specific optimizations
+# - PWA capabilities
+# - Offline-first architecture
+# - Factory environment support
+# - Security hardening
+
+# Stage 1: Build Environment
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for native modules
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    musl-dev \
+    giflib-dev \
+    pixman-dev \
+    pangomm-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
+
+# Copy package files
+COPY package*.json ./
+COPY package.build.json ./
+
+# Install dependencies
+RUN npm ci --only=production --silent && \
+    npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Set build arguments
+ARG NODE_ENV=production
+ARG TABLET_OPTIMIZED=false
+ARG FACTORY_NETWORK=false
+ARG API_BASE_URL=https://api.ms5dashboard.com
+ARG WS_BASE_URL=wss://api.ms5dashboard.com
+
+# Set environment variables
+ENV NODE_ENV=${NODE_ENV}
+ENV TABLET_OPTIMIZED=${TABLET_OPTIMIZED}
+ENV FACTORY_NETWORK=${FACTORY_NETWORK}
+ENV API_BASE_URL=${API_BASE_URL}
+ENV WS_BASE_URL=${WS_BASE_URL}
+
+# Build the application
+RUN npm run build:aks
+
+# Stage 2: Production Environment
+FROM nginx:1.25-alpine AS production
+
+# Install security updates and required packages
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+    curl \
+    tzdata && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1000 -S appgroup && \
+    adduser -u 1000 -S appuser -G appgroup
+
+# Set timezone
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Create application directory
+WORKDIR /app
+
+# Copy built application from builder stage
+COPY --from=builder /app/build /app/public
+
+# Create custom nginx configuration for tablet deployment
+COPY nginx.aks.conf /etc/nginx/nginx.conf
+COPY nginx.aks.d/ /etc/nginx/conf.d/
+
+# Create nginx directories and set permissions
+RUN mkdir -p /var/cache/nginx /var/log/nginx /var/run && \
+    chown -R appuser:appgroup /var/cache/nginx /var/log/nginx /var/run /etc/nginx /app
+
+# Create health check scripts
+COPY <<EOF /app/health-check.sh
+#!/bin/sh
+# Health check script for Kubernetes probes
+
+# Check if nginx is running
+if ! pgrep nginx > /dev/null; then
+    echo "Nginx not running"
+    exit 1
+fi
+
+# Check if application files exist
+if [ ! -f /app/public/index.html ]; then
+    echo "Application files not found"
+    exit 1
+fi
+
+# Check if nginx can serve the application
+if ! curl -f http://localhost/health > /dev/null 2>&1; then
+    echo "Health endpoint not responding"
+    exit 1
+fi
+
+echo "Health check passed"
+exit 0
+EOF
+
+RUN chmod +x /app/health-check.sh
+
+# Create readiness check script
+COPY <<EOF /app/readiness-check.sh
+#!/bin/sh
+# Readiness check script for Kubernetes probes
+
+# Check if nginx is ready to serve traffic
+if ! curl -f http://localhost/ready > /dev/null 2>&1; then
+    echo "Readiness check failed"
+    exit 1
+fi
+
+# Check if application is ready
+if ! curl -f http://localhost/ > /dev/null 2>&1; then
+    echo "Application not ready"
+    exit 1
+fi
+
+echo "Readiness check passed"
+exit 0
+EOF
+
+RUN chmod +x /app/readiness-check.sh
+
+# Create startup check script
+COPY <<EOF /app/startup-check.sh
+#!/bin/sh
+# Startup check script for Kubernetes probes
+
+# Check if nginx is starting up
+if ! pgrep nginx > /dev/null; then
+    echo "Nginx not started"
+    exit 1
+fi
+
+# Check if application is starting up
+if ! curl -f http://localhost/live > /dev/null 2>&1; then
+    echo "Application not started"
+    exit 1
+fi
+
+echo "Startup check passed"
+exit 0
+EOF
+
+RUN chmod +x /app/startup-check.sh
+
+# Set security context
+USER appuser
+
+# Expose port
+EXPOSE 8080
+
+# Add labels for Kubernetes
+LABEL maintainer="MS5.0 Development Team"
+LABEL description="MS5.0 Floor Dashboard - React Native Web for AKS"
+LABEL version="1.0.0"
+LABEL app="ms5-frontend"
+LABEL component="frontend"
+LABEL platform="kubernetes"
+LABEL environment="production"
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /app/health-check.sh
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

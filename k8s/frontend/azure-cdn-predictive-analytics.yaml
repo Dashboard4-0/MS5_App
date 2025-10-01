@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-predictive-analytics
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Predictive Analytics Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Predictive Analytics configuration
+  cdn-predictive-analytics.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-predictive-analytics
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Predictive Analytics Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      predictive-analytics-config.json: |
+        {
+          "predictiveAnalytics": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "predictiveAnalyticsTypes": [
+              {
+                "name": "Traffic Prediction",
+                "description": "Predictive analytics for CDN traffic patterns",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Data collection",
+                  "Pattern analysis",
+                  "Prediction generation",
+                  "Performance monitoring"
+                ]
+              },
+              {
+                "name": "Performance Prediction",
+                "description": "Predictive analytics for CDN performance",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Performance analysis",
+                  "Trend identification",
+                  "Prediction generation",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Capacity Prediction",
+                "description": "Predictive analytics for CDN capacity planning",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Capacity analysis",
+                  "Growth prediction",
+                  "Planning optimization",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Cost Prediction",
+                "description": "Predictive analytics for CDN cost optimization",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Cost analysis",
+                  "Trend prediction",
+                  "Optimization planning",
+                  "Monitoring"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Predictive Analytics monitoring
+  cdn-predictive-analytics-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-predictive-analytics-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Predictive Analytics Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      predictive-analytics-monitoring.json: |
+        {
+          "monitoring": {
+            "predictiveAnalytics": "ms5-cdn-predictive-analytics",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "PredictiveAnalyticsAccuracy",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average predictive analytics accuracy"
+              },
+              {
+                "name": "PredictiveAnalyticsPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average predictive analytics performance"
+              },
+              {
+                "name": "PredictiveAnalyticsLatency",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average predictive analytics latency"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowPredictiveAnalyticsAccuracy",
+                "condition": "predictive_analytics_accuracy < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Predictive analytics accuracy is below 80%"
+              },
+              {
+                "name": "HighPredictiveAnalyticsLatency",
+                "condition": "predictive_analytics_latency > 1000ms",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Predictive analytics latency is above 1000ms"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Predictive Analytics script
+  cdn-predictive-analytics.py: |
+    #!/usr/bin/env python3
+    """
+    CDN predictive analytics script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_predictive_analytics():
+        """Get CDN predictive analytics from Azure"""
+        try:
+            # Azure CDN predictive analytics endpoint
+            predictive_analytics_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/predictive-analytics"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(predictive_analytics_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                predictive_analytics = response.json()
+                
+                return {
+                    "request_count": predictive_analytics.get("RequestCount", 0),
+                    "bytes_sent": predictive_analytics.get("BytesSent", 0),
+                    "cache_hit_ratio": predictive_analytics.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN predictive analytics: {e}")
+            return None
+    
+    def send_predictive_analytics_to_prometheus(predictive_analytics):
+        """Send CDN predictive analytics to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_predictive_analytics",
+                "value": predictive_analytics["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN predictive analytics sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN predictive analytics to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN predictive analytics to Prometheus: {e}")
+    
+    def main():
+        """Main predictive analytics loop"""
+        while True:
+            predictive_analytics = get_cdn_predictive_analytics()
+            if predictive_analytics:
+                print(json.dumps(predictive_analytics, indent=2))
+                send_predictive_analytics_to_prometheus(predictive_analytics)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Predictive Analytics deployment
+  cdn-predictive-analytics-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-predictive-analytics
+      namespace: ms5-frontend
+      labels:
+        app: cdn-predictive-analytics
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-predictive-analytics
+      template:
+        metadata:
+          labels:
+            app: cdn-predictive-analytics
+        spec:
+          containers:
+          - name: cdn-predictive-analytics
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-predictive-analytics.py"]
+            volumeMounts:
+            - name: predictive-analytics-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: predictive-analytics-script
+            configMap:
+              name: cdn-predictive-analytics-config
+              defaultMode: 0755

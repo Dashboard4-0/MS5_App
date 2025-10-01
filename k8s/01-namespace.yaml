@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-production
+  labels:
+    name: ms5-production
+    environment: production
+    app: ms5-dashboard
+    version: "1.0.0"
+    # Pod Security Standards - Production (Restricted)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    description: "MS5.0 Floor Dashboard Production Namespace"
+    contact: "devops@company.com"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ms5-resource-quota
+  namespace: ms5-production
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    requests.storage: 1Ti
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    limits.storage: 2Ti
+    persistentvolumeclaims: "20"
+    pods: "50"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ms5-limit-range
+  namespace: ms5-production
+spec:
+  limits:
+  - default:
+      cpu: "2"
+      memory: 4Gi
+    defaultRequest:
+      cpu: "100m"
+      memory: 256Mi
+    type: Container
+  - max:
+      storage: 500Gi
+    min:
+      storage: 1Gi
+    type: PersistentVolumeClaim

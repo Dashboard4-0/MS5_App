@@ -1,0 +1,306 @@
+# MS5.0 Floor Dashboard - Frontend Deployment
+# 
+# This deployment provides:
+# - High availability with multiple replicas
+# - Rolling updates with zero downtime
+# - Resource management and limits
+# - Health checks and probes
+# - Security hardening
+# - Tablet optimization
+# - Factory environment support
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms5-frontend-deployment
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Deployment"
+    deployment.kubernetes.io/revision: "1"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Deployment strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  
+  # Replica configuration
+  replicas: 3
+  revisionHistoryLimit: 10
+  
+  # Selector configuration
+  selector:
+    matchLabels:
+      app: ms5-frontend
+      component: frontend
+      environment: production
+  
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: ms5-frontend
+        component: frontend
+        environment: production
+        platform: kubernetes
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "false"
+    
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Service account
+      serviceAccountName: ms5-frontend-service-account
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+      
+      # DNS configuration
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+      
+      # Node selection
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-type: frontend
+      
+      # Affinity rules for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ms5-frontend
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for dedicated nodes
+      tolerations:
+      - key: "frontend-only"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # Init containers for setup
+      initContainers:
+      - name: init-config
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Initializing frontend configuration..."
+          mkdir -p /app/public
+          chown -R 1000:1000 /app
+          echo "Configuration initialized"
+        volumeMounts:
+        - name: app-volume
+          mountPath: /app
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+      
+      # Main container
+      containers:
+      - name: ms5-frontend
+        image: ms5-frontend:1.0.0
+        imagePullPolicy: Always
+        
+        # Port configuration
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        
+        # Environment variables
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: APP_ENVIRONMENT
+        - name: API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: API_BASE_URL
+        - name: WS_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: WS_BASE_URL
+        - name: TABLET_OPTIMIZED
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: FEATURE_TABLET_OPTIMIZED
+        - name: FACTORY_NETWORK
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-frontend-config
+              key: FEATURE_FACTORY_NETWORK
+        - name: API_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ms5-frontend-secrets
+              key: API_SECRET_KEY
+        - name: WS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ms5-frontend-secrets
+              key: WS_SECRET_KEY
+        
+        # Resource management
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
+          httpGet:
+            path: /live
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: app-volume
+          mountPath: /app
+          readOnly: true
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: nginx-config-d
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: var-cache-nginx
+          mountPath: /var/cache/nginx
+        - name: var-log-nginx
+          mountPath: /var/log/nginx
+        - name: var-run
+          mountPath: /var/run
+      
+      # Sidecar container for monitoring
+      - name: nginx-exporter
+        image: nginx/nginx-prometheus-exporter:0.11.0
+        ports:
+        - name: metrics
+          containerPort: 9113
+          protocol: TCP
+        args:
+        - -nginx.scrape-uri=http://localhost:8080/nginx_status
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volumes
+      volumes:
+      - name: app-volume
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: ms5-frontend-nginx-config
+          defaultMode: 420
+      - name: nginx-config-d
+        configMap:
+          name: ms5-frontend-nginx-config-d
+          defaultMode: 420
+      - name: tmp-volume
+        emptyDir: {}
+      - name: var-cache-nginx
+        emptyDir: {}
+      - name: var-log-nginx
+        emptyDir: {}
+      - name: var-run
+        emptyDir: {}
+      
+      # Image pull secrets
+      imagePullSecrets:
+      - name: ms5-registry-secret
+      
+      # Restart policy
+      restartPolicy: Always

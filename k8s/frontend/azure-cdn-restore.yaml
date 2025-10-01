@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-restore
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Restore Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Restore configuration
+  cdn-restore.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-restore
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Restore Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      restore-config.json: |
+        {
+          "restore": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "restoreTypes": [
+              {
+                "name": "Restore Technology",
+                "description": "Restore technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Restore Process",
+                "description": "Restore process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Restore Automation",
+                "description": "Restore automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Restore Monitoring",
+                "description": "Restore monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Restore monitoring
+  cdn-restore-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-restore-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Restore Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      restore-monitoring.json: |
+        {
+          "monitoring": {
+            "restore": "ms5-cdn-restore",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "RestoreTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average restore technology performance"
+              },
+              {
+                "name": "RestoreProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average restore process performance"
+              },
+              {
+                "name": "RestoreAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average restore automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowRestoreTechnologyPerformance",
+                "condition": "restore_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Restore technology performance is below 80%"
+              },
+              {
+                "name": "LowRestoreProcessPerformance",
+                "condition": "restore_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Restore process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Restore script
+  cdn-restore.py: |
+    #!/usr/bin/env python3
+    """
+    CDN restore script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_restore():
+        """Get CDN restore from Azure"""
+        try:
+            # Azure CDN restore endpoint
+            restore_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/restore"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(restore_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                restore = response.json()
+                
+                return {
+                    "request_count": restore.get("RequestCount", 0),
+                    "bytes_sent": restore.get("BytesSent", 0),
+                    "cache_hit_ratio": restore.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN restore: {e}")
+            return None
+    
+    def send_restore_to_prometheus(restore):
+        """Send CDN restore to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_restore",
+                "value": restore["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN restore sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN restore to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN restore to Prometheus: {e}")
+    
+    def main():
+        """Main restore loop"""
+        while True:
+            restore = get_cdn_restore()
+            if restore:
+                print(json.dumps(restore, indent=2))
+                send_restore_to_prometheus(restore)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Restore deployment
+  cdn-restore-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-restore
+      namespace: ms5-frontend
+      labels:
+        app: cdn-restore
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-restore
+      template:
+        metadata:
+          labels:
+            app: cdn-restore
+        spec:
+          containers:
+          - name: cdn-restore
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-restore.py"]
+            volumeMounts:
+            - name: restore-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: restore-script
+            configMap:
+              name: cdn-restore-config
+              defaultMode: 0755

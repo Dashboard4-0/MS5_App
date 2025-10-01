@@ -1,0 +1,474 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-spot-config
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: spot-instances
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Spot Instances Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Spot instance node selector configuration
+  spot-node-selector.yaml: |
+    nodeSelector:
+      kubernetes.azure.com/scalesetpriority: spot
+      node.kubernetes.io/instance-type: Standard_D4s_v3
+    tolerations:
+    - key: "kubernetes.azure.com/scalesetpriority"
+      operator: "Equal"
+      value: "spot"
+      effect: "NoSchedule"
+    - key: "kubernetes.azure.com/scalesetpriority"
+      operator: "Equal"
+      value: "spot"
+      effect: "NoExecute"
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: kubernetes.azure.com/scalesetpriority
+              operator: In
+              values:
+              - spot
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.azure.com/scalesetpriority
+              operator: In
+              values:
+              - spot
+  
+  # Spot instance deployment configuration
+  spot-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ms5-frontend-spot-deployment
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: frontend
+        tier: frontend
+        environment: production
+        deployment: aks
+        instance-type: spot
+    spec:
+      replicas: 2
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 1
+      selector:
+        matchLabels:
+          app: ms5-frontend
+          instance-type: spot
+      template:
+        metadata:
+          labels:
+            app: ms5-frontend
+            instance-type: spot
+        spec:
+          # Spot instance configuration
+          nodeSelector:
+            kubernetes.azure.com/scalesetpriority: spot
+          tolerations:
+          - key: "kubernetes.azure.com/scalesetpriority"
+            operator: "Equal"
+            value: "spot"
+            effect: "NoSchedule"
+          - key: "kubernetes.azure.com/scalesetpriority"
+            operator: "Equal"
+            value: "spot"
+            effect: "NoExecute"
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                  - key: kubernetes.azure.com/scalesetpriority
+                    operator: In
+                    values:
+                    - spot
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                      - ms5-frontend
+                  topologyKey: kubernetes.io/hostname
+          # Graceful handling of spot evictions
+          terminationGracePeriodSeconds: 30
+          containers:
+          - name: ms5-frontend
+            image: ms5-frontend:aks
+            imagePullPolicy: Always
+            ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            env:
+            - name: NODE_ENV
+              value: "production"
+            - name: INSTANCE_TYPE
+              value: "spot"
+            - name: SPOT_EVICTION_HANDLING
+              value: "graceful"
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "128Mi"
+              limits:
+                cpu: "250m"
+                memory: "512Mi"
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: http
+              initialDelaySeconds: 15
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+            readinessProbe:
+              httpGet:
+                path: /ready
+                port: http
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 3
+            startupProbe:
+              httpGet:
+                path: /live
+                port: http
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 30
+            # Graceful shutdown handling
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "sleep 15"]
+  
+  # Spot instance HPA configuration
+  spot-hpa.yaml: |
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: ms5-frontend-spot-hpa
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: frontend
+        tier: frontend
+        environment: production
+        deployment: aks
+        instance-type: spot
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ms5-frontend-spot-deployment
+      minReplicas: 1
+      maxReplicas: 10
+      metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 80
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            averageUtilization: 85
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+          policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 60
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+          selectPolicy: Min
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+          selectPolicy: Max
+  
+  # Spot instance monitoring configuration
+  spot-monitoring.yaml: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ms5-frontend-spot-service
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: frontend
+        tier: frontend
+        environment: production
+        deployment: aks
+        instance-type: spot
+    spec:
+      type: ClusterIP
+      ports:
+      - name: http
+        port: 80
+        targetPort: http
+        protocol: TCP
+      - name: metrics
+        port: 9090
+        targetPort: metrics
+        protocol: TCP
+      selector:
+        app: ms5-frontend
+        instance-type: spot
+    
+    ---
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: ms5-frontend-spot-monitor
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: frontend
+        tier: frontend
+        environment: production
+        deployment: aks
+        instance-type: spot
+    spec:
+      selector:
+        matchLabels:
+          app: ms5-frontend
+          instance-type: spot
+      endpoints:
+      - port: metrics
+        path: /metrics
+        interval: 30s
+        scrapeTimeout: 10s
+  
+  # Spot instance eviction handling
+  spot-eviction-handler.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: spot-eviction-handler
+      namespace: ms5-frontend
+    data:
+      eviction-handler.sh: |
+        #!/bin/bash
+        # Spot instance eviction handler script
+        
+        set -e
+        
+        echo "Spot instance eviction detected at $(date)"
+        
+        # Graceful shutdown of application
+        echo "Initiating graceful shutdown..."
+        
+        # Send SIGTERM to all processes
+        pkill -TERM -f "ms5-frontend" || true
+        
+        # Wait for graceful shutdown
+        sleep 10
+        
+        # Force kill if still running
+        pkill -KILL -f "ms5-frontend" || true
+        
+        echo "Graceful shutdown completed at $(date)"
+        
+        exit 0
+      
+      eviction-handler.yaml: |
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: spot-eviction-handler
+          namespace: ms5-frontend
+          labels:
+            app: spot-eviction-handler
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.azure.com/scalesetpriority: spot
+          tolerations:
+          - key: "kubernetes.azure.com/scalesetpriority"
+            operator: "Equal"
+            value: "spot"
+            effect: "NoSchedule"
+          containers:
+          - name: eviction-handler
+            image: busybox:1.35
+            command: ["/bin/sh"]
+            args: ["-c", "while true; do sleep 30; done"]
+            volumeMounts:
+            - name: eviction-script
+              mountPath: /scripts
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+          volumes:
+          - name: eviction-script
+            configMap:
+              name: spot-eviction-handler
+              defaultMode: 0755
+          - name: host-proc
+            hostPath:
+              path: /proc
+  
+  # Spot instance cost monitoring
+  spot-cost-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: spot-cost-monitoring
+      namespace: ms5-frontend
+    data:
+      cost-monitor.py: |
+        #!/usr/bin/env python3
+        """
+        Spot instance cost monitoring script
+        """
+        import json
+        import requests
+        import time
+        from datetime import datetime
+        
+        def get_spot_instance_cost():
+            """Get current spot instance cost from Azure"""
+            try:
+                # Azure metadata service
+                metadata_url = "http://169.254.169.254/metadata/instance/compute"
+                headers = {"Metadata": "true"}
+                
+                response = requests.get(metadata_url, headers=headers, timeout=5)
+                if response.status_code == 200:
+                    metadata = response.json()
+                    
+                    # Get spot instance pricing (simplified)
+                    vm_size = metadata.get("vmSize", "Standard_D4s_v3")
+                    region = metadata.get("location", "eastus")
+                    
+                    # Calculate estimated cost (simplified)
+                    spot_discount = 0.7  # 70% discount for spot instances
+                    base_cost = 0.192  # Base cost per hour for Standard_D4s_v3
+                    spot_cost = base_cost * (1 - spot_discount)
+                    
+                    return {
+                        "vm_size": vm_size,
+                        "region": region,
+                        "spot_cost_per_hour": spot_cost,
+                        "base_cost_per_hour": base_cost,
+                        "savings_percentage": spot_discount * 100,
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as e:
+                print(f"Error getting spot instance cost: {e}")
+                return None
+        
+        def main():
+            """Main monitoring loop"""
+            while True:
+                cost_info = get_spot_instance_cost()
+                if cost_info:
+                    print(json.dumps(cost_info, indent=2))
+                    
+                    # Send to monitoring system
+                    try:
+                        requests.post(
+                            "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write",
+                            json={
+                                "metric": "spot_instance_cost_per_hour",
+                                "value": cost_info["spot_cost_per_hour"],
+                                "labels": {
+                                    "vm_size": cost_info["vm_size"],
+                                    "region": cost_info["region"]
+                                }
+                            },
+                            timeout=5
+                        )
+                    except Exception as e:
+                        print(f"Error sending metrics: {e}")
+                
+                time.sleep(300)  # Check every 5 minutes
+        
+        if __name__ == "__main__":
+            main()
+      
+      cost-monitor.yaml: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: spot-cost-monitor
+          namespace: ms5-frontend
+          labels:
+            app: spot-cost-monitor
+            component: monitoring
+            tier: frontend
+            environment: production
+            deployment: aks
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: spot-cost-monitor
+          template:
+            metadata:
+              labels:
+                app: spot-cost-monitor
+            spec:
+              nodeSelector:
+                kubernetes.azure.com/scalesetpriority: spot
+              tolerations:
+              - key: "kubernetes.azure.com/scalesetpriority"
+                operator: "Equal"
+                value: "spot"
+                effect: "NoSchedule"
+              containers:
+              - name: cost-monitor
+                image: python:3.9-alpine
+                command: ["python3", "/scripts/cost-monitor.py"]
+                volumeMounts:
+                - name: cost-script
+                  mountPath: /scripts
+                resources:
+                  requests:
+                    cpu: "10m"
+                    memory: "32Mi"
+                  limits:
+                    cpu: "50m"
+                    memory: "64Mi"
+              volumes:
+              - name: cost-script
+                configMap:
+                  name: spot-cost-monitoring
+                  defaultMode: 0755

@@ -43,60 +43,269 @@ The MS5.0 Floor Dashboard is a comprehensive manufacturing execution system desi
 2. Enter your username and password
 3. Tap "Login" to access the system
 4. The system will remember your login for future sessions
+5. **Two-Factor Authentication**: If enabled, enter the verification code from your authenticator app
+6. **Biometric Login**: Use fingerprint or face recognition if configured
 
 ### Navigation
 - **Main Menu**: Tap the menu icon (☰) in the top-left corner to access all features
 - **Dashboard**: Tap the home icon to return to the main dashboard
 - **Notifications**: Tap the bell icon to view system notifications
 - **Profile**: Tap your profile icon to access settings and logout
+- **Search**: Use the search icon to quickly find equipment, jobs, or reports
+- **Help**: Tap the question mark icon for contextual help
 
 ### First-Time Setup
 1. Complete your profile information
 2. Set your notification preferences
 3. Configure dashboard preferences
 4. Review your assigned permissions and roles
+5. **Set Language**: Choose your preferred language from the settings
+6. **Configure Themes**: Select light or dark mode based on your preference
+7. **Enable Offline Mode**: Configure offline capabilities for areas with poor connectivity
+
+### Role-Based Access
+The system automatically adapts based on your role:
+
+#### **Production Manager**
+- Full access to all production lines and schedules
+- Advanced analytics and reporting capabilities
+- User management and system configuration
+- Real-time production monitoring and control
+
+#### **Shift Manager**
+- Production line monitoring and job assignment
+- Team management and shift reporting
+- Andon event management and escalation
+- Performance tracking and analysis
+
+#### **Operator**
+- Job execution and status updates
+- Quality check completion
+- Andon event reporting
+- Equipment status monitoring
+
+#### **Maintenance Technician**
+- Work order management and completion
+- Equipment diagnostics and troubleshooting
+- Preventive maintenance scheduling
+- Parts inventory management
+
+#### **Quality Inspector**
+- Quality check execution and documentation
+- Defect tracking and analysis
+- Quality metrics monitoring
+- Non-conformance reporting
+
+#### **Engineer**
+- System configuration and optimization
+- Equipment parameter adjustment
+- Technical troubleshooting
+- Performance analysis and improvement
+
+#### **Viewer**
+- Read-only access to dashboards and reports
+- Production status monitoring
+- Historical data analysis
+- Export capabilities for reports
 
 ## Dashboard Overview
 
-The main dashboard provides a comprehensive overview of your production operations with real-time data updates.
+The main dashboard provides a comprehensive overview of your production operations with real-time data updates. The dashboard automatically refreshes every 5 seconds and adapts to your role and permissions.
 
-### Dashboard Sections
+### Dashboard Layout
 
-#### Production Overview
-- **Active Production Lines**: Current status of all production lines
-- **OEE Metrics**: Overall Equipment Effectiveness for each line
-- **Production Targets**: Progress towards daily production goals
-- **Shift Performance**: Current shift performance metrics
+#### **Header Section**
+- **User Profile**: Your name, role, and current shift
+- **System Status**: Overall system health indicator
+- **Notifications**: Real-time alerts and messages
+- **Quick Actions**: Role-specific action buttons
+- **Search**: Global search for equipment, jobs, or reports
 
-#### Quick Actions
-- **Start Job**: Quick access to job management
-- **Report Issue**: Direct Andon event reporting
-- **Quality Check**: Access to quality control functions
-- **Maintenance Request**: Submit maintenance work orders
+#### **Main Content Area**
+The dashboard is organized into customizable widgets based on your role:
 
-#### Real-time Alerts
-- **Active Andon Events**: Current production issues requiring attention
-- **Quality Alerts**: Quality threshold breaches
+##### **Production Overview Widget**
+- **Active Production Lines**: Current status with color-coded indicators
+  - 🟢 Green: Running normally
+  - 🟡 Yellow: Warning condition
+  - 🔴 Red: Error or stopped
+  - 🔵 Blue: Maintenance mode
+- **OEE Metrics**: Real-time Overall Equipment Effectiveness
+  - Availability percentage
+  - Performance percentage
+  - Quality percentage
+  - Overall OEE score
+- **Production Targets**: Progress towards daily/weekly goals
+- **Shift Performance**: Current shift metrics and comparisons
+
+##### **Real-time Alerts Widget**
+- **Active Andon Events**: Critical issues requiring immediate attention
+  - Event priority (Low, Medium, High, Critical)
+  - Time since event occurred
+  - Assigned personnel
+  - Escalation status
+- **Quality Alerts**: Quality threshold breaches and trends
 - **Maintenance Alerts**: Equipment requiring maintenance
-- **System Notifications**: General system notifications
+- **System Notifications**: General system updates and announcements
 
-#### Performance Metrics
+##### **Performance Metrics Widget**
 - **Line Efficiency**: Real-time efficiency calculations
 - **Downtime Tracking**: Current and historical downtime data
 - **Energy Consumption**: Real-time energy monitoring
 - **Quality Metrics**: First-pass yield and defect rates
+- **Throughput**: Parts per hour and cycle time analysis
+
+##### **Quick Actions Widget**
+Role-specific quick access buttons:
+- **Start Job**: Quick access to job management
+- **Report Issue**: Direct Andon event reporting
+- **Quality Check**: Access to quality control functions
+- **Maintenance Request**: Submit maintenance work orders
+- **Generate Report**: Quick report generation
+- **Equipment Status**: View detailed equipment information
+
+### Dashboard Customization
+
+#### **Widget Management**
+1. Tap the "Customize" button in the dashboard header
+2. Drag and drop widgets to rearrange them
+3. Tap the "X" to remove unwanted widgets
+4. Tap "Add Widget" to include additional metrics
+5. Save your custom layout
+
+#### **Refresh Settings**
+- **Auto-refresh**: Automatically updates every 5 seconds
+- **Manual refresh**: Tap the refresh icon for immediate updates
+- **Pause refresh**: Stop auto-refresh during critical operations
+- **Custom intervals**: Set refresh intervals from 1 second to 5 minutes
+
+#### **Display Options**
+- **Compact View**: Show more widgets in less space
+- **Detailed View**: Show expanded information for each widget
+- **Full Screen**: Expand individual widgets to full screen
+- **Split View**: View multiple widgets simultaneously
+
+### Real-time Data Features
+
+#### **Live Updates**
+- **WebSocket Connection**: Maintains persistent connection for real-time data
+- **Connection Status**: Visual indicator of data connection quality
+- **Offline Mode**: Automatic fallback to cached data when offline
+- **Sync Status**: Shows when data is being synchronized
+
+#### **Data Visualization**
+- **Trend Charts**: Historical data with trend analysis
+- **Gauge Displays**: Real-time metric visualization
+- **Status Indicators**: Color-coded status representations
+- **Progress Bars**: Completion status for ongoing processes
+
+#### **Interactive Elements**
+- **Drill-down**: Tap widgets to view detailed information
+- **Filter Options**: Filter data by time period, line, or equipment
+- **Export Functions**: Export data to PDF, Excel, or CSV
+- **Share Capabilities**: Share dashboard views with team members
 
 ## Production Management
 
 ### Production Lines
-View and manage all production lines in your facility.
+View and manage all production lines in your facility with real-time monitoring and control capabilities.
 
-#### Line Status
-- **Running**: Line is actively producing
-- **Idle**: Line is stopped but ready to run
-- **Maintenance**: Line is under maintenance
-- **Setup**: Line is being set up for new product
-- **Error**: Line has an active error condition
+#### **Line Status Indicators**
+- **🟢 Running**: Line is actively producing with optimal performance
+- **🟡 Idle**: Line is stopped but ready to run (normal state)
+- **🔵 Setup**: Line is being configured for new product or job
+- **🟠 Maintenance**: Line is under scheduled or emergency maintenance
+- **🔴 Error**: Line has an active error condition requiring attention
+- **⚫ Offline**: Line is disconnected or not responding
+
+#### **Line Information Display**
+Each production line shows:
+- **Line Name and Code**: Unique identifier and description
+- **Current Job**: Active production job details
+- **OEE Score**: Real-time Overall Equipment Effectiveness
+- **Production Rate**: Parts per hour and cycle time
+- **Quality Metrics**: First-pass yield and defect rate
+- **Energy Consumption**: Current power usage
+- **Temperature**: Equipment temperature readings
+- **Vibration**: Equipment vibration levels
+- **Last Updated**: Timestamp of last data update
+
+#### **Line Control Actions**
+Based on your permissions, you can:
+- **Start Production**: Begin production on idle lines
+- **Stop Production**: Halt production safely
+- **Pause Production**: Temporary production pause
+- **Changeover**: Switch to different product configuration
+- **Emergency Stop**: Immediate production halt for safety
+- **Reset Line**: Clear errors and reset line status
+
+### Production Scheduling
+
+#### **Schedule Management**
+- **Daily Schedule**: View and manage daily production plans
+- **Weekly Schedule**: Plan production for the entire week
+- **Monthly Schedule**: Long-term production planning
+- **Shift Schedule**: Manage shift-specific production plans
+
+#### **Schedule Features**
+- **Drag-and-Drop**: Easily rearrange production jobs
+- **Auto-Scheduling**: Automatic job assignment based on priorities
+- **Resource Allocation**: Assign equipment and personnel
+- **Conflict Detection**: Automatic detection of scheduling conflicts
+- **Optimization**: AI-powered schedule optimization
+
+#### **Job Assignment**
+- **Automatic Assignment**: System assigns jobs based on rules
+- **Manual Assignment**: Manually assign jobs to operators
+- **Skill Matching**: Match jobs to operator skills and certifications
+- **Load Balancing**: Distribute workload evenly across operators
+- **Priority Management**: Handle high-priority jobs first
+
+### Real-time Production Monitoring
+
+#### **Live Production Data**
+- **Production Count**: Real-time parts produced
+- **Target vs Actual**: Compare actual production to targets
+- **Efficiency Tracking**: Monitor production efficiency
+- **Cycle Time Analysis**: Track individual cycle times
+- **Throughput Monitoring**: Monitor parts per hour
+
+#### **Performance Analytics**
+- **Trend Analysis**: Historical performance trends
+- **Comparative Analysis**: Compare performance across shifts/lines
+- **Root Cause Analysis**: Identify causes of performance issues
+- **Predictive Analytics**: Forecast future performance
+- **KPI Tracking**: Monitor key performance indicators
+
+#### **Production Alerts**
+- **Target Missed**: Alert when production targets are not met
+- **Efficiency Drop**: Alert when efficiency drops below threshold
+- **Cycle Time Increase**: Alert when cycle times increase
+- **Quality Issues**: Alert when quality metrics decline
+- **Equipment Issues**: Alert when equipment performance degrades
+
+### Production Reporting
+
+#### **Real-time Reports**
+- **Production Summary**: Current production status
+- **Efficiency Report**: Real-time efficiency metrics
+- **Quality Report**: Current quality metrics
+- **Downtime Report**: Current downtime analysis
+- **Energy Report**: Current energy consumption
+
+#### **Historical Reports**
+- **Daily Production Report**: Complete daily production summary
+- **Weekly Production Report**: Weekly production analysis
+- **Monthly Production Report**: Monthly production overview
+- **Shift Comparison Report**: Compare performance across shifts
+- **Trend Analysis Report**: Long-term production trends
+
+#### **Custom Reports**
+- **Report Builder**: Create custom reports with specific metrics
+- **Scheduled Reports**: Automatically generate reports at set intervals
+- **Email Reports**: Send reports via email to stakeholders
+- **Export Options**: Export reports in various formats (PDF, Excel, CSV)
+- **Dashboard Integration**: Embed reports in custom dashboards
 
 #### Line Details
 Tap on any production line to view detailed information:
@@ -370,12 +579,185 @@ Common error messages and solutions:
 3. Submit a support ticket
 4. Call the help desk
 
+## Advanced Features
+
+### Offline Mode and Synchronization
+
+#### **Offline Capabilities**
+The MS5.0 Floor Dashboard includes comprehensive offline functionality:
+- **Data Caching**: Critical data is cached locally for offline access
+- **Offline Operations**: Continue working even without internet connection
+- **Automatic Sync**: Data synchronizes when connection is restored
+- **Conflict Resolution**: Automatic resolution of data conflicts
+- **Offline Indicators**: Clear visual indicators when working offline
+
+#### **Offline Features**
+- **View Production Data**: Access cached production information
+- **Complete Quality Checks**: Perform quality inspections offline
+- **Report Andon Events**: Create Andon events for later synchronization
+- **Update Job Status**: Modify job status and progress
+- **Access Documentation**: View cached documentation and procedures
+
+#### **Synchronization Process**
+1. **Automatic Detection**: System detects when connection is restored
+2. **Background Sync**: Data synchronizes automatically in the background
+3. **Conflict Resolution**: System resolves any data conflicts
+4. **Status Notification**: User is notified when sync is complete
+5. **Data Validation**: All synchronized data is validated for accuracy
+
+### Mobile Optimization
+
+#### **Tablet-Specific Features**
+- **Touch-Optimized Interface**: Large buttons and touch-friendly controls
+- **Gesture Support**: Swipe, pinch, and tap gestures for navigation
+- **Orientation Support**: Automatic rotation between portrait and landscape
+- **Battery Optimization**: Efficient power usage for extended operation
+- **Screen Brightness**: Automatic adjustment based on ambient light
+
+#### **Responsive Design**
+- **Adaptive Layout**: Interface adapts to different screen sizes
+- **Scalable Text**: Text size adjusts based on user preferences
+- **High Contrast Mode**: Enhanced visibility in bright environments
+- **Large Touch Targets**: Easy-to-tap buttons and controls
+- **Voice Commands**: Voice input for hands-free operation
+
+### Integration Features
+
+#### **PLC Integration**
+- **Real-time Data**: Direct connection to PLC systems
+- **Equipment Control**: Remote control of equipment parameters
+- **Fault Detection**: Automatic detection of equipment faults
+- **Predictive Maintenance**: AI-powered maintenance predictions
+- **Data Logging**: Comprehensive equipment data logging
+
+#### **ERP Integration**
+- **Order Management**: Integration with ERP order systems
+- **Inventory Tracking**: Real-time inventory updates
+- **Resource Planning**: Integration with resource planning systems
+- **Financial Reporting**: Cost tracking and financial reporting
+- **Supply Chain**: Integration with supply chain management
+
+#### **Third-Party Integrations**
+- **MES Systems**: Integration with Manufacturing Execution Systems
+- **Quality Systems**: Integration with quality management systems
+- **Maintenance Systems**: Integration with CMMS systems
+- **Analytics Platforms**: Integration with business intelligence tools
+- **Cloud Services**: Integration with cloud-based services
+
+### Security Features
+
+#### **Authentication and Authorization**
+- **Multi-Factor Authentication**: Enhanced security with 2FA
+- **Role-Based Access**: Granular permissions based on user roles
+- **Session Management**: Secure session handling and timeout
+- **Audit Logging**: Comprehensive audit trail of all actions
+- **Data Encryption**: End-to-end encryption of sensitive data
+
+#### **Data Protection**
+- **Data Backup**: Automatic backup of critical data
+- **Data Recovery**: Quick recovery from data loss
+- **Privacy Controls**: User privacy and data protection
+- **Compliance**: GDPR and industry compliance features
+- **Secure Communication**: Encrypted communication protocols
+
+### Performance Optimization
+
+#### **System Performance**
+- **Caching Strategy**: Intelligent caching for improved performance
+- **Load Balancing**: Automatic load balancing across servers
+- **Resource Optimization**: Efficient use of system resources
+- **Performance Monitoring**: Real-time performance monitoring
+- **Automatic Scaling**: Automatic scaling based on demand
+
+#### **User Experience Optimization**
+- **Fast Loading**: Optimized loading times for all features
+- **Smooth Animations**: Fluid animations and transitions
+- **Responsive Interface**: Quick response to user interactions
+- **Error Handling**: Graceful error handling and recovery
+- **User Feedback**: Clear feedback for all user actions
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### **Login Issues**
+- **Forgotten Password**: Use the "Forgot Password" link to reset
+- **Account Locked**: Contact administrator to unlock account
+- **Two-Factor Authentication**: Ensure authenticator app is working
+- **Network Issues**: Check internet connection and VPN settings
+
+#### **Performance Issues**
+- **Slow Loading**: Clear browser cache and restart application
+- **Connection Problems**: Check network connectivity and firewall settings
+- **Data Not Updating**: Refresh the page or restart the application
+- **Memory Issues**: Close unused browser tabs and restart device
+
+#### **Feature-Specific Issues**
+- **Dashboard Not Loading**: Check permissions and refresh the page
+- **Reports Not Generating**: Verify data availability and permissions
+- **Andon Events Not Creating**: Check required fields and permissions
+- **Quality Checks Not Saving**: Verify network connection and data validation
+
+### Error Messages and Solutions
+
+#### **Authentication Errors**
+- **"Invalid Credentials"**: Check username and password
+- **"Session Expired"**: Log in again to refresh session
+- **"Access Denied"**: Contact administrator for permission changes
+- **"Account Disabled"**: Contact administrator to enable account
+
+#### **Data Errors**
+- **"Data Not Found"**: Check if data exists and refresh
+- **"Validation Error"**: Verify all required fields are completed
+- **"Sync Error"**: Check network connection and retry
+- **"Permission Error"**: Contact administrator for access rights
+
+#### **System Errors**
+- **"Server Error"**: Contact technical support
+- **"Database Error"**: Contact technical support immediately
+- **"Network Error"**: Check internet connection and retry
+- **"Timeout Error"**: Check network speed and retry
+
+### Getting Help
+
+#### **Self-Service Options**
+- **Help Documentation**: Comprehensive online help system
+- **Video Tutorials**: Step-by-step video guides
+- **FAQ Section**: Frequently asked questions and answers
+- **Search Function**: Search for specific topics and solutions
+
+#### **Support Channels**
+- **In-App Help**: Contextual help within the application
+- **Email Support**: Send detailed questions to support team
+- **Phone Support**: Call support for urgent issues
+- **Live Chat**: Real-time chat with support representatives
+
+#### **Escalation Process**
+1. **Level 1**: Basic troubleshooting and common issues
+2. **Level 2**: Advanced technical support
+3. **Level 3**: Engineering team for complex issues
+4. **Management**: Escalation to management for critical issues
+
 ## Support
 
 ### Contact Information
-- **Help Desk**: extension 1234
-- **Email**: support@company.com
-- **Hours**: 24/7 support available
+- **Email**: support@ms5.company.com
+- **Phone**: +1-800-MS5-HELP
+- **Live Chat**: Available within the application
+- **Support Portal**: https://support.ms5.company.com
+
+### Business Hours
+- **Monday-Friday**: 7:00 AM - 7:00 PM EST
+- **Saturday**: 8:00 AM - 4:00 PM EST
+- **Sunday**: Emergency support only
+- **Holidays**: Emergency support only
+
+### Emergency Support
+For critical production issues:
+- **Emergency Hotline**: +1-800-MS5-EMRG
+- **24/7 Support**: Available for critical issues
+- **On-Site Support**: Available for major issues
+- **Remote Support**: Immediate remote assistance
 
 ### Training Resources
 - **Video Tutorials**: Available in the app
@@ -388,6 +770,10 @@ Common error messages and solutions:
 - **Internet**: Stable internet connection required
 - **Browser**: Latest version recommended
 - **Permissions**: Camera, storage, and network access
+
+---
+
+*This user guide is updated regularly. For the latest version, please check the help section within the application.*
 
 ### Updates and Maintenance
 - **Automatic Updates**: System updates automatically

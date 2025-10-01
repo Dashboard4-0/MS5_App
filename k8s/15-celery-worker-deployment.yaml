@@ -1,0 +1,232 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms5-celery-worker
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery-worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: celery-worker
+    spec:
+      serviceAccountName: ms5-backend-sa
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+      - name: celery-worker
+        image: ms5acrprod.azurecr.io/ms5-backend:latest
+        command:
+        - celery
+        - -A
+        - app.celery
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        - --queues=production,maintenance,reports,notifications,data_processing,oee,andon,quality
+        env:
+        # Application Settings
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ENVIRONMENT
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DEBUG
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: LOG_LEVEL
+        # Security Settings
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: SECRET_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: JWT_SECRET
+        # Database Settings
+        - name: DATABASE_URL
+          value: "postgresql+asyncpg://ms5_user:$(DATABASE_PASSWORD)@postgres-primary.ms5-production.svc.cluster.local:5432/factory_telemetry"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-database-secrets
+              key: POSTGRES_PASSWORD
+        # Redis Settings
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-primary.ms5-production.svc.cluster.local:6379/0"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-redis-secrets
+              key: REDIS_PASSWORD
+        # Production Settings
+        - name: PRODUCTION_LINE_POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: PRODUCTION_LINE_POLL_INTERVAL
+        - name: OEE_CALCULATION_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: OEE_CALCULATION_INTERVAL
+        - name: DOWNTIME_DETECTION_THRESHOLD
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DOWNTIME_DETECTION_THRESHOLD
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: reports
+          mountPath: /app/reports
+        - name: uploads
+          mountPath: /app/uploads
+        - name: temp
+          mountPath: /app/temp
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.celery
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.celery
+            - inspect
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: reports
+        emptyDir: {}
+      - name: uploads
+        emptyDir: {}
+      - name: temp
+        emptyDir: {}
+      initContainers:
+      - name: wait-for-database
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z postgres-primary.ms5-production.svc.cluster.local 5432; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+          echo "Database is ready!"
+      - name: wait-for-redis
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z redis-primary.ms5-production.svc.cluster.local 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready!"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ms5-celery-worker-hpa
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: celery-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ms5-celery-worker
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: celery_queue_length
+      target:
+        type: AverageValue
+        averageValue: "10"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      selectPolicy: Max

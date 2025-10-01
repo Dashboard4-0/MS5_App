@@ -1,0 +1,307 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-certification
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Certification Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Certification configuration
+  cdn-certification.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-certification
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Certification Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      certification-config.json: |
+        {
+          "certification": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "certifications": [
+              {
+                "name": "Azure CDN Fundamentals",
+                "description": "Basic understanding of Azure CDN concepts and features",
+                "duration": "2 hours",
+                "level": "Beginner",
+                "topics": [
+                  "CDN concepts",
+                  "Azure CDN features",
+                  "CDN pricing models",
+                  "CDN performance optimization"
+                ],
+                "exam": {
+                  "questions": 20,
+                  "timeLimit": "60 minutes",
+                  "passingScore": 70
+                }
+              },
+              {
+                "name": "Azure CDN Configuration",
+                "description": "Advanced configuration of Azure CDN for optimal performance",
+                "duration": "3 hours",
+                "level": "Intermediate",
+                "topics": [
+                  "CDN profile creation",
+                  "Endpoint configuration",
+                  "Custom domain setup",
+                  "SSL certificate management"
+                ],
+                "exam": {
+                  "questions": 30,
+                  "timeLimit": "90 minutes",
+                  "passingScore": 75
+                }
+              },
+              {
+                "name": "Azure CDN Monitoring",
+                "description": "Expert-level monitoring and troubleshooting of Azure CDN",
+                "duration": "2 hours",
+                "level": "Advanced",
+                "topics": [
+                  "CDN metrics and logs",
+                  "Performance monitoring",
+                  "Troubleshooting common issues",
+                  "Cost optimization"
+                ],
+                "exam": {
+                  "questions": 40,
+                  "timeLimit": "120 minutes",
+                  "passingScore": 80
+                }
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Certification monitoring
+  cdn-certification-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-certification-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Certification Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      certification-monitoring.json: |
+        {
+          "monitoring": {
+            "certification": "ms5-cdn-certification",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "CertificationCompletions",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of certification completions"
+              },
+              {
+                "name": "CertificationPassRate",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average certification pass rate"
+              },
+              {
+                "name": "CertificationSatisfaction",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average certification satisfaction rating"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowCertificationCompletions",
+                "condition": "certification_completions < 3/hour",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Certification completions are below 3 per hour"
+              },
+              {
+                "name": "LowCertificationPassRate",
+                "condition": "certification_pass_rate < 60%",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Certification pass rate is below 60%"
+              },
+              {
+                "name": "LowCertificationSatisfaction",
+                "condition": "certification_satisfaction < 3.0",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Certification satisfaction is below 3.0"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Certification script
+  cdn-certification.py: |
+    #!/usr/bin/env python3
+    """
+    CDN certification script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_certification():
+        """Get CDN certification from Azure"""
+        try:
+            # Azure CDN certification endpoint
+            certification_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/certification"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(certification_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                certification = response.json()
+                
+                return {
+                    "request_count": certification.get("RequestCount", 0),
+                    "bytes_sent": certification.get("BytesSent", 0),
+                    "cache_hit_ratio": certification.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN certification: {e}")
+            return None
+    
+    def send_certification_to_prometheus(certification):
+        """Send CDN certification to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_certification",
+                "value": certification["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN certification sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN certification to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN certification to Prometheus: {e}")
+    
+    def main():
+        """Main certification loop"""
+        while True:
+            certification = get_cdn_certification()
+            if certification:
+                print(json.dumps(certification, indent=2))
+                send_certification_to_prometheus(certification)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Certification deployment
+  cdn-certification-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-certification
+      namespace: ms5-frontend
+      labels:
+        app: cdn-certification
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-certification
+      template:
+        metadata:
+          labels:
+            app: cdn-certification
+        spec:
+          containers:
+          - name: cdn-certification
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-certification.py"]
+            volumeMounts:
+            - name: certification-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: certification-script
+            configMap:
+              name: cdn-certification-config
+              defaultMode: 0755

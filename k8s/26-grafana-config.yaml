@@ -1,0 +1,290 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-grafana-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: grafana
+data:
+  datasources.yml: |
+    apiVersion: 1
+    
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.ms5-production.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: "5s"
+          queryTimeout: "60s"
+          httpMethod: "POST"
+      
+      - name: PostgreSQL
+        type: postgres
+        access: proxy
+        url: postgres-primary.ms5-production.svc.cluster.local:5432
+        database: factory_telemetry
+        user: ms5_monitoring_user
+        secureJsonData:
+          password: ms5_monitoring_password
+        jsonData:
+          sslmode: "disable"
+          maxOpenConns: 10
+          maxIdleConns: 5
+          connMaxLifetime: 14400
+      
+      - name: Redis
+        type: redis
+        access: proxy
+        url: redis-primary.ms5-production.svc.cluster.local:6379
+        jsonData:
+          client: "node"
+          poolSize: 5
+          timeout: 5
+          pingInterval: 0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-grafana-dashboards
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: grafana
+data:
+  dashboard-provider.yml: |
+    apiVersion: 1
+    
+    providers:
+      - name: 'MS5.0 Dashboard'
+        orgId: 1
+        folder: 'MS5.0 Floor Dashboard'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  
+  ms5-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Floor Dashboard - Overview",
+        "tags": ["ms5", "overview"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "System Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"ms5-backend\"}",
+                "legendFormat": "Backend API"
+              },
+              {
+                "expr": "up{job=\"postgres\"}",
+                "legendFormat": "PostgreSQL"
+              },
+              {
+                "expr": "up{job=\"redis\"}",
+                "legendFormat": "Redis"
+              },
+              {
+                "expr": "up{job=\"minio\"}",
+                "legendFormat": "MinIO"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "API Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"ms5-backend\"}[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Database Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "pg_stat_database_numbackends",
+                "legendFormat": "Active Connections"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Redis Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
+                "legendFormat": "Memory Usage %"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          },
+          {
+            "id": 5,
+            "title": "Celery Queue Length",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "celery_queue_length",
+                "legendFormat": "Queue Length"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 16
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  ms5-production.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "MS5.0 Production Metrics",
+        "tags": ["ms5", "production"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Production Lines Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "ms5_production_line_status",
+                "legendFormat": "Line {{equipment_id}}"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "OEE Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "ms5_oee_availability",
+                "legendFormat": "Availability"
+              },
+              {
+                "expr": "ms5_oee_performance",
+                "legendFormat": "Performance"
+              },
+              {
+                "expr": "ms5_oee_quality",
+                "legendFormat": "Quality"
+              },
+              {
+                "expr": "ms5_oee_overall",
+                "legendFormat": "Overall OEE"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 3,
+            "title": "Production Throughput",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(ms5_production_units_total[5m])",
+                "legendFormat": "Units per minute"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 16
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

@@ -1,0 +1,289 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-best-practices
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Best Practices Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Best Practices configuration
+  cdn-best-practices.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-best-practices
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Best Practices Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      best-practices-config.json: |
+        {
+          "bestPractices": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "practices": [
+              {
+                "name": "CacheOptimization",
+                "description": "Optimize cache settings for better performance and cost efficiency",
+                "recommendations": [
+                  "Set appropriate cache TTL for different content types",
+                  "Use cache rules to control caching behavior",
+                  "Implement cache warming for critical content",
+                  "Monitor cache hit ratios regularly"
+                ]
+              },
+              {
+                "name": "CompressionOptimization",
+                "description": "Enable compression to reduce bandwidth usage",
+                "recommendations": [
+                  "Enable gzip compression for text-based content",
+                  "Enable Brotli compression for better compression ratios",
+                  "Configure compression for appropriate content types",
+                  "Monitor compression effectiveness"
+                ]
+              },
+              {
+                "name": "ImageOptimization",
+                "description": "Optimize images to reduce bandwidth usage",
+                "recommendations": [
+                  "Enable WebP conversion for better compression",
+                  "Enable AVIF conversion for modern browsers",
+                  "Optimize image quality settings",
+                  "Use responsive images"
+                ]
+              },
+              {
+                "name": "SecurityOptimization",
+                "description": "Implement security best practices",
+                "recommendations": [
+                  "Enable HTTPS for all traffic",
+                  "Implement WAF rules",
+                  "Use security headers",
+                  "Monitor for suspicious activity"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Best Practices monitoring
+  cdn-best-practices-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-best-practices-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Best Practices Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      best-practices-monitoring.json: |
+        {
+          "monitoring": {
+            "bestPractices": "ms5-cdn-best-practices",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "BestPracticesCompliance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Percentage of best practices compliance"
+              },
+              {
+                "name": "PerformanceImprovement",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Performance improvement achieved through best practices"
+              },
+              {
+                "name": "CostSavings",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Cost savings achieved through best practices"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowBestPracticesCompliance",
+                "condition": "best_practices_compliance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Best practices compliance is below 80%"
+              },
+              {
+                "name": "LowPerformanceImprovement",
+                "condition": "performance_improvement < 10%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Performance improvement is below 10%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Best Practices script
+  cdn-best-practices.py: |
+    #!/usr/bin/env python3
+    """
+    CDN best practices script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_best_practices():
+        """Get CDN best practices from Azure"""
+        try:
+            # Azure CDN best practices endpoint
+            best_practices_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/best-practices"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(best_practices_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                best_practices = response.json()
+                
+                return {
+                    "request_count": best_practices.get("RequestCount", 0),
+                    "bytes_sent": best_practices.get("BytesSent", 0),
+                    "cache_hit_ratio": best_practices.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN best practices: {e}")
+            return None
+    
+    def send_best_practices_to_prometheus(best_practices):
+        """Send CDN best practices to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_best_practices",
+                "value": best_practices["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN best practices sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN best practices to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN best practices to Prometheus: {e}")
+    
+    def main():
+        """Main best practices loop"""
+        while True:
+            best_practices = get_cdn_best_practices()
+            if best_practices:
+                print(json.dumps(best_practices, indent=2))
+                send_best_practices_to_prometheus(best_practices)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Best Practices deployment
+  cdn-best-practices-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-best-practices
+      namespace: ms5-frontend
+      labels:
+        app: cdn-best-practices
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-best-practices
+      template:
+        metadata:
+          labels:
+            app: cdn-best-practices
+        spec:
+          containers:
+          - name: cdn-best-practices
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-best-practices.py"]
+            volumeMounts:
+            - name: best-practices-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: best-practices-script
+            configMap:
+              name: cdn-best-practices-config
+              defaultMode: 0755

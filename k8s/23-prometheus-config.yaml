@@ -1,0 +1,388 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-prometheus-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'ms5-production'
+        environment: 'production'
+    
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+    
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager.ms5-production.svc.cluster.local:9093
+    
+    scrape_configs:
+      # Prometheus self-monitoring
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # Kubernetes nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics
+      
+      # Kubernetes pods
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # MS5.0 Backend API
+      - job_name: 'ms5-backend'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ms5-production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: ms5-backend-monitoring
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+        metrics_path: /metrics
+        scrape_interval: 30s
+      
+      # PostgreSQL Database
+      - job_name: 'postgres'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ms5-production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: postgres-monitoring
+        metrics_path: /metrics
+        scrape_interval: 30s
+      
+      # Redis Cache
+      - job_name: 'redis'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ms5-production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: redis-monitoring
+        metrics_path: /metrics
+        scrape_interval: 30s
+      
+      # MinIO Object Storage
+      - job_name: 'minio'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ms5-production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: minio-monitoring
+        metrics_path: /minio/v2/metrics/cluster
+        scrape_interval: 30s
+      
+      # Celery Workers
+      - job_name: 'celery-workers'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - ms5-production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: ms5-celery-worker
+        metrics_path: /metrics
+        scrape_interval: 30s
+      
+      # Kubernetes cAdvisor
+      - job_name: 'kubernetes-cadvisor'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+      
+      # Kubernetes service endpoints
+      - job_name: 'kubernetes-service-endpoints'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+            action: replace
+            target_label: __scheme__
+            regex: (https?)
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            action: replace
+            target_label: kubernetes_name
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-prometheus-rules
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+data:
+  ms5-backend-rules.yml: |
+    groups:
+    - name: ms5-backend
+      rules:
+      - alert: MS5BackendDown
+        expr: up{job="ms5-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MS5.0 Backend is down"
+          description: "MS5.0 Backend has been down for more than 1 minute."
+      
+      - alert: MS5BackendHighErrorRate
+        expr: rate(http_requests_total{job="ms5-backend",status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MS5.0 Backend high error rate"
+          description: "MS5.0 Backend error rate is {{ $value }} errors per second."
+      
+      - alert: MS5BackendHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ms5-backend"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MS5.0 Backend high response time"
+          description: "MS5.0 Backend 95th percentile response time is {{ $value }} seconds."
+      
+      - alert: MS5BackendHighMemoryUsage
+        expr: (container_memory_usage_bytes{job="ms5-backend"} / container_spec_memory_limit_bytes{job="ms5-backend"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MS5.0 Backend high memory usage"
+          description: "MS5.0 Backend memory usage is {{ $value }}% of limit."
+      
+      - alert: MS5BackendHighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total{job="ms5-backend"}[5m]) / container_spec_cpu_quota{job="ms5-backend"} * container_spec_cpu_period{job="ms5-backend"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MS5.0 Backend high CPU usage"
+          description: "MS5.0 Backend CPU usage is {{ $value }}% of limit."
+  
+  ms5-database-rules.yml: |
+    groups:
+    - name: ms5-database
+      rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+      
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value }}% of maximum."
+      
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_returned{job="postgres"}[5m]) / rate(pg_stat_database_tup_fetched{job="postgres"}[5m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "PostgreSQL query efficiency is {{ $value }}."
+      
+      - alert: PostgreSQLHighDiskUsage
+        expr: (pg_database_size_bytes / pg_database_size_limit_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL high disk usage"
+          description: "PostgreSQL disk usage is {{ $value }}% of limit."
+  
+  ms5-redis-rules.yml: |
+    groups:
+    - name: ms5-redis
+      rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 1 minute."
+      
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value }}% of maximum."
+      
+      - alert: RedisHighKeyEviction
+        expr: rate(redis_evicted_keys_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high key eviction rate"
+          description: "Redis key eviction rate is {{ $value }} keys per second."
+      
+      - alert: RedisSlowCommands
+        expr: rate(redis_slowlog_entries_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis slow commands detected"
+          description: "Redis slow command rate is {{ $value }} commands per second."
+  
+  ms5-celery-rules.yml: |
+    groups:
+    - name: ms5-celery
+      rules:
+      - alert: CeleryWorkerDown
+        expr: up{job="celery-workers"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Celery worker is down"
+          description: "Celery worker has been down for more than 1 minute."
+      
+      - alert: CeleryHighQueueLength
+        expr: celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery high queue length"
+          description: "Celery queue length is {{ $value }} tasks."
+      
+      - alert: CeleryHighTaskFailureRate
+        expr: rate(celery_tasks_failed_total[5m]) / rate(celery_tasks_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery high task failure rate"
+          description: "Celery task failure rate is {{ $value }}%."
+      
+      - alert: CelerySlowTasks
+        expr: histogram_quantile(0.95, rate(celery_task_duration_seconds_bucket[5m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery slow tasks detected"
+          description: "Celery 95th percentile task duration is {{ $value }} seconds."

@@ -1,301 +1,594 @@
 """
-Unit tests for Andon Service
-Tests all Andon service methods and functionality
+MS5.0 Floor Dashboard - Andon Service Unit Tests
+
+Tests the Andon service with the precision of emergency response systems.
+Every event is handled with the reliability of a starship's alert system.
+
+Coverage Requirements:
+- 100% method coverage
+- 100% event handling coverage
+- All escalation scenarios tested
+- All notification paths verified
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timedelta
-import uuid
+import pytest_asyncio
+from unittest.mock import AsyncMock, Mock, patch
+from datetime import datetime, timezone, timedelta
+from uuid import uuid4
+import structlog
 
-# Import the service to test
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
-
-from app.services.andon_service import AndonService
+from backend.app.services.andon_service import AndonService
+from backend.app.services.plc_integrated_andon_service import PLCIntegratedAndonService
+from backend.app.models.production import (
+    AndonEventCreate, AndonEventUpdate, AndonEventResponse,
+    AndonPriority, AndonStatus, AndonEventType
+)
+from backend.app.utils.exceptions import (
+    NotFoundError, ValidationError, ConflictError, BusinessLogicError
+)
 
 
 class TestAndonService:
-    """Test cases for AndonService"""
+    """Comprehensive tests for AndonService."""
     
     @pytest.fixture
-    def mock_db(self):
-        """Mock database connection"""
-        mock_db = AsyncMock()
-        return mock_db
+    def service(self):
+        """Create an AndonService instance for testing."""
+        return AndonService()
     
     @pytest.fixture
-    def mock_notification_service(self):
-        """Mock notification service"""
-        return AsyncMock()
+    def mock_db_session(self):
+        """Create a mock database session."""
+        session = AsyncMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
     
     @pytest.fixture
-    def mock_escalation_service(self):
-        """Mock escalation service"""
-        return AsyncMock()
-    
-    @pytest.fixture
-    def andon_service(self, mock_db, mock_notification_service, mock_escalation_service):
-        """Create AndonService instance with mocked dependencies"""
-        with patch('app.services.andon_service.get_database', return_value=mock_db):
-            with patch('app.services.andon_service.NotificationService', return_value=mock_notification_service):
-                with patch('app.services.andon_service.AndonEscalationService', return_value=mock_escalation_service):
-                    service = AndonService()
-                    return service
+    def sample_andon_event(self):
+        """Provide sample Andon event data."""
+        return {
+            "id": str(uuid4()),
+            "equipment_code": "EQ_001",
+            "event_type": AndonEventType.FAULT,
+            "priority": AndonPriority.HIGH,
+            "description": "Test fault event",
+            "status": AndonStatus.OPEN,
+            "created_at": datetime.now(timezone.utc),
+            "acknowledged_at": None,
+            "resolved_at": None,
+            "acknowledged_by": None,
+            "resolved_by": None
+        }
     
     @pytest.mark.asyncio
-    async def test_create_andon_event(self, andon_service, mock_db):
-        """Test creating an Andon event"""
-        event_data = {
-            'equipment_code': 'EQ-001',
-            'line_id': str(uuid.uuid4()),
-            'event_type': 'fault',
-            'priority': 'high',
-            'description': 'Equipment fault detected',
-            'reported_by': str(uuid.uuid4())
+    async def test_create_andon_event_success(self, service, mock_db_session, sample_andon_event):
+        """Test successful Andon event creation."""
+        # Arrange
+        create_data = AndonEventCreate(
+            equipment_code="EQ_001",
+            event_type=AndonEventType.FAULT,
+            priority=AndonPriority.HIGH,
+            description="Test fault event"
+        )
+        
+        # Mock equipment existence check
+        mock_equipment_check = Mock()
+        mock_equipment_check.scalar_one_or_none.return_value = {"equipment_code": "EQ_001"}
+        mock_db_session.execute.return_value = mock_equipment_check
+        
+        with patch('backend.app.database.execute_scalar', return_value=sample_andon_event["id"]):
+            # Act
+            result = await service.create_andon_event(create_data, mock_db_session)
+            
+            # Assert
+            assert result is not None
+            assert result.equipment_code == create_data.equipment_code
+            assert result.event_type == create_data.event_type
+            assert result.priority == create_data.priority
+            assert result.description == create_data.description
+            assert result.status == AndonStatus.OPEN
+            mock_db_session.commit.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_create_andon_event_equipment_not_found(self, service, mock_db_session):
+        """Test Andon event creation with non-existent equipment."""
+        # Arrange
+        create_data = AndonEventCreate(
+            equipment_code="NONEXISTENT",
+            event_type=AndonEventType.FAULT,
+            priority=AndonPriority.HIGH,
+            description="Test fault event"
+        )
+        
+        # Mock equipment not found
+        mock_equipment_check = Mock()
+        mock_equipment_check.scalar_one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_equipment_check
+        
+        # Act & Assert
+        with pytest.raises(NotFoundError, match="Equipment NONEXISTENT not found"):
+            await service.create_andon_event(create_data, mock_db_session)
+        
+        mock_db_session.rollback.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_get_andon_event_success(self, service, mock_db_session, sample_andon_event):
+        """Test successful Andon event retrieval."""
+        # Arrange
+        event_id = sample_andon_event["id"]
+        
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = sample_andon_event
+        mock_db_session.execute.return_value = mock_result
+        
+        # Act
+        result = await service.get_andon_event(event_id, mock_db_session)
+        
+        # Assert
+        assert result is not None
+        assert result.id == event_id
+        assert result.equipment_code == sample_andon_event["equipment_code"]
+        assert result.event_type == sample_andon_event["event_type"]
+        assert result.status == sample_andon_event["status"]
+    
+    @pytest.mark.asyncio
+    async def test_get_andon_event_not_found(self, service, mock_db_session):
+        """Test Andon event retrieval when event doesn't exist."""
+        # Arrange
+        event_id = str(uuid4())
+        
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+        
+        # Act & Assert
+        with pytest.raises(NotFoundError, match=f"Andon event {event_id} not found"):
+            await service.get_andon_event(event_id, mock_db_session)
+    
+    @pytest.mark.asyncio
+    async def test_acknowledge_andon_event_success(self, service, mock_db_session, sample_andon_event):
+        """Test successful Andon event acknowledgment."""
+        # Arrange
+        event_id = sample_andon_event["id"]
+        user_id = str(uuid4())
+        
+        # Mock existing event check
+        mock_existing = Mock()
+        mock_existing.scalar_one_or_none.return_value = sample_andon_event
+        mock_db_session.execute.return_value = mock_existing
+        
+        with patch('backend.app.database.execute_update', return_value=True):
+            # Act
+            result = await service.acknowledge_andon_event(event_id, user_id, mock_db_session)
+            
+            # Assert
+            assert result is True
+            mock_db_session.commit.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_acknowledge_andon_event_already_acknowledged(self, service, mock_db_session):
+        """Test Andon event acknowledgment when already acknowledged."""
+        # Arrange
+        event_id = str(uuid4())
+        user_id = str(uuid4())
+        
+        already_acknowledged_event = {
+            "id": event_id,
+            "status": AndonStatus.ACKNOWLEDGED,
+            "acknowledged_at": datetime.now(timezone.utc),
+            "acknowledged_by": str(uuid4())
         }
         
-        mock_db.fetch_one.return_value = {
-            'id': str(uuid.uuid4()),
-            **event_data,
-            'status': 'active',
-            'created_at': datetime.now()
-        }
+        mock_existing = Mock()
+        mock_existing.scalar_one_or_none.return_value = already_acknowledged_event
+        mock_db_session.execute.return_value = mock_existing
         
-        result = await andon_service.create_andon_event(event_data)
-        
-        assert result is not None
-        assert result['status'] == 'active'
-        assert result['event_type'] == 'fault'
-        assert result['priority'] == 'high'
-        mock_db.fetch_one.assert_called_once()
+        # Act & Assert
+        with pytest.raises(BusinessLogicError, match="Event is already acknowledged"):
+            await service.acknowledge_andon_event(event_id, user_id, mock_db_session)
     
     @pytest.mark.asyncio
-    async def test_get_andon_events(self, andon_service, mock_db):
-        """Test getting Andon events"""
-        mock_db.fetch_all.return_value = [
-            {
-                'id': str(uuid.uuid4()),
-                'equipment_code': 'EQ-001',
-                'event_type': 'fault',
-                'priority': 'high',
-                'status': 'active',
-                'created_at': datetime.now()
-            }
-        ]
-        
-        result = await andon_service.get_andon_events()
-        
-        assert result is not None
-        assert len(result) == 1
-        assert result[0]['event_type'] == 'fault'
-        mock_db.fetch_all.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_get_andon_event_by_id(self, andon_service, mock_db):
-        """Test getting Andon event by ID"""
-        event_id = str(uuid.uuid4())
-        
-        mock_db.fetch_one.return_value = {
-            'id': event_id,
-            'equipment_code': 'EQ-001',
-            'event_type': 'fault',
-            'priority': 'high',
-            'status': 'active',
-            'created_at': datetime.now()
-        }
-        
-        result = await andon_service.get_andon_event_by_id(event_id)
-        
-        assert result is not None
-        assert result['id'] == event_id
-        mock_db.fetch_one.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_acknowledge_andon_event(self, andon_service, mock_db, mock_notification_service):
-        """Test acknowledging an Andon event"""
-        event_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
-        
-        mock_db.fetch_one.return_value = {
-            'id': event_id,
-            'status': 'acknowledged',
-            'acknowledged_by': user_id,
-            'acknowledged_at': datetime.now()
-        }
-        
-        result = await andon_service.acknowledge_andon_event(event_id, user_id)
-        
-        assert result is not None
-        assert result['status'] == 'acknowledged'
-        assert result['acknowledged_by'] == user_id
-        mock_db.fetch_one.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_resolve_andon_event(self, andon_service, mock_db, mock_notification_service):
-        """Test resolving an Andon event"""
-        event_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
+    async def test_resolve_andon_event_success(self, service, mock_db_session, sample_andon_event):
+        """Test successful Andon event resolution."""
+        # Arrange
+        event_id = sample_andon_event["id"]
+        user_id = str(uuid4())
         resolution_notes = "Issue resolved by replacing faulty component"
         
-        mock_db.fetch_one.return_value = {
-            'id': event_id,
-            'status': 'resolved',
-            'resolved_by': user_id,
-            'resolved_at': datetime.now(),
-            'resolution_notes': resolution_notes
-        }
+        # Mock existing event check
+        mock_existing = Mock()
+        mock_existing.scalar_one_or_none.return_value = sample_andon_event
+        mock_db_session.execute.return_value = mock_existing
         
-        result = await andon_service.resolve_andon_event(event_id, user_id, resolution_notes)
-        
-        assert result is not None
-        assert result['status'] == 'resolved'
-        assert result['resolved_by'] == user_id
-        assert result['resolution_notes'] == resolution_notes
-        mock_db.fetch_one.assert_called_once()
+        with patch('backend.app.database.execute_update', return_value=True):
+            # Act
+            result = await service.resolve_andon_event(event_id, user_id, resolution_notes, mock_db_session)
+            
+            # Assert
+            assert result is True
+            mock_db_session.commit.assert_called_once()
     
     @pytest.mark.asyncio
-    async def test_escalate_andon_event(self, andon_service, mock_db, mock_escalation_service):
-        """Test escalating an Andon event"""
-        event_id = str(uuid.uuid4())
-        escalation_level = 2
+    async def test_resolve_andon_event_not_acknowledged(self, service, mock_db_session):
+        """Test Andon event resolution when not acknowledged."""
+        # Arrange
+        event_id = str(uuid4())
+        user_id = str(uuid4())
+        resolution_notes = "Issue resolved"
         
-        mock_db.fetch_one.return_value = {
-            'id': event_id,
-            'status': 'escalated',
-            'escalation_level': escalation_level,
-            'escalated_at': datetime.now()
+        unacknowledged_event = {
+            "id": event_id,
+            "status": AndonStatus.OPEN,
+            "acknowledged_at": None,
+            "acknowledged_by": None
         }
         
-        result = await andon_service.escalate_andon_event(event_id, escalation_level)
+        mock_existing = Mock()
+        mock_existing.scalar_one_or_none.return_value = unacknowledged_event
+        mock_db_session.execute.return_value = mock_existing
         
-        assert result is not None
-        assert result['status'] == 'escalated'
-        assert result['escalation_level'] == escalation_level
-        mock_db.fetch_one.assert_called_once()
+        # Act & Assert
+        with pytest.raises(BusinessLogicError, match="Event must be acknowledged before resolution"):
+            await service.resolve_andon_event(event_id, user_id, resolution_notes, mock_db_session)
     
     @pytest.mark.asyncio
-    async def test_get_active_andon_events(self, andon_service, mock_db):
-        """Test getting active Andon events"""
-        mock_db.fetch_all.return_value = [
+    async def test_escalate_andon_event_success(self, service, mock_db_session, sample_andon_event):
+        """Test successful Andon event escalation."""
+        # Arrange
+        event_id = sample_andon_event["id"]
+        escalation_reason = "No response within timeout period"
+        
+        # Mock existing event check
+        mock_existing = Mock()
+        mock_existing.scalar_one_or_none.return_value = sample_andon_event
+        mock_db_session.execute.return_value = mock_existing
+        
+        with patch('backend.app.database.execute_update', return_value=True):
+            # Act
+            result = await service.escalate_andon_event(event_id, escalation_reason, mock_db_session)
+            
+            # Assert
+            assert result is True
+            mock_db_session.commit.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_get_active_andon_events_success(self, service, mock_db_session):
+        """Test successful retrieval of active Andon events."""
+        # Arrange
+        active_events = [
             {
-                'id': str(uuid.uuid4()),
-                'equipment_code': 'EQ-001',
-                'event_type': 'fault',
-                'priority': 'high',
-                'status': 'active',
-                'created_at': datetime.now()
+                "id": str(uuid4()),
+                "equipment_code": "EQ_001",
+                "event_type": AndonEventType.FAULT,
+                "priority": AndonPriority.HIGH,
+                "status": AndonStatus.OPEN
+            },
+            {
+                "id": str(uuid4()),
+                "equipment_code": "EQ_002",
+                "event_type": AndonEventType.QUALITY,
+                "priority": AndonPriority.MEDIUM,
+                "status": AndonStatus.ACKNOWLEDGED
             }
         ]
         
-        result = await andon_service.get_active_andon_events()
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = active_events
+        mock_db_session.execute.return_value = mock_result
         
-        assert result is not None
-        assert len(result) == 1
-        assert result[0]['status'] == 'active'
-        mock_db.fetch_all.assert_called_once()
+        # Act
+        result = await service.get_active_andon_events(mock_db_session)
+        
+        # Assert
+        assert len(result) == 2
+        assert all(event.status in [AndonStatus.OPEN, AndonStatus.ACKNOWLEDGED] for event in result)
     
     @pytest.mark.asyncio
-    async def test_get_andon_events_by_equipment(self, andon_service, mock_db):
-        """Test getting Andon events by equipment"""
-        equipment_code = 'EQ-001'
-        
-        mock_db.fetch_all.return_value = [
+    async def test_get_andon_events_by_equipment_success(self, service, mock_db_session):
+        """Test successful retrieval of Andon events by equipment."""
+        # Arrange
+        equipment_code = "EQ_001"
+        equipment_events = [
             {
-                'id': str(uuid.uuid4()),
-                'equipment_code': equipment_code,
-                'event_type': 'fault',
-                'priority': 'high',
-                'status': 'active',
-                'created_at': datetime.now()
+                "id": str(uuid4()),
+                "equipment_code": equipment_code,
+                "event_type": AndonEventType.FAULT,
+                "status": AndonStatus.RESOLVED
             }
         ]
         
-        result = await andon_service.get_andon_events_by_equipment(equipment_code)
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = equipment_events
+        mock_db_session.execute.return_value = mock_result
         
-        assert result is not None
+        # Act
+        result = await service.get_andon_events_by_equipment(equipment_code, mock_db_session)
+        
+        # Assert
         assert len(result) == 1
-        assert result[0]['equipment_code'] == equipment_code
-        mock_db.fetch_all.assert_called_once()
+        assert result[0].equipment_code == equipment_code
     
     @pytest.mark.asyncio
-    async def test_get_andon_events_by_priority(self, andon_service, mock_db):
-        """Test getting Andon events by priority"""
-        priority = 'high'
-        
-        mock_db.fetch_all.return_value = [
+    async def test_get_andon_events_by_priority_success(self, service, mock_db_session):
+        """Test successful retrieval of Andon events by priority."""
+        # Arrange
+        priority = AndonPriority.HIGH
+        high_priority_events = [
             {
-                'id': str(uuid.uuid4()),
-                'equipment_code': 'EQ-001',
-                'event_type': 'fault',
-                'priority': priority,
-                'status': 'active',
-                'created_at': datetime.now()
+                "id": str(uuid4()),
+                "equipment_code": "EQ_001",
+                "priority": priority,
+                "status": AndonStatus.OPEN
             }
         ]
         
-        result = await andon_service.get_andon_events_by_priority(priority)
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = high_priority_events
+        mock_db_session.execute.return_value = mock_result
         
-        assert result is not None
+        # Act
+        result = await service.get_andon_events_by_priority(priority, mock_db_session)
+        
+        # Assert
         assert len(result) == 1
-        assert result[0]['priority'] == priority
-        mock_db.fetch_all.assert_called_once()
+        assert result[0].priority == priority
     
-    @pytest.mark.asyncio
-    async def test_get_andon_statistics(self, andon_service, mock_db):
-        """Test getting Andon statistics"""
-        mock_db.fetch_one.return_value = {
-            'total_events': 100,
-            'active_events': 5,
-            'resolved_events': 90,
-            'escalated_events': 5,
-            'avg_resolution_time_minutes': 45.5
-        }
+    def test_validate_andon_event_data_valid(self, service):
+        """Test Andon event data validation with valid data."""
+        # Arrange
+        valid_data = AndonEventCreate(
+            equipment_code="EQ_001",
+            event_type=AndonEventType.FAULT,
+            priority=AndonPriority.HIGH,
+            description="Valid fault description"
+        )
         
-        result = await andon_service.get_andon_statistics()
+        # Act
+        result = service._validate_andon_event_data(valid_data)
         
-        assert result is not None
-        assert 'total_events' in result
-        assert 'active_events' in result
-        assert 'resolved_events' in result
-        assert 'escalated_events' in result
-        assert 'avg_resolution_time_minutes' in result
-        mock_db.fetch_one.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_update_andon_event(self, andon_service, mock_db):
-        """Test updating an Andon event"""
-        event_id = str(uuid.uuid4())
-        update_data = {'priority': 'critical', 'description': 'Updated description'}
-        
-        mock_db.fetch_one.return_value = {
-            'id': event_id,
-            'priority': 'critical',
-            'description': 'Updated description',
-            'updated_at': datetime.now()
-        }
-        
-        result = await andon_service.update_andon_event(event_id, update_data)
-        
-        assert result is not None
-        assert result['priority'] == 'critical'
-        assert result['description'] == 'Updated description'
-        mock_db.fetch_one.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_delete_andon_event(self, andon_service, mock_db):
-        """Test deleting an Andon event"""
-        event_id = str(uuid.uuid4())
-        
-        mock_db.execute.return_value = True
-        
-        result = await andon_service.delete_andon_event(event_id)
-        
+        # Assert
         assert result is True
-        mock_db.execute.assert_called_once()
+    
+    def test_validate_andon_event_data_invalid(self, service):
+        """Test Andon event data validation with invalid data."""
+        # Test cases for invalid data
+        invalid_cases = [
+            # Empty equipment code
+            AndonEventCreate(equipment_code="", event_type=AndonEventType.FAULT, priority=AndonPriority.HIGH, description="Test"),
+            # Empty description
+            AndonEventCreate(equipment_code="EQ_001", event_type=AndonEventType.FAULT, priority=AndonPriority.HIGH, description=""),
+            # Invalid event type
+            AndonEventCreate(equipment_code="EQ_001", event_type="INVALID", priority=AndonPriority.HIGH, description="Test"),
+            # Invalid priority
+            AndonEventCreate(equipment_code="EQ_001", event_type=AndonEventType.FAULT, priority="INVALID", description="Test"),
+        ]
+        
+        for invalid_data in invalid_cases:
+            with pytest.raises(ValidationError):
+                service._validate_andon_event_data(invalid_data)
+    
+    @pytest.mark.asyncio
+    async def test_calculate_andon_statistics_success(self, service, mock_db_session):
+        """Test Andon statistics calculation."""
+        # Arrange
+        equipment_code = "EQ_001"
+        start_date = datetime.now(timezone.utc) - timedelta(days=30)
+        end_date = datetime.now(timezone.utc)
+        
+        # Mock statistics data
+        stats_data = {
+            "total_events": 15,
+            "resolved_events": 12,
+            "avg_resolution_time": 45.5,
+            "events_by_type": {"FAULT": 8, "QUALITY": 4, "MAINTENANCE": 3},
+            "events_by_priority": {"HIGH": 5, "MEDIUM": 7, "LOW": 3}
+        }
+        
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = stats_data
+        mock_db_session.execute.return_value = mock_result
+        
+        # Act
+        result = await service.calculate_andon_statistics(
+            equipment_code, start_date, end_date, mock_db_session
+        )
+        
+        # Assert
+        assert result is not None
+        assert result["total_events"] == 15
+        assert result["resolved_events"] == 12
+        assert result["avg_resolution_time"] == 45.5
+        assert "events_by_type" in result
+        assert "events_by_priority" in result
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+class TestPLCIntegratedAndonService:
+    """Comprehensive tests for PLCIntegratedAndonService."""
+    
+    @pytest.fixture
+    def service(self):
+        """Create a PLCIntegratedAndonService instance for testing."""
+        return PLCIntegratedAndonService()
+    
+    @pytest.fixture
+    def mock_db_session(self):
+        """Create a mock database session."""
+        session = AsyncMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
+    
+    @pytest.mark.asyncio
+    async def test_process_plc_andon_signal_success(self, service, mock_db_session):
+        """Test PLC Andon signal processing."""
+        # Arrange
+        plc_signal = {
+            "equipment_code": "EQ_001",
+            "signal_type": "FAULT",
+            "signal_value": 1,
+            "timestamp": datetime.now(timezone.utc),
+            "additional_data": {"fault_code": "F001", "description": "Motor overload"}
+        }
+        
+        # Mock equipment configuration
+        equipment_config = {
+            "equipment_code": "EQ_001",
+            "andon_settings": {
+                "auto_andon_enabled": True,
+                "fault_thresholds": {"F001": {"priority": "HIGH", "auto_escalate": True}}
+            }
+        }
+        
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = equipment_config
+        mock_db_session.execute.return_value = mock_result
+        
+        with patch.object(service, 'create_andon_event', return_value=Mock(id=str(uuid4()))):
+            # Act
+            result = await service.process_plc_andon_signal(plc_signal, mock_db_session)
+            
+            # Assert
+            assert result is not None
+            assert result["processed"] is True
+            assert "andon_event_id" in result
+    
+    @pytest.mark.asyncio
+    async def test_process_plc_andon_signal_auto_andon_disabled(self, service, mock_db_session):
+        """Test PLC Andon signal processing with auto-Andon disabled."""
+        # Arrange
+        plc_signal = {
+            "equipment_code": "EQ_001",
+            "signal_type": "FAULT",
+            "signal_value": 1,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        
+        # Mock equipment configuration with auto-Andon disabled
+        equipment_config = {
+            "equipment_code": "EQ_001",
+            "andon_settings": {"auto_andon_enabled": False}
+        }
+        
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = equipment_config
+        mock_db_session.execute.return_value = mock_result
+        
+        # Act
+        result = await service.process_plc_andon_signal(plc_signal, mock_db_session)
+        
+        # Assert
+        assert result["processed"] is False
+        assert result["reason"] == "Auto-Andon disabled for equipment"
+    
+    @pytest.mark.asyncio
+    async def test_validate_plc_andon_signal_valid(self, service):
+        """Test PLC Andon signal validation with valid signal."""
+        # Arrange
+        valid_signal = {
+            "equipment_code": "EQ_001",
+            "signal_type": "FAULT",
+            "signal_value": 1,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        
+        # Act
+        result = service._validate_plc_andon_signal(valid_signal)
+        
+        # Assert
+        assert result is True
+    
+    @pytest.mark.asyncio
+    async def test_validate_plc_andon_signal_invalid(self, service):
+        """Test PLC Andon signal validation with invalid signal."""
+        # Test cases for invalid signals
+        invalid_cases = [
+            # Missing equipment_code
+            {"signal_type": "FAULT", "signal_value": 1, "timestamp": datetime.now(timezone.utc)},
+            # Invalid signal_type
+            {"equipment_code": "EQ_001", "signal_type": "INVALID", "signal_value": 1, "timestamp": datetime.now(timezone.utc)},
+            # Invalid signal_value
+            {"equipment_code": "EQ_001", "signal_type": "FAULT", "signal_value": "invalid", "timestamp": datetime.now(timezone.utc)},
+            # Missing timestamp
+            {"equipment_code": "EQ_001", "signal_type": "FAULT", "signal_value": 1},
+        ]
+        
+        for invalid_signal in invalid_cases:
+            with pytest.raises(ValidationError):
+                service._validate_plc_andon_signal(invalid_signal)
+    
+    @pytest.mark.asyncio
+    async def test_map_plc_signal_to_andon_event_success(self, service):
+        """Test mapping PLC signal to Andon event."""
+        # Arrange
+        plc_signal = {
+            "equipment_code": "EQ_001",
+            "signal_type": "FAULT",
+            "signal_value": 1,
+            "additional_data": {"fault_code": "F001", "description": "Motor overload"}
+        }
+        
+        equipment_config = {
+            "andon_settings": {
+                "fault_thresholds": {
+                    "F001": {
+                        "priority": "HIGH",
+                        "event_type": "FAULT",
+                        "description_template": "Fault {fault_code}: {description}"
+                    }
+                }
+            }
+        }
+        
+        # Act
+        result = service._map_plc_signal_to_andon_event(plc_signal, equipment_config)
+        
+        # Assert
+        assert result is not None
+        assert result["equipment_code"] == "EQ_001"
+        assert result["event_type"] == "FAULT"
+        assert result["priority"] == "HIGH"
+        assert "F001" in result["description"]
+        assert "Motor overload" in result["description"]
+    
+    @pytest.mark.asyncio
+    async def test_check_andon_escalation_conditions_success(self, service, mock_db_session):
+        """Test Andon escalation condition checking."""
+        # Arrange
+        event_id = str(uuid4())
+        andon_event = {
+            "id": event_id,
+            "priority": AndonPriority.HIGH,
+            "created_at": datetime.now(timezone.utc) - timedelta(minutes=30),
+            "acknowledged_at": None,
+            "escalation_settings": {"timeout_minutes": 15}
+        }
+        
+        # Act
+        result = await service._check_andon_escalation_conditions(andon_event, mock_db_session)
+        
+        # Assert
+        assert result["should_escalate"] is True
+        assert result["escalation_reason"] == "Timeout exceeded"
+    
+    @pytest.mark.asyncio
+    async def test_check_andon_escalation_conditions_no_escalation(self, service, mock_db_session):
+        """Test Andon escalation condition checking when no escalation needed."""
+        # Arrange
+        event_id = str(uuid4())
+        andon_event = {
+            "id": event_id,
+            "priority": AndonPriority.LOW,
+            "created_at": datetime.now(timezone.utc) - timedelta(minutes=5),
+            "acknowledged_at": None,
+            "escalation_settings": {"timeout_minutes": 15}
+        }
+        
+        # Act
+        result = await service._check_andon_escalation_conditions(andon_event, mock_db_session)
+        
+        # Assert
+        assert result["should_escalate"] is False

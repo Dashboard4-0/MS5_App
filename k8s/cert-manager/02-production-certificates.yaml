@@ -1,0 +1,391 @@
+---
+# MS5.0 Floor Dashboard - Production SSL Certificate Configuration
+# Phase 9: Production Deployment
+#
+# This manifest implements comprehensive SSL certificate management
+# using cert-manager with Let's Encrypt for production deployment.
+#
+# Features:
+# - Automatic certificate issuance and renewal
+# - Wildcard certificates for subdomains
+# - Certificate monitoring and alerting
+# - Backup and recovery procedures
+
+# Let's Encrypt Production ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@ms5-dashboard.company.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    - dns01:
+        azureDNS:
+          clientID: ${AZURE_CLIENT_ID}
+          clientSecretSecretRef:
+            name: azure-dns-secret
+            key: client-secret
+          subscriptionID: ${AZURE_SUBSCRIPTION_ID}
+          tenantID: ${AZURE_TENANT_ID}
+          resourceGroupName: ms5-production-rg
+          hostedZoneName: ms5-dashboard.company.com
+          environment: AzurePublicCloud
+
+---
+# Let's Encrypt Staging ClusterIssuer (for testing)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@ms5-dashboard.company.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+# Main Application Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-dashboard-main-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  secretName: ms5-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - ms5-dashboard.company.com
+  - www.ms5-dashboard.company.com
+  duration: 8760h  # 1 year
+  renewBefore: 720h  # 30 days before expiry
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  - client auth
+
+---
+# API Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-dashboard-api-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  secretName: ms5-api-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - api.ms5-dashboard.company.com
+  duration: 8760h  # 1 year
+  renewBefore: 720h  # 30 days before expiry
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+
+---
+# Monitoring Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-dashboard-monitoring-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  secretName: ms5-monitoring-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - grafana.ms5-dashboard.company.com
+  - prometheus.ms5-dashboard.company.com
+  - flower.ms5-dashboard.company.com
+  duration: 8760h  # 1 year
+  renewBefore: 720h  # 30 days before expiry
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+
+---
+# Wildcard Certificate for Subdomains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ms5-dashboard-wildcard-cert
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  secretName: ms5-wildcard-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - "*.ms5-dashboard.company.com"
+  duration: 8760h  # 1 year
+  renewBefore: 720h  # 30 days before expiry
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+
+---
+# Certificate Monitoring and Alerting
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certificate-monitoring-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+data:
+  certificate-alerts.yaml: |
+    groups:
+    - name: certificate-monitoring
+      rules:
+      - alert: CertificateExpiringSoon
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          component: cert-manager
+        annotations:
+          summary: "Certificate expiring soon"
+          description: "Certificate {{ $labels.name }} expires in {{ $value }} days"
+      
+      - alert: CertificateExpired
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) < 0
+        for: 0m
+        labels:
+          severity: critical
+          component: cert-manager
+        annotations:
+          summary: "Certificate has expired"
+          description: "Certificate {{ $labels.name }} has expired"
+      
+      - alert: CertificateRenewalFailed
+        expr: certmanager_certificate_ready_status == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: cert-manager
+        annotations:
+          summary: "Certificate renewal failed"
+          description: "Certificate {{ $labels.name }} renewal has failed"
+      
+      - alert: CertificateIssuerNotReady
+        expr: certmanager_issuer_ready_status == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: cert-manager
+        annotations:
+          summary: "Certificate issuer not ready"
+          description: "Certificate issuer {{ $labels.name }} is not ready"
+
+---
+# Certificate Backup Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certificate-backup-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+data:
+  backup-script.sh: |
+    #!/bin/bash
+    # Certificate backup script for MS5.0 Dashboard
+    
+    set -euo pipefail
+    
+    NAMESPACE="ms5-production"
+    BACKUP_DIR="/backups/certificates"
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR"
+    
+    # Backup all certificate secrets
+    for secret in $(kubectl get secrets -n "$NAMESPACE" -l component=cert-manager -o name); do
+        echo "Backing up $secret"
+        kubectl get "$secret" -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/${secret}_${TIMESTAMP}.yaml"
+    done
+    
+    # Backup certificate resources
+    kubectl get certificates -n "$NAMESPACE" -o yaml > "$BACKUP_DIR/certificates_${TIMESTAMP}.yaml"
+    kubectl get clusterissuers -o yaml > "$BACKUP_DIR/clusterissuers_${TIMESTAMP}.yaml"
+    
+    echo "Certificate backup completed: $BACKUP_DIR"
+
+---
+# Certificate Validation Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: certificate-validation
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: cert-manager
+          containers:
+          - name: certificate-validator
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/sh
+              set -e
+              
+              echo "Starting certificate validation..."
+              
+              # Check certificate expiration
+              for cert in ms5-tls-secret ms5-api-tls-secret ms5-monitoring-tls-secret ms5-wildcard-tls-secret; do
+                echo "Checking certificate: $cert"
+                
+                # Get certificate expiration date
+                expiration=$(kubectl get secret "$cert" -n ms5-production -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -enddate | cut -d= -f2)
+                expiration_timestamp=$(date -d "$expiration" +%s)
+                current_timestamp=$(date +%s)
+                days_until_expiry=$(( (expiration_timestamp - current_timestamp) / 86400 ))
+                
+                echo "Certificate $cert expires in $days_until_expiry days"
+                
+                if [ $days_until_expiry -lt 30 ]; then
+                  echo "WARNING: Certificate $cert expires in less than 30 days"
+                fi
+              done
+              
+              echo "Certificate validation completed"
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          restartPolicy: OnFailure
+
+---
+# Certificate Renewal Monitoring
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-manager-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+spec:
+  ports:
+  - name: metrics
+    port: 9402
+    targetPort: 9402
+    protocol: TCP
+  selector:
+    app: cert-manager
+    component: cert-manager
+
+---
+# Certificate Health Check Endpoint
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certificate-health-check
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: cert-manager
+    environment: production
+data:
+  health-check.sh: |
+    #!/bin/bash
+    # Certificate health check script
+    
+    set -euo pipefail
+    
+    NAMESPACE="ms5-production"
+    HEALTHY=true
+    
+    echo "Checking certificate health..."
+    
+    # Check if all certificates are ready
+    for cert in $(kubectl get certificates -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+      ready=$(kubectl get certificate "$cert" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [ "$ready" != "True" ]; then
+        echo "Certificate $cert is not ready"
+        HEALTHY=false
+      fi
+    done
+    
+    # Check if all ClusterIssuers are ready
+    for issuer in $(kubectl get clusterissuers -o jsonpath='{.items[*].metadata.name}'); do
+      ready=$(kubectl get clusterissuer "$issuer" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      if [ "$ready" != "True" ]; then
+        echo "ClusterIssuer $issuer is not ready"
+        HEALTHY=false
+      fi
+    done
+    
+    if [ "$HEALTHY" = "true" ]; then
+      echo "All certificates are healthy"
+      exit 0
+    else
+      echo "Some certificates are not healthy"
+      exit 1
+    fi

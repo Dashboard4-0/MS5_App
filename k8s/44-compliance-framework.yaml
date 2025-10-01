@@ -1,0 +1,675 @@
+---
+# MS5.0 Floor Dashboard - Compliance Framework Implementation
+# Phase 7B: Advanced Security & Compliance
+#
+# This manifest implements comprehensive compliance framework
+# with CIS benchmark compliance, regulatory compliance, and
+# security baseline validation.
+#
+# Compliance Architecture:
+# - CIS Benchmark Compliance: Kubernetes and container CIS benchmark scanning
+# - Regulatory Compliance: ISO 27001, SOC 2, GDPR, FDA 21 CFR Part 11
+# - Security Baseline Validation: Security configuration validation
+# - Compliance Monitoring: Continuous compliance assessment and reporting
+
+# CIS Benchmark Compliance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cis-benchmark-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  cis-benchmark-policy.yaml: |
+    # CIS Benchmark Compliance Policy
+    # Comprehensive CIS benchmark scanning and validation
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+    metadata:
+      name: ms5-cis-benchmark-policy
+      namespace: ms5-production
+    spec:
+      # Kubernetes CIS Benchmark
+      kubernetesCIS:
+        enabled: true
+        version: "1.24"
+        scanSchedule: "0 1 * * *"  # Daily at 1 AM
+        remediation:
+          autoRemediate: false
+          notificationChannels:
+            - "security-team"
+            - "compliance-team"
+        
+        # Control categories
+        controlCategories:
+          - "1.1 Master Node Configuration"
+          - "1.2 API Server"
+          - "1.3 Controller Manager"
+          - "1.4 Scheduler"
+          - "1.5 Etcd"
+          - "2.1 Node Configuration"
+          - "2.2 Kubelet"
+          - "3.1 RBAC"
+          - "3.2 Service Account"
+          - "4.1 Network Policies"
+          - "4.2 CNI"
+          - "5.1 RBAC"
+          - "5.2 Service Account"
+          - "5.3 Pod Security"
+      
+      # Container CIS Benchmark
+      containerCIS:
+        enabled: true
+        version: "1.0"
+        scanSchedule: "0 2 * * *"  # Daily at 2 AM
+        remediation:
+          autoRemediate: false
+          notificationChannels:
+            - "security-team"
+            - "compliance-team"
+        
+        # Control categories
+        controlCategories:
+          - "1.1 Host Configuration"
+          - "1.2 Docker daemon configuration"
+          - "1.3 Docker daemon configuration files"
+          - "1.4 Container Images"
+          - "1.5 Container Runtime"
+          - "2.1 Network Configuration"
+          - "2.2 Logging"
+          - "2.3 Monitoring"
+          - "3.1 Docker daemon"
+          - "3.2 Docker daemon configuration files"
+          - "3.3 Docker daemon configuration files"
+          - "3.4 Container Images and Build File"
+          - "3.5 Container Runtime"
+          - "4.1 Network Configuration"
+          - "4.2 Logging"
+          - "4.3 Monitoring"
+          - "5.1 Access Control"
+          - "5.2 Linux Host"
+          - "5.3 Linux Host"
+          - "5.4 Linux Host"
+          - "5.5 Linux Host"
+          - "5.6 Linux Host"
+          - "5.7 Linux Host"
+          - "5.8 Linux Host"
+          - "5.9 Linux Host"
+          - "5.10 Linux Host"
+          - "5.11 Linux Host"
+          - "5.12 Linux Host"
+          - "5.13 Linux Host"
+          - "5.14 Linux Host"
+          - "5.15 Linux Host"
+          - "5.16 Linux Host"
+          - "5.17 Linux Host"
+          - "5.18 Linux Host"
+          - "5.19 Linux Host"
+          - "5.20 Linux Host"
+          - "5.21 Linux Host"
+          - "5.22 Linux Host"
+          - "5.23 Linux Host"
+          - "5.24 Linux Host"
+          - "5.25 Linux Host"
+          - "5.26 Linux Host"
+          - "5.27 Linux Host"
+          - "5.28 Linux Host"
+          - "5.29 Linux Host"
+          - "5.30 Linux Host"
+          - "5.31 Linux Host"
+---
+# ISO 27001 Controls Implementation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iso27001-controls
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  iso27001-controls.yaml: |
+    # ISO 27001 Controls Implementation
+    # Information Security Management System controls
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+    metadata:
+      name: ms5-iso27001-controls
+      namespace: ms5-production
+    spec:
+      # A.5 Information Security Policies
+      informationSecurityPolicies:
+        - id: "A.5.1.1"
+          name: "Policies for information security"
+          description: "Information security policies"
+          implementation:
+            - "Security policy documentation"
+            - "Policy review and approval process"
+            - "Policy communication and training"
+          controls:
+            - "Security policy exists and is approved"
+            - "Policy is communicated to all personnel"
+            - "Policy is reviewed annually"
+        
+        - id: "A.5.1.2"
+          name: "Review of information security policies"
+          description: "Regular review of security policies"
+          implementation:
+            - "Annual policy review process"
+            - "Policy update procedures"
+            - "Change management process"
+          controls:
+            - "Policies reviewed annually"
+            - "Policy changes documented"
+            - "Policy version control"
+      
+      # A.8 Asset Management
+      assetManagement:
+        - id: "A.8.1.1"
+          name: "Inventory of assets"
+          description: "Asset inventory management"
+          implementation:
+            - "Asset discovery and classification"
+            - "Asset ownership assignment"
+            - "Asset lifecycle management"
+          controls:
+            - "Complete asset inventory"
+            - "Asset classification scheme"
+            - "Asset ownership defined"
+        
+        - id: "A.8.1.2"
+          name: "Ownership of assets"
+          description: "Asset ownership management"
+          implementation:
+            - "Asset owner assignment"
+            - "Owner responsibility definition"
+            - "Owner change procedures"
+          controls:
+            - "All assets have defined owners"
+            - "Owner responsibilities documented"
+            - "Owner changes tracked"
+      
+      # A.9 Access Control
+      accessControl:
+        - id: "A.9.1.1"
+          name: "Access control policy"
+          description: "Access control management"
+          implementation:
+            - "RBAC implementation"
+            - "Access review process"
+            - "Privileged access management"
+          controls:
+            - "Access control policy exists"
+            - "RBAC implemented"
+            - "Access reviews conducted"
+        
+        - id: "A.9.1.2"
+          name: "Access to networks and network services"
+          description: "Network access control"
+          implementation:
+            - "Network segmentation"
+            - "Network access policies"
+            - "Network monitoring"
+          controls:
+            - "Network access policies defined"
+            - "Network segmentation implemented"
+            - "Network access monitored"
+      
+      # A.10 Cryptography
+      cryptography:
+        - id: "A.10.1.1"
+          name: "Policy on the use of cryptographic controls"
+          description: "Cryptographic policy"
+          implementation:
+            - "Encryption policy"
+            - "Key management procedures"
+            - "Cryptographic standards"
+          controls:
+            - "Cryptographic policy exists"
+            - "Encryption implemented"
+            - "Key management procedures"
+        
+        - id: "A.10.1.2"
+          name: "Key management"
+          description: "Cryptographic key management"
+          implementation:
+            - "Key generation procedures"
+            - "Key distribution procedures"
+            - "Key storage procedures"
+          controls:
+            - "Key management procedures"
+            - "Key storage security"
+            - "Key rotation procedures"
+---
+# FDA 21 CFR Part 11 Compliance
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fda-compliance
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  fda-compliance.yaml: |
+    # FDA 21 CFR Part 11 Compliance
+    # Electronic records and signatures compliance
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+    metadata:
+      name: ms5-fda-compliance
+      namespace: ms5-production
+    spec:
+      # 11.10 Controls for closed systems
+      closedSystemControls:
+        - id: "11.10"
+          name: "Controls for closed systems"
+          description: "Electronic record controls"
+          implementation:
+            - "Audit trail implementation"
+            - "System access controls"
+            - "Data integrity verification"
+          controls:
+            - "Audit trail for all electronic records"
+            - "Access controls implemented"
+            - "Data integrity verification"
+            - "System validation procedures"
+        
+        - id: "11.10(a)"
+          name: "Validation of systems"
+          description: "System validation"
+          implementation:
+            - "System validation procedures"
+            - "Validation documentation"
+            - "Validation testing"
+          controls:
+            - "System validation documented"
+            - "Validation testing completed"
+            - "Validation results documented"
+        
+        - id: "11.10(b)"
+          name: "Access to closed systems"
+          description: "System access controls"
+          implementation:
+            - "User authentication"
+            - "Access authorization"
+            - "Access logging"
+          controls:
+            - "User authentication implemented"
+            - "Access authorization defined"
+            - "Access logging enabled"
+        
+        - id: "11.10(c)"
+          name: "Audit trail"
+          description: "Electronic record audit trail"
+          implementation:
+            - "Audit trail logging"
+            - "Audit trail integrity"
+            - "Audit trail retention"
+          controls:
+            - "Audit trail implemented"
+            - "Audit trail integrity verified"
+            - "Audit trail retained"
+        
+        - id: "11.10(d)"
+          name: "Data integrity"
+          description: "Data integrity controls"
+          implementation:
+            - "Data integrity verification"
+            - "Data backup procedures"
+            - "Data recovery procedures"
+          controls:
+            - "Data integrity verified"
+            - "Data backup implemented"
+            - "Data recovery procedures"
+      
+      # 11.30 Controls for open systems
+      openSystemControls:
+        - id: "11.30"
+          name: "Controls for open systems"
+          description: "Open system controls"
+          implementation:
+            - "Encryption in transit"
+            - "Digital signatures"
+            - "Access authentication"
+          controls:
+            - "Encryption in transit"
+            - "Digital signatures implemented"
+            - "Access authentication"
+            - "System validation"
+      
+      # 11.50 Signature manifestations
+      signatureManifestations:
+        - id: "11.50"
+          name: "Signature manifestations"
+          description: "Digital signature requirements"
+          implementation:
+            - "Digital signature validation"
+            - "Signature binding"
+            - "Signature verification"
+          controls:
+            - "Digital signatures validated"
+            - "Signature binding verified"
+            - "Signature verification implemented"
+---
+# SOC 2 Compliance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: soc2-compliance
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  soc2-compliance.yaml: |
+    # SOC 2 Compliance Configuration
+    # Security, availability, and confidentiality compliance
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+    metadata:
+      name: ms5-soc2-compliance
+      namespace: ms5-production
+    spec:
+      # CC6.1 Logical and Physical Access Controls
+      logicalPhysicalAccessControls:
+        - id: "CC6.1"
+          name: "Logical and Physical Access Controls"
+          description: "Access control implementation"
+          implementation:
+            - "RBAC implementation"
+            - "Network access controls"
+            - "Physical access controls"
+          controls:
+            - "Logical access controls implemented"
+            - "Physical access controls implemented"
+            - "Access controls monitored"
+        
+        - id: "CC6.2"
+          name: "System Access Controls"
+          description: "System access management"
+          implementation:
+            - "User authentication"
+            - "Access authorization"
+            - "Access monitoring"
+          controls:
+            - "User authentication implemented"
+            - "Access authorization defined"
+            - "Access monitoring enabled"
+      
+      # CC6.3 System Access Controls
+      systemAccessControls:
+        - id: "CC6.3"
+          name: "System Access Controls"
+          description: "System access management"
+          implementation:
+            - "System access policies"
+            - "Access control procedures"
+            - "Access control monitoring"
+          controls:
+            - "System access policies defined"
+            - "Access control procedures implemented"
+            - "Access control monitoring enabled"
+      
+      # CC6.4 Data Protection
+      dataProtection:
+        - id: "CC6.4"
+          name: "Data Protection"
+          description: "Data protection controls"
+          implementation:
+            - "Data encryption"
+            - "Data backup procedures"
+            - "Data recovery procedures"
+          controls:
+            - "Data encryption implemented"
+            - "Data backup procedures"
+            - "Data recovery procedures"
+      
+      # CC6.5 System Monitoring
+      systemMonitoring:
+        - id: "CC6.5"
+          name: "System Monitoring"
+          description: "System monitoring controls"
+          implementation:
+            - "System monitoring procedures"
+            - "Monitoring tools implementation"
+            - "Monitoring alerting"
+          controls:
+            - "System monitoring procedures"
+            - "Monitoring tools implemented"
+            - "Monitoring alerting enabled"
+---
+# GDPR Compliance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gdpr-compliance
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  gdpr-compliance.yaml: |
+    # GDPR Compliance Configuration
+    # General Data Protection Regulation compliance
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+      name: ms5-gdpr-compliance
+      namespace: ms5-production
+    spec:
+      # Article 5 - Principles of processing
+      dataProcessingPrinciples:
+        - id: "Article 5"
+          name: "Principles of processing"
+          description: "Data processing principles"
+          implementation:
+            - "Lawfulness of processing"
+            - "Purpose limitation"
+            - "Data minimization"
+            - "Accuracy"
+            - "Storage limitation"
+            - "Integrity and confidentiality"
+          controls:
+            - "Lawful basis for processing"
+            - "Purpose limitation implemented"
+            - "Data minimization practiced"
+            - "Data accuracy maintained"
+            - "Storage limitation enforced"
+            - "Data integrity and confidentiality"
+      
+      # Article 25 - Data protection by design
+      dataProtectionByDesign:
+        - id: "Article 25"
+          name: "Data protection by design"
+          description: "Privacy by design implementation"
+          implementation:
+            - "Privacy by design principles"
+            - "Data protection impact assessment"
+            - "Privacy enhancing technologies"
+          controls:
+            - "Privacy by design implemented"
+            - "DPIA conducted"
+            - "Privacy enhancing technologies"
+      
+      # Article 32 - Security of processing
+      securityOfProcessing:
+        - id: "Article 32"
+          name: "Security of processing"
+          description: "Data processing security"
+          implementation:
+            - "Technical security measures"
+            - "Organizational security measures"
+            - "Security incident procedures"
+          controls:
+            - "Technical security measures"
+            - "Organizational security measures"
+            - "Security incident procedures"
+      
+      # Article 33 - Breach notification
+      breachNotification:
+        - id: "Article 33"
+          name: "Breach notification"
+          description: "Data breach notification"
+          implementation:
+            - "Breach detection procedures"
+            - "Breach notification procedures"
+            - "Breach response procedures"
+          controls:
+            - "Breach detection procedures"
+            - "Breach notification procedures"
+            - "Breach response procedures"
+---
+# Compliance Monitoring Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  compliance-monitoring.yaml: |
+    # Compliance Monitoring Configuration
+    # Continuous compliance assessment and reporting
+    
+    apiVersion: compliance.k8s.io/v1
+    kind: CompliancePolicy
+    metadata:
+      name: ms5-compliance-monitoring
+      namespace: ms5-production
+    spec:
+      # Compliance assessment schedule
+      assessmentSchedule:
+        cisBenchmark: "0 1 * * *"  # Daily at 1 AM
+        iso27001: "0 2 * * 0"      # Weekly on Sunday at 2 AM
+        fdaCompliance: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+        soc2Compliance: "0 4 * * 0" # Weekly on Sunday at 4 AM
+        gdprCompliance: "0 5 * * 0" # Weekly on Sunday at 5 AM
+      
+      # Compliance reporting
+      reporting:
+        enabled: true
+        reportSchedule: "0 6 * * 1"  # Weekly on Monday at 6 AM
+        reportFormats:
+          - "pdf"
+          - "json"
+          - "csv"
+        reportRecipients:
+          - "compliance-team@company.com"
+          - "security-team@company.com"
+          - "management@company.com"
+      
+      # Compliance alerting
+      alerting:
+        enabled: true
+        alertChannels:
+          - "slack"
+          - "email"
+          - "webhook"
+        alertThresholds:
+          critical: 0
+          high: 5
+          medium: 10
+          low: 20
+---
+# Compliance Monitoring Alerts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-monitoring-alerts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  compliance-alerts.yaml: |
+    # Compliance Monitoring Alerts
+    # Comprehensive compliance monitoring and alerting
+    
+    groups:
+    - name: compliance-monitoring
+      rules:
+      - alert: CISBenchmarkFailure
+        expr: cis_benchmark_compliance_score < 95
+        for: 1h
+        labels:
+          severity: warning
+          component: compliance
+        annotations:
+          summary: "CIS Benchmark compliance score below threshold"
+          description: "CIS Benchmark compliance score is {{ $value }}%, below 95% threshold"
+      
+      - alert: ISO27001ComplianceFailure
+        expr: iso27001_compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          component: compliance
+        annotations:
+          summary: "ISO 27001 compliance score below threshold"
+          description: "ISO 27001 compliance score is {{ $value }}%, below 90% threshold"
+      
+      - alert: FDAComplianceFailure
+        expr: fda_compliance_score < 95
+        for: 1h
+        labels:
+          severity: critical
+          component: compliance
+        annotations:
+          summary: "FDA 21 CFR Part 11 compliance score below threshold"
+          description: "FDA compliance score is {{ $value }}%, below 95% threshold"
+      
+      - alert: SOC2ComplianceFailure
+        expr: soc2_compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          component: compliance
+        annotations:
+          summary: "SOC 2 compliance score below threshold"
+          description: "SOC 2 compliance score is {{ $value }}%, below 90% threshold"
+      
+      - alert: GDPRComplianceFailure
+        expr: gdpr_compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          component: compliance
+        annotations:
+          summary: "GDPR compliance score below threshold"
+          description: "GDPR compliance score is {{ $value }}%, below 90% threshold"
+      
+      - alert: ComplianceScanFailure
+        expr: compliance_scan_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: compliance
+        annotations:
+          summary: "Compliance scan failed"
+          description: "Compliance scan {{ $labels.scan_type }} failed: {{ $labels.error_message }}"
+      
+      - alert: ComplianceDriftDetected
+        expr: increase(compliance_drift_detected_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: compliance
+        annotations:
+          summary: "Compliance drift detected"
+          description: "Compliance drift detected in {{ $labels.compliance_framework }}: {{ $labels.drift_details }}"

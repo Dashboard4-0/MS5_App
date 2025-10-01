@@ -1,0 +1,562 @@
+---
+# MS5.0 Floor Dashboard - Phase 6B: SLI/SLO Monitoring
+# Service Level Indicators and Objectives monitoring implementation
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sli-slo-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+data:
+  sli-definitions.yaml: |
+    # Service Level Indicators (SLIs) for MS5.0 Floor Dashboard
+    slis:
+      # API Service SLIs
+      - name: "api_availability"
+        metric_name: "ms5_api_requests_total"
+        target_value: 99.9
+        comparison_operator: ">="
+        window_duration: "5m"
+        description: "API availability percentage"
+        calculation: |
+          (
+            sum(rate(ms5_api_requests_total{status_code!~"5.."}[5m])) /
+            sum(rate(ms5_api_requests_total[5m]))
+          ) * 100
+      
+      - name: "api_latency"
+        metric_name: "ms5_api_request_duration_seconds"
+        target_value: 0.2
+        comparison_operator: "<="
+        window_duration: "5m"
+        description: "API response time p95"
+        calculation: |
+          histogram_quantile(0.95, rate(ms5_api_request_duration_seconds_bucket[5m]))
+      
+      - name: "api_error_rate"
+        metric_name: "ms5_api_requests_total"
+        target_value: 0.1
+        comparison_operator: "<="
+        window_duration: "5m"
+        description: "API error rate percentage"
+        calculation: |
+          (
+            sum(rate(ms5_api_requests_total{status_code=~"5.."}[5m])) /
+            sum(rate(ms5_api_requests_total[5m]))
+          ) * 100
+      
+      # Database Service SLIs
+      - name: "db_availability"
+        metric_name: "ms5_db_connections_active"
+        target_value: 99.95
+        comparison_operator: ">="
+        window_duration: "5m"
+        description: "Database availability percentage"
+        calculation: |
+          (
+            avg_over_time(ms5_db_connections_active[5m]) /
+            avg_over_time(ms5_db_connections_active[5m])
+          ) * 100
+      
+      - name: "db_query_latency"
+        metric_name: "ms5_db_query_duration_seconds"
+        target_value: 0.1
+        comparison_operator: "<="
+        window_duration: "5m"
+        description: "Database query latency p95"
+        calculation: |
+          histogram_quantile(0.95, rate(ms5_db_query_duration_seconds_bucket[5m]))
+      
+      - name: "db_connection_pool"
+        metric_name: "ms5_db_connections_active"
+        target_value: 80
+        comparison_operator: "<="
+        window_duration: "5m"
+        description: "Database connection pool utilization"
+        calculation: |
+          avg_over_time(ms5_db_connections_active[5m])
+      
+      # Production SLIs
+      - name: "production_oee"
+        metric_name: "ms5_production_oee"
+        target_value: 85.0
+        comparison_operator: ">="
+        window_duration: "1h"
+        description: "Production OEE percentage"
+        calculation: |
+          avg_over_time(ms5_production_oee[1h]) * 100
+      
+      - name: "production_efficiency"
+        metric_name: "ms5_production_efficiency_percent"
+        target_value: 80.0
+        comparison_operator: ">="
+        window_duration: "1h"
+        description: "Production efficiency percentage"
+        calculation: |
+          avg_over_time(ms5_production_efficiency_percent[1h])
+      
+      - name: "andon_response_time"
+        metric_name: "ms5_andon_response_time_seconds"
+        target_value: 300.0
+        comparison_operator: "<="
+        window_duration: "1h"
+        description: "Andon response time p95"
+        calculation: |
+          histogram_quantile(0.95, rate(ms5_andon_response_time_seconds_bucket[1h]))
+      
+      # Quality SLIs
+      - name: "quality_defect_rate"
+        metric_name: "ms5_quality_defect_rate"
+        target_value: 5.0
+        comparison_operator: "<="
+        window_duration: "1h"
+        description: "Quality defect rate per 1000 units"
+        calculation: |
+          avg_over_time(ms5_quality_defect_rate[1h])
+      
+      # System SLIs
+      - name: "system_availability"
+        metric_name: "up"
+        target_value: 99.9
+        comparison_operator: ">="
+        window_duration: "5m"
+        description: "System availability percentage"
+        calculation: |
+          avg_over_time(up[5m]) * 100
+      
+      - name: "websocket_connections"
+        metric_name: "ms5_websocket_connections_active"
+        target_value: 100
+        comparison_operator: "<="
+        window_duration: "5m"
+        description: "WebSocket connection count"
+        calculation: |
+          avg_over_time(ms5_websocket_connections_active[5m])
+  
+  slo-definitions.yaml: |
+    # Service Level Objectives (SLOs) for MS5.0 Floor Dashboard
+    slos:
+      # API Service SLOs
+      - name: "api_availability_slo"
+        sli_name: "api_availability"
+        target_percentage: 99.9
+        error_budget_percentage: 0.1
+        window_duration: "30d"
+        description: "API availability SLO"
+        alert_thresholds:
+          warning: 0.05
+          critical: 0.08
+      
+      - name: "api_latency_slo"
+        sli_name: "api_latency"
+        target_percentage: 95.0
+        error_budget_percentage: 5.0
+        window_duration: "7d"
+        description: "API latency SLO"
+        alert_thresholds:
+          warning: 2.0
+          critical: 4.0
+      
+      - name: "api_error_rate_slo"
+        sli_name: "api_error_rate"
+        target_percentage: 99.9
+        error_budget_percentage: 0.1
+        window_duration: "7d"
+        description: "API error rate SLO"
+        alert_thresholds:
+          warning: 0.05
+          critical: 0.08
+      
+      # Database Service SLOs
+      - name: "db_availability_slo"
+        sli_name: "db_availability"
+        target_percentage: 99.95
+        error_budget_percentage: 0.05
+        window_duration: "30d"
+        description: "Database availability SLO"
+        alert_thresholds:
+          warning: 0.02
+          critical: 0.04
+      
+      - name: "db_query_latency_slo"
+        sli_name: "db_query_latency"
+        target_percentage: 95.0
+        error_budget_percentage: 5.0
+        window_duration: "7d"
+        description: "Database query latency SLO"
+        alert_thresholds:
+          warning: 0.05
+          critical: 0.08
+      
+      # Production SLOs
+      - name: "production_oee_slo"
+        sli_name: "production_oee"
+        target_percentage: 85.0
+        error_budget_percentage: 15.0
+        window_duration: "30d"
+        description: "Production OEE SLO"
+        alert_thresholds:
+          warning: 5.0
+          critical: 10.0
+      
+      - name: "production_efficiency_slo"
+        sli_name: "production_efficiency"
+        target_percentage: 80.0
+        error_budget_percentage: 20.0
+        window_duration: "30d"
+        description: "Production efficiency SLO"
+        alert_thresholds:
+          warning: 5.0
+          critical: 10.0
+      
+      - name: "andon_response_time_slo"
+        sli_name: "andon_response_time"
+        target_percentage: 95.0
+        error_budget_percentage: 5.0
+        window_duration: "7d"
+        description: "Andon response time SLO"
+        alert_thresholds:
+          warning: 150.0
+          critical: 300.0
+      
+      # Quality SLOs
+      - name: "quality_defect_rate_slo"
+        sli_name: "quality_defect_rate"
+        target_percentage: 95.0
+        error_budget_percentage: 5.0
+        window_duration: "30d"
+        description: "Quality defect rate SLO"
+        alert_thresholds:
+          warning: 2.0
+          critical: 3.0
+      
+      # System SLOs
+      - name: "system_availability_slo"
+        sli_name: "system_availability"
+        target_percentage: 99.9
+        error_budget_percentage: 0.1
+        window_duration: "30d"
+        description: "System availability SLO"
+        alert_thresholds:
+          warning: 0.05
+          critical: 0.08
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sli-slo-alerts
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+spec:
+  groups:
+  - name: sli.rules
+    rules:
+    # API SLI Alerts
+    - alert: APIAvailabilityLow
+      expr: |
+        (
+          sum(rate(ms5_api_requests_total{status_code!~"5.."}[5m])) /
+          sum(rate(ms5_api_requests_total[5m]))
+        ) * 100 < 99.9
+      for: 5m
+      labels:
+        severity: warning
+        service: api
+        sli: api_availability
+      annotations:
+        summary: "API availability below SLO"
+        description: "API availability is {{ $value }}%, below the 99.9% SLO"
+    
+    - alert: APILatencyHigh
+      expr: |
+        histogram_quantile(0.95, rate(ms5_api_request_duration_seconds_bucket[5m])) > 0.2
+      for: 5m
+      labels:
+        severity: warning
+        service: api
+        sli: api_latency
+      annotations:
+        summary: "API latency above SLO"
+        description: "API latency p95 is {{ $value }}s, above the 0.2s SLO"
+    
+    - alert: APIErrorRateHigh
+      expr: |
+        (
+          sum(rate(ms5_api_requests_total{status_code=~"5.."}[5m])) /
+          sum(rate(ms5_api_requests_total[5m]))
+        ) * 100 > 0.1
+      for: 5m
+      labels:
+        severity: critical
+        service: api
+        sli: api_error_rate
+      annotations:
+        summary: "API error rate above SLO"
+        description: "API error rate is {{ $value }}%, above the 0.1% SLO"
+    
+    # Database SLI Alerts
+    - alert: DatabaseAvailabilityLow
+      expr: |
+        avg_over_time(ms5_db_connections_active[5m]) == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: database
+        sli: db_availability
+      annotations:
+        summary: "Database availability below SLO"
+        description: "Database is not available, below the 99.95% SLO"
+    
+    - alert: DatabaseQueryLatencyHigh
+      expr: |
+        histogram_quantile(0.95, rate(ms5_db_query_duration_seconds_bucket[5m])) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: database
+        sli: db_query_latency
+      annotations:
+        summary: "Database query latency above SLO"
+        description: "Database query latency p95 is {{ $value }}s, above the 0.1s SLO"
+    
+    # Production SLI Alerts
+    - alert: ProductionOEELow
+      expr: |
+        avg_over_time(ms5_production_oee[1h]) * 100 < 85
+      for: 1h
+      labels:
+        severity: warning
+        service: production
+        sli: production_oee
+      annotations:
+        summary: "Production OEE below SLO"
+        description: "Production OEE is {{ $value }}%, below the 85% SLO"
+    
+    - alert: ProductionEfficiencyLow
+      expr: |
+        avg_over_time(ms5_production_efficiency_percent[1h]) < 80
+      for: 1h
+      labels:
+        severity: warning
+        service: production
+        sli: production_efficiency
+      annotations:
+        summary: "Production efficiency below SLO"
+        description: "Production efficiency is {{ $value }}%, below the 80% SLO"
+    
+    - alert: AndonResponseTimeHigh
+      expr: |
+        histogram_quantile(0.95, rate(ms5_andon_response_time_seconds_bucket[1h])) > 300
+      for: 1h
+      labels:
+        severity: warning
+        service: andon
+        sli: andon_response_time
+      annotations:
+        summary: "Andon response time above SLO"
+        description: "Andon response time p95 is {{ $value }}s, above the 300s SLO"
+    
+    # Quality SLI Alerts
+    - alert: QualityDefectRateHigh
+      expr: |
+        avg_over_time(ms5_quality_defect_rate[1h]) > 5
+      for: 1h
+      labels:
+        severity: warning
+        service: quality
+        sli: quality_defect_rate
+      annotations:
+        summary: "Quality defect rate above SLO"
+        description: "Quality defect rate is {{ $value }} per 1000 units, above the 5 SLO"
+    
+    # System SLI Alerts
+    - alert: SystemAvailabilityLow
+      expr: |
+        avg_over_time(up[5m]) * 100 < 99.9
+      for: 5m
+      labels:
+        severity: critical
+        service: system
+        sli: system_availability
+      annotations:
+        summary: "System availability below SLO"
+        description: "System availability is {{ $value }}%, below the 99.9% SLO"
+    
+    - alert: WebSocketConnectionsHigh
+      expr: |
+        avg_over_time(ms5_websocket_connections_active[5m]) > 100
+      for: 5m
+      labels:
+        severity: warning
+        service: websocket
+        sli: websocket_connections
+      annotations:
+        summary: "WebSocket connections above SLO"
+        description: "WebSocket connections is {{ $value }}, above the 100 SLO"
+
+  - name: slo.rules
+    rules:
+    # SLO Error Budget Alerts
+    - alert: APIAvailabilityErrorBudgetBurn
+      expr: |
+        (
+          (
+            sum(rate(ms5_api_requests_total{status_code!~"5.."}[5m])) /
+            sum(rate(ms5_api_requests_total[5m]))
+          ) * 100
+        ) < 99.9
+      for: 10m
+      labels:
+        severity: warning
+        service: api
+        slo: api_availability_slo
+      annotations:
+        summary: "API availability SLO error budget burning"
+        description: "API availability SLO error budget is being consumed rapidly"
+    
+    - alert: APILatencyErrorBudgetBurn
+      expr: |
+        histogram_quantile(0.95, rate(ms5_api_request_duration_seconds_bucket[5m])) > 0.2
+      for: 10m
+      labels:
+        severity: warning
+        service: api
+        slo: api_latency_slo
+      annotations:
+        summary: "API latency SLO error budget burning"
+        description: "API latency SLO error budget is being consumed rapidly"
+    
+    - alert: ProductionOEEErrorBudgetBurn
+      expr: |
+        avg_over_time(ms5_production_oee[1h]) * 100 < 85
+      for: 2h
+      labels:
+        severity: warning
+        service: production
+        slo: production_oee_slo
+      annotations:
+        summary: "Production OEE SLO error budget burning"
+        description: "Production OEE SLO error budget is being consumed rapidly"
+    
+    - alert: SystemAvailabilityErrorBudgetBurn
+      expr: |
+        avg_over_time(up[5m]) * 100 < 99.9
+      for: 10m
+      labels:
+        severity: critical
+        service: system
+        slo: system_availability_slo
+      annotations:
+        summary: "System availability SLO error budget burning"
+        description: "System availability SLO error budget is being consumed rapidly"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sli-slo-calculator
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+    service: sli-slo-calculator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: monitoring
+      service: sli-slo-calculator
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: monitoring
+        service: sli-slo-calculator
+    spec:
+      containers:
+      - name: sli-slo-calculator
+        image: python:3.11-slim
+        command: ["python", "-m", "sli_slo_calculator"]
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.ms5-production.svc.cluster.local:9090"
+        - name: CALCULATION_INTERVAL
+          value: "30s"
+        - name: NAMESPACE
+          value: "ms5-production"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: sli-slo-config
+          mountPath: /etc/sli-slo
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: sli-slo-config
+        configMap:
+          name: sli-slo-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sli-slo-calculator
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+    service: sli-slo-calculator
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: ms5-dashboard
+    component: monitoring
+    service: sli-slo-calculator
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: sli-slo-calculator-monitor
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: monitoring
+      service: sli-slo-calculator
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true

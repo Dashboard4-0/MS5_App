@@ -1,0 +1,279 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-cost-optimization
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Cost Optimization Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Cost Optimization configuration
+  cdn-cost-optimization.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-cost-optimization
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Cost Optimization Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      cost-optimization-config.json: |
+        {
+          "costOptimization": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "optimizationStrategies": [
+              {
+                "name": "CacheOptimization",
+                "description": "Optimize cache settings to reduce origin bandwidth",
+                "actions": [
+                  "Increase cache TTL for static assets",
+                  "Implement cache warming",
+                  "Optimize cache rules"
+                ],
+                "expectedSavings": "20-30%"
+              },
+              {
+                "name": "CompressionOptimization",
+                "description": "Enable compression to reduce bandwidth usage",
+                "actions": [
+                  "Enable gzip compression",
+                  "Enable Brotli compression",
+                  "Optimize compression settings"
+                ],
+                "expectedSavings": "15-25%"
+              },
+              {
+                "name": "ImageOptimization",
+                "description": "Optimize images to reduce bandwidth usage",
+                "actions": [
+                  "Enable WebP conversion",
+                  "Enable AVIF conversion",
+                  "Optimize image quality"
+                ],
+                "expectedSavings": "10-20%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Cost Optimization monitoring
+  cdn-cost-optimization-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-cost-optimization-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Cost Optimization Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      cost-optimization-monitoring.json: |
+        {
+          "monitoring": {
+            "costOptimization": "ms5-cdn-cost-optimization",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "CostSavings",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total cost savings achieved through optimization"
+              },
+              {
+                "name": "BandwidthUsage",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total bandwidth usage"
+              },
+              {
+                "name": "OriginBandwidthUsage",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total origin bandwidth usage"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighBandwidthUsage",
+                "condition": "bandwidth_usage > 100GB/hour",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Bandwidth usage is above 100GB/hour"
+              },
+              {
+                "name": "HighOriginBandwidthUsage",
+                "condition": "origin_bandwidth_usage > 50GB/hour",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Origin bandwidth usage is above 50GB/hour"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Cost Optimization script
+  cdn-cost-optimization.py: |
+    #!/usr/bin/env python3
+    """
+    CDN cost optimization script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_cost_optimization():
+        """Get CDN cost optimization from Azure"""
+        try:
+            # Azure CDN cost optimization endpoint
+            cost_optimization_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/cost-optimization"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(cost_optimization_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                cost_optimization = response.json()
+                
+                return {
+                    "request_count": cost_optimization.get("RequestCount", 0),
+                    "bytes_sent": cost_optimization.get("BytesSent", 0),
+                    "cache_hit_ratio": cost_optimization.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN cost optimization: {e}")
+            return None
+    
+    def send_cost_optimization_to_prometheus(cost_optimization):
+        """Send CDN cost optimization to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_cost_optimization",
+                "value": cost_optimization["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN cost optimization sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN cost optimization to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN cost optimization to Prometheus: {e}")
+    
+    def main():
+        """Main cost optimization loop"""
+        while True:
+            cost_optimization = get_cdn_cost_optimization()
+            if cost_optimization:
+                print(json.dumps(cost_optimization, indent=2))
+                send_cost_optimization_to_prometheus(cost_optimization)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Cost Optimization deployment
+  cdn-cost-optimization-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-cost-optimization
+      namespace: ms5-frontend
+      labels:
+        app: cdn-cost-optimization
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-cost-optimization
+      template:
+        metadata:
+          labels:
+            app: cdn-cost-optimization
+        spec:
+          containers:
+          - name: cdn-cost-optimization
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-cost-optimization.py"]
+            volumeMounts:
+            - name: cost-optimization-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: cost-optimization-script
+            configMap:
+              name: cdn-cost-optimization-config
+              defaultMode: 0755

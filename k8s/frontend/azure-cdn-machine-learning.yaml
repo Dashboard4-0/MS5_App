@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-machine-learning
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Machine Learning Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Machine Learning configuration
+  cdn-machine-learning.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-machine-learning
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Machine Learning Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      machine-learning-config.json: |
+        {
+          "machineLearning": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "machineLearningTypes": [
+              {
+                "name": "Machine Learning Technology",
+                "description": "Machine learning technology for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Technology research",
+                  "Implementation planning",
+                  "Deployment",
+                  "Monitoring"
+                ]
+              },
+              {
+                "name": "Machine Learning Process",
+                "description": "Machine learning process for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "High",
+                "procedures": [
+                  "Process planning",
+                  "Implementation",
+                  "Performance monitoring",
+                  "Optimization"
+                ]
+              },
+              {
+                "name": "Machine Learning Automation",
+                "description": "Machine learning automation for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Automation planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              },
+              {
+                "name": "Machine Learning Monitoring",
+                "description": "Machine learning monitoring for MS5.0 Dashboard",
+                "status": "Active",
+                "priority": "Medium",
+                "procedures": [
+                  "Monitoring planning",
+                  "Implementation",
+                  "Testing",
+                  "Reporting"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Machine Learning monitoring
+  cdn-machine-learning-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-machine-learning-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Machine Learning Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      machine-learning-monitoring.json: |
+        {
+          "monitoring": {
+            "machineLearning": "ms5-cdn-machine-learning",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "MachineLearningTechnologyPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average machine learning technology performance"
+              },
+              {
+                "name": "MachineLearningProcessPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average machine learning process performance"
+              },
+              {
+                "name": "MachineLearningAutomationPerformance",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average machine learning automation performance"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowMachineLearningTechnologyPerformance",
+                "condition": "machine_learning_technology_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Machine learning technology performance is below 80%"
+              },
+              {
+                "name": "LowMachineLearningProcessPerformance",
+                "condition": "machine_learning_process_performance < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Machine learning process performance is below 80%"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Machine Learning script
+  cdn-machine-learning.py: |
+    #!/usr/bin/env python3
+    """
+    CDN machine learning script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_machine_learning():
+        """Get CDN machine learning from Azure"""
+        try:
+            # Azure CDN machine learning endpoint
+            machine_learning_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/machine-learning"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(machine_learning_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                machine_learning = response.json()
+                
+                return {
+                    "request_count": machine_learning.get("RequestCount", 0),
+                    "bytes_sent": machine_learning.get("BytesSent", 0),
+                    "cache_hit_ratio": machine_learning.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN machine learning: {e}")
+            return None
+    
+    def send_machine_learning_to_prometheus(machine_learning):
+        """Send CDN machine learning to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_machine_learning",
+                "value": machine_learning["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN machine learning sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN machine learning to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN machine learning to Prometheus: {e}")
+    
+    def main():
+        """Main machine learning loop"""
+        while True:
+            machine_learning = get_cdn_machine_learning()
+            if machine_learning:
+                print(json.dumps(machine_learning, indent=2))
+                send_machine_learning_to_prometheus(machine_learning)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Machine Learning deployment
+  cdn-machine-learning-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-machine-learning
+      namespace: ms5-frontend
+      labels:
+        app: cdn-machine-learning
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-machine-learning
+      template:
+        metadata:
+          labels:
+            app: cdn-machine-learning
+        spec:
+          containers:
+          - name: cdn-machine-learning
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-machine-learning.py"]
+            volumeMounts:
+            - name: machine-learning-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: machine-learning-script
+            configMap:
+              name: cdn-machine-learning-config
+              defaultMode: 0755

@@ -1,0 +1,294 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-support
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Support Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Support configuration
+  cdn-support.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-support
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Support Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      support-config.json: |
+        {
+          "support": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "supportChannels": [
+              {
+                "name": "Email",
+                "address": "support@ms5floor.com",
+                "responseTime": "24 hours",
+                "severity": "All"
+              },
+              {
+                "name": "Phone",
+                "number": "+1-800-MSFLOOR",
+                "responseTime": "4 hours",
+                "severity": "High"
+              },
+              {
+                "name": "Chat",
+                "url": "https://support.ms5floor.com/chat",
+                "responseTime": "1 hour",
+                "severity": "Medium"
+              }
+            ],
+            "escalationMatrix": [
+              {
+                "level": 1,
+                "team": "L1 Support",
+                "responseTime": "1 hour",
+                "severity": "Low"
+              },
+              {
+                "level": 2,
+                "team": "L2 Support",
+                "responseTime": "30 minutes",
+                "severity": "Medium"
+              },
+              {
+                "level": 3,
+                "team": "L3 Support",
+                "responseTime": "15 minutes",
+                "severity": "High"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Support monitoring
+  cdn-support-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-support-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Support Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      support-monitoring.json: |
+        {
+          "monitoring": {
+            "support": "ms5-cdn-support",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "SupportTickets",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of support tickets"
+              },
+              {
+                "name": "SupportResponseTime",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average support response time"
+              },
+              {
+                "name": "SupportResolutionTime",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average support resolution time"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighSupportTickets",
+                "condition": "support_tickets > 10/hour",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Support tickets are above 10 per hour"
+              },
+              {
+                "name": "HighSupportResponseTime",
+                "condition": "support_response_time > 4 hours",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Support response time is above 4 hours"
+              },
+              {
+                "name": "HighSupportResolutionTime",
+                "condition": "support_resolution_time > 24 hours",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Support resolution time is above 24 hours"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Support script
+  cdn-support.py: |
+    #!/usr/bin/env python3
+    """
+    CDN support script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_support():
+        """Get CDN support from Azure"""
+        try:
+            # Azure CDN support endpoint
+            support_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/support"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(support_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                support = response.json()
+                
+                return {
+                    "request_count": support.get("RequestCount", 0),
+                    "bytes_sent": support.get("BytesSent", 0),
+                    "cache_hit_ratio": support.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN support: {e}")
+            return None
+    
+    def send_support_to_prometheus(support):
+        """Send CDN support to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_support",
+                "value": support["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN support sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN support to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN support to Prometheus: {e}")
+    
+    def main():
+        """Main support loop"""
+        while True:
+            support = get_cdn_support()
+            if support:
+                print(json.dumps(support, indent=2))
+                send_support_to_prometheus(support)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Support deployment
+  cdn-support-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-support
+      namespace: ms5-frontend
+      labels:
+        app: cdn-support
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-support
+      template:
+        metadata:
+          labels:
+            app: cdn-support
+        spec:
+          containers:
+          - name: cdn-support
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-support.py"]
+            volumeMounts:
+            - name: support-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: support-script
+            configMap:
+              name: cdn-support-config
+              defaultMode: 0755

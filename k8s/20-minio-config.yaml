@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-minio-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+data:
+  # MinIO Configuration
+  MINIO_ROOT_USER: "ms5_minio_user"
+  MINIO_CONSOLE_ADDRESS: ":9001"
+  
+  # Bucket Policies
+  bucket-policy.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "AWS": ["*"]
+          },
+          "Action": [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject"
+          ],
+          "Resource": [
+            "arn:aws:s3:::ms5-uploads/*",
+            "arn:aws:s3:::ms5-reports/*",
+            "arn:aws:s3:::ms5-backups/*"
+          ]
+        }
+      ]
+    }
+  
+  # MinIO Server Configuration
+  config.json: |
+    {
+      "version": "32",
+      "credential": {
+        "accessKey": "ms5_minio_user",
+        "secretKey": "ms5_minio_password"
+      },
+      "region": "us-east-1",
+      "browser": "on",
+      "domain": "",
+      "storageclass": {
+        "standard": "",
+        "rrs": ""
+      },
+      "cache": {
+        "drives": [],
+        "expiry": 90,
+        "maxuse": 80,
+        "exclude": []
+      },
+      "notify": {
+        "amqp": {},
+        "nats": {},
+        "elasticsearch": {},
+        "redis": {},
+        "postgres": {},
+        "mysql": {},
+        "kafka": {},
+        "webhook": {}
+      },
+      "logger": {
+        "console": {
+          "enable": true,
+          "level": "info"
+        },
+        "file": {
+          "enable": true,
+          "filename": "/var/log/minio.log",
+          "level": "info"
+        },
+        "audit": {
+          "enable": true,
+          "filename": "/var/log/minio-audit.log"
+        }
+      }
+    }
+  
+  # CORS Configuration
+  cors.json: |
+    [
+      {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"],
+        "MaxAgeSeconds": 3000
+      }
+    ]
+  
+  # Notification Configuration
+  notification.json: |
+    {
+      "version": "1",
+      "notifications": {
+        "webhook": {
+          "1": {
+            "enable": true,
+            "endpoint": "http://ms5-backend.ms5-production.svc.cluster.local:8000/webhooks/minio",
+            "events": ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
+          }
+        }
+      }
+    }

@@ -1,0 +1,526 @@
+# MS5.0 Floor Dashboard - Helm Chart Values
+
+# Global configuration
+global:
+  imageRegistry: ms5acrprod.azurecr.io
+  imagePullSecrets:
+    - name: ms5-acr-secret
+  storageClass: managed-premium
+  namespace: ms5-production
+
+# Namespace configuration
+namespace:
+  create: true
+  name: ms5-production
+  labels:
+    name: ms5-production
+    environment: production
+    app: ms5-dashboard
+    version: "1.0.0"
+
+# Resource quotas
+resourceQuota:
+  enabled: true
+  cpu: "20"
+  memory: 40Gi
+  storage: 1Ti
+  pods: "50"
+  services: "20"
+  secrets: "20"
+  configmaps: "20"
+
+# Limit ranges
+limitRange:
+  enabled: true
+  default:
+    cpu: "2"
+    memory: 4Gi
+  defaultRequest:
+    cpu: "100m"
+    memory: 256Mi
+  max:
+    storage: 500Gi
+  min:
+    storage: 1Gi
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    registry: ms5acrprod.azurecr.io
+    repository: timescale/timescaledb
+    tag: latest-pg15
+  auth:
+    postgresPassword: ms5_password
+    username: ms5_user
+    password: ms5_password
+    database: factory_telemetry
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: managed-premium
+    resources:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: managed-premium
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    registry: ms5acrprod.azurecr.io
+    repository: redis
+    tag: 7-alpine
+  auth:
+    enabled: true
+    password: ms5_redis_password
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: managed-premium
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: managed-premium
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+
+# Backend API configuration
+backend:
+  enabled: true
+  image:
+    repository: ms5-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+    port: 8000
+    metricsPort: 9090
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    hosts:
+      - host: ms5-api.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-api-tls
+        hosts:
+          - ms5-api.company.com
+
+# Celery Worker configuration
+celeryWorker:
+  enabled: true
+  image:
+    repository: ms5-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Celery Beat configuration
+celeryBeat:
+  enabled: true
+  image:
+    repository: ms5-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Flower configuration
+flower:
+  enabled: true
+  image:
+    repository: ms5-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 5555
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: ms5-flower.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-flower-tls
+        hosts:
+          - ms5-flower.company.com
+
+# MinIO configuration
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  persistence:
+    enabled: true
+    size: 500Gi
+    storageClass: managed-premium
+  auth:
+    rootUser: ms5_minio_user
+    rootPassword: ms5_minio_password
+  service:
+    type: ClusterIP
+    port: 9000
+    consolePort: 9001
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: ms5-storage.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-storage-tls
+        hosts:
+          - ms5-storage.company.com
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  image:
+    repository: prom/prometheus
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  persistence:
+    enabled: true
+    size: 200Gi
+    storageClass: managed-premium
+  service:
+    type: ClusterIP
+    port: 9090
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: ms5-prometheus.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-prometheus-tls
+        hosts:
+          - ms5-prometheus.company.com
+
+# Grafana configuration
+grafana:
+  enabled: true
+  image:
+    repository: grafana/grafana
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: managed-premium
+  auth:
+    adminPassword: admin
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: ms5-grafana.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-grafana-tls
+        hosts:
+          - ms5-grafana.company.com
+
+# AlertManager configuration
+alertmanager:
+  enabled: true
+  image:
+    repository: prom/alertmanager
+    tag: latest
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: managed-premium
+  service:
+    type: ClusterIP
+    port: 9093
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: ms5-alerts.company.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ms5-alerts-tls
+        hosts:
+          - ms5-alerts.company.com
+
+# Network policies
+networkPolicies:
+  enabled: true
+  defaultDeny: true
+  allowDNS: true
+  allowIngress: true
+
+# Pod Security Standards
+podSecurityStandards:
+  enabled: true
+  level: restricted
+  version: v1.24
+
+# RBAC
+rbac:
+  enabled: true
+  create: true
+
+# Service accounts
+serviceAccounts:
+  backend:
+    create: true
+    name: ms5-backend-sa
+  database:
+    create: true
+    name: ms5-database-sa
+  monitoring:
+    create: true
+    name: ms5-monitoring-sa
+
+# Secrets
+secrets:
+  enabled: true
+  create: true
+  backend:
+    secretKey: my-host-secret-key-change-in-production
+    jwtSecret: my-jwt-secret-key-for-ms5-dashboard
+  database:
+    password: ms5_password
+    replicationPassword: ms5_replication_password
+  redis:
+    password: ms5_redis_password
+  minio:
+    password: ms5_minio_password
+  grafana:
+    adminPassword: admin
+
+# ConfigMaps
+configMaps:
+  enabled: true
+  create: true
+  app:
+    environment: production
+    debug: false
+    logLevel: INFO
+  database:
+    postgresDb: factory_telemetry
+    postgresUser: ms5_user
+  redis:
+    maxMemory: 2gb
+    maxMemoryPolicy: allkeys-lru
+  minio:
+    rootUser: ms5_minio_user
+    consoleAddress: ":9001"
+
+# Azure Key Vault integration
+azureKeyVault:
+  enabled: true
+  name: kv-ms5-prod-uksouth
+  tenantId: <tenant-id>
+  clientId: <client-id>
+  clientSecret: <client-secret>
+  managedIdentityId: <managed-identity-id>
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+  grafana:
+    enabled: true
+    dashboards:
+      - ms5-overview
+      - ms5-production
+      - ms5-system
+  alertmanager:
+    enabled: true
+    receivers:
+      - name: web.hook
+        webhook_configs:
+          - url: 'http://ms5-backend.ms5-production.svc.cluster.local:8000/webhooks/alerts'
+
+# SLI/SLO monitoring
+sliSlo:
+  enabled: true
+  definitions:
+    enabled: true
+  configuration:
+    enabled: true
+  costMonitoring:
+    enabled: true
+
+# Chaos engineering
+chaosEngineering:
+  enabled: false
+  litmus:
+    enabled: false
+  chaosMonkey:
+    enabled: false
+
+# Backup and disaster recovery
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: "30d"
+  storage:
+    type: azure-blob
+    container: ms5-backups
+    account: ms5storageaccount
+
+# Security
+security:
+  enabled: true
+  podSecurityStandards: true
+  networkPolicies: true
+  rbac: true
+  secretsManagement: true
+  imageScanning: true
+  vulnerabilityScanning: true
+
+# Compliance
+compliance:
+  enabled: true
+  gdpr: true
+  soc2: true
+  iso27001: true
+  fda21cfr11: true

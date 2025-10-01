@@ -1,0 +1,292 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-training
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Training Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Training configuration
+  cdn-training.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-training
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Training Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      training-config.json: |
+        {
+          "training": {
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "trainingModules": [
+              {
+                "name": "CDN Fundamentals",
+                "description": "Introduction to Azure CDN concepts and features",
+                "duration": "2 hours",
+                "level": "Beginner",
+                "topics": [
+                  "What is a CDN",
+                  "Azure CDN features",
+                  "CDN pricing models",
+                  "CDN performance optimization"
+                ]
+              },
+              {
+                "name": "CDN Configuration",
+                "description": "How to configure Azure CDN for optimal performance",
+                "duration": "3 hours",
+                "level": "Intermediate",
+                "topics": [
+                  "CDN profile creation",
+                  "Endpoint configuration",
+                  "Custom domain setup",
+                  "SSL certificate management"
+                ]
+              },
+              {
+                "name": "CDN Monitoring",
+                "description": "How to monitor and troubleshoot Azure CDN",
+                "duration": "2 hours",
+                "level": "Advanced",
+                "topics": [
+                  "CDN metrics and logs",
+                  "Performance monitoring",
+                  "Troubleshooting common issues",
+                  "Cost optimization"
+                ]
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Training monitoring
+  cdn-training-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-training-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Training Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      training-monitoring.json: |
+        {
+          "monitoring": {
+            "training": "ms5-cdn-training",
+            "endpoint": "ms5-cdn-endpoint",
+            "profile": "ms5-cdn-profile",
+            "resourceGroup": "ms5-rg",
+            "subscription": "{subscription-id}",
+            "metrics": [
+              {
+                "name": "TrainingCompletions",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "description": "Total number of training completions"
+              },
+              {
+                "name": "TrainingProgress",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average training progress"
+              },
+              {
+                "name": "TrainingSatisfaction",
+                "aggregation": "Average",
+                "interval": "PT1H",
+                "description": "Average training satisfaction rating"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "LowTrainingCompletions",
+                "condition": "training_completions < 5/hour",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Training completions are below 5 per hour"
+              },
+              {
+                "name": "LowTrainingProgress",
+                "condition": "training_progress < 50%",
+                "severity": "Medium",
+                "action": "NotifyTeam",
+                "description": "Training progress is below 50%"
+              },
+              {
+                "name": "LowTrainingSatisfaction",
+                "condition": "training_satisfaction < 3.0",
+                "severity": "High",
+                "action": "NotifyTeam",
+                "description": "Training satisfaction is below 3.0"
+              }
+            ]
+          }
+        }
+  
+  # Azure CDN Training script
+  cdn-training.py: |
+    #!/usr/bin/env python3
+    """
+    CDN training script for MS5.0 Dashboard
+    """
+    import json
+    import requests
+    import time
+    from datetime import datetime
+    
+    def get_cdn_training():
+        """Get CDN training from Azure"""
+        try:
+            # Azure CDN training endpoint
+            training_url = "https://management.azure.com/subscriptions/{subscription-id}/resourceGroups/{resource-group}/providers/Microsoft.Cdn/profiles/{profile-name}/endpoints/{endpoint-name}/training"
+            
+            headers = {
+                "Authorization": "Bearer {access-token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "api-version": "2021-06-01",
+                "metricnames": "RequestCount,BytesSent,CacheHitRatio",
+                "aggregation": "Total",
+                "interval": "PT1H",
+                "startTime": "2023-01-01T00:00:00Z",
+                "endTime": "2023-01-02T00:00:00Z"
+            }
+            
+            response = requests.get(training_url, headers=headers, params=params, timeout=30)
+            if response.status_code == 200:
+                training = response.json()
+                
+                return {
+                    "request_count": training.get("RequestCount", 0),
+                    "bytes_sent": training.get("BytesSent", 0),
+                    "cache_hit_ratio": training.get("CacheHitRatio", 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            print(f"Error getting CDN training: {e}")
+            return None
+    
+    def send_training_to_prometheus(training):
+        """Send CDN training to Prometheus"""
+        try:
+            prometheus_url = "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write"
+            
+            payload = {
+                "metric": "cdn_training",
+                "value": training["request_count"],
+                "labels": {
+                    "cdn_profile": "ms5-cdn-profile",
+                    "endpoint": "ms5-cdn-endpoint"
+                }
+            }
+            
+            response = requests.post(prometheus_url, json=payload, timeout=5)
+            if response.status_code == 200:
+                print("CDN training sent to Prometheus successfully")
+            else:
+                print(f"Failed to send CDN training to Prometheus: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending CDN training to Prometheus: {e}")
+    
+    def main():
+        """Main training loop"""
+        while True:
+            training = get_cdn_training()
+            if training:
+                print(json.dumps(training, indent=2))
+                send_training_to_prometheus(training)
+            
+            time.sleep(3600)  # Check every hour
+    
+    if __name__ == "__main__":
+        main()
+  
+  # Azure CDN Training deployment
+  cdn-training-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cdn-training
+      namespace: ms5-frontend
+      labels:
+        app: cdn-training
+        component: monitoring
+        tier: frontend
+        environment: production
+        deployment: aks
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cdn-training
+      template:
+        metadata:
+          labels:
+            app: cdn-training
+        spec:
+          containers:
+          - name: cdn-training
+            image: python:3.9-alpine
+            command: ["python3", "/scripts/cdn-training.py"]
+            volumeMounts:
+            - name: training-script
+              mountPath: /scripts
+            env:
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: subscription-id
+            - name: AZURE_RESOURCE_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: resource-group
+            - name: AZURE_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: access-token
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "32Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+          volumes:
+          - name: training-script
+            configMap:
+              name: cdn-training-config
+              defaultMode: 0755

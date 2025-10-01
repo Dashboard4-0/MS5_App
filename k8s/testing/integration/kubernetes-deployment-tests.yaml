@@ -1,0 +1,246 @@
+# Kubernetes Deployment Validation Tests
+# Comprehensive test suite for validating Kubernetes deployments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-deployment-tests
+  namespace: ci-cd
+  labels:
+    app.kubernetes.io/name: k8s-deployment-tests
+    app.kubernetes.io/part-of: ci-cd-pipeline
+    app.kubernetes.io/component: deployment-validation
+data:
+  test-suite.yaml: |
+    # Kubernetes Deployment Test Suite
+    # Starship-grade validation for bulletproof deployments
+    
+    test_suites:
+      # Pod Health and Readiness Tests
+      pod_health_tests:
+        - name: "pod-ready-state"
+          description: "Verify all pods are in Ready state"
+          type: "kubectl"
+          command: |
+            kubectl get pods -n {{ .namespace }} -l app={{ .app_label }} -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -v False
+          timeout: "300s"
+          retry_count: 10
+          retry_interval: "30s"
+          
+        - name: "pod-running-state"
+          description: "Verify all pods are in Running phase"
+          type: "kubectl"
+          command: |
+            kubectl get pods -n {{ .namespace }} -l app={{ .app_label }} -o jsonpath='{.items[*].status.phase}' | grep -v Running && exit 1 || exit 0
+          timeout: "300s"
+          retry_count: 10
+          retry_interval: "30s"
+          
+        - name: "container-restart-count"
+          description: "Verify container restart count is acceptable"
+          type: "kubectl"
+          command: |
+            kubectl get pods -n {{ .namespace }} -l app={{ .app_label }} -o jsonpath='{.items[*].status.containerStatuses[*].restartCount}' | awk '{for(i=1;i<=NF;i++) if($i>3) exit 1}'
+          timeout: "60s"
+          
+        - name: "pod-resource-limits"
+          description: "Verify pods have resource limits defined"
+          type: "kubectl"
+          command: |
+            kubectl get pods -n {{ .namespace }} -l app={{ .app_label }} -o jsonpath='{.items[*].spec.containers[*].resources.limits}' | grep -q cpu
+          timeout: "30s"
+      
+      # Service and Networking Tests
+      service_tests:
+        - name: "service-endpoints"
+          description: "Verify service has healthy endpoints"
+          type: "kubectl"
+          command: |
+            kubectl get endpoints -n {{ .namespace }} {{ .service_name }} -o jsonpath='{.subsets[*].addresses[*].ip}' | wc -w | awk '$1 > 0 {exit 0} {exit 1}'
+          timeout: "120s"
+          retry_count: 5
+          retry_interval: "10s"
+          
+        - name: "service-port-connectivity"
+          description: "Verify service ports are accessible"
+          type: "connectivity"
+          command: |
+            kubectl run test-pod --rm -i --restart=Never --image=busybox -- nc -z {{ .service_name }}.{{ .namespace }}.svc.cluster.local {{ .service_port }}
+          timeout: "60s"
+          retry_count: 3
+          retry_interval: "10s"
+          
+        - name: "dns-resolution"
+          description: "Verify DNS resolution works for services"
+          type: "connectivity"
+          command: |
+            kubectl run test-pod --rm -i --restart=Never --image=busybox -- nslookup {{ .service_name }}.{{ .namespace }}.svc.cluster.local
+          timeout: "30s"
+          
+        - name: "ingress-connectivity"
+          description: "Verify ingress is accessible externally"
+          type: "http"
+          url: "https://{{ .ingress_host }}/health"
+          expected_status: 200
+          timeout: "60s"
+          retry_count: 5
+          retry_interval: "10s"
+      
+      # Storage and Persistence Tests
+      storage_tests:
+        - name: "pvc-bound-state"
+          description: "Verify PersistentVolumeClaims are bound"
+          type: "kubectl"
+          command: |
+            kubectl get pvc -n {{ .namespace }} -o jsonpath='{.items[*].status.phase}' | grep -v Bound && exit 1 || exit 0
+          timeout: "300s"
+          retry_count: 5
+          retry_interval: "30s"
+          
+        - name: "storage-capacity"
+          description: "Verify storage has sufficient capacity"
+          type: "kubectl"
+          command: |
+            kubectl get pvc -n {{ .namespace }} -o jsonpath='{.items[*].status.capacity.storage}' | awk '{print $1}' | numfmt --from=iec | awk '$1 > 1073741824 {exit 0} {exit 1}'
+          timeout: "60s"
+          
+        - name: "volume-mount-test"
+          description: "Verify volumes are properly mounted"
+          type: "kubectl"
+          command: |
+            kubectl exec -n {{ .namespace }} deployment/{{ .deployment_name }} -- df -h | grep -q /data
+          timeout: "30s"
+      
+      # Configuration and Secrets Tests
+      config_tests:
+        - name: "configmap-exists"
+          description: "Verify required ConfigMaps exist"
+          type: "kubectl"
+          command: |
+            kubectl get configmap -n {{ .namespace }} {{ .configmap_name }}
+          timeout: "30s"
+          
+        - name: "secret-exists"
+          description: "Verify required Secrets exist"
+          type: "kubectl"
+          command: |
+            kubectl get secret -n {{ .namespace }} {{ .secret_name }}
+          timeout: "30s"
+          
+        - name: "environment-variables"
+          description: "Verify environment variables are set"
+          type: "kubectl"
+          command: |
+            kubectl exec -n {{ .namespace }} deployment/{{ .deployment_name }} -- env | grep -q {{ .required_env_var }}
+          timeout: "30s"
+      
+      # Security Tests
+      security_tests:
+        - name: "pod-security-context"
+          description: "Verify pods run with security context"
+          type: "kubectl"
+          command: |
+            kubectl get pods -n {{ .namespace }} -l app={{ .app_label }} -o jsonpath='{.items[*].spec.securityContext.runAsNonRoot}' | grep -q true
+          timeout: "30s"
+          
+        - name: "network-policy-enforcement"
+          description: "Verify network policies are enforced"
+          type: "kubectl"
+          command: |
+            kubectl get networkpolicy -n {{ .namespace }} | wc -l | awk '$1 > 0 {exit 0} {exit 1}'
+          timeout: "30s"
+          
+        - name: "rbac-permissions"
+          description: "Verify RBAC permissions are correctly configured"
+          type: "kubectl"
+          command: |
+            kubectl auth can-i --as=system:serviceaccount:{{ .namespace }}:{{ .service_account }} create pods -n {{ .namespace }}
+          timeout: "30s"
+      
+      # Performance Tests
+      performance_tests:
+        - name: "resource-utilization"
+          description: "Verify resource utilization is within limits"
+          type: "metrics"
+          query: |
+            (rate(container_cpu_usage_seconds_total{namespace="{{ .namespace }}", pod=~"{{ .pod_pattern }}"}[5m]) * 100) < 80
+          timeout: "120s"
+          
+        - name: "memory-usage"
+          description: "Verify memory usage is within limits"
+          type: "metrics"
+          query: |
+            (container_memory_usage_bytes{namespace="{{ .namespace }}", pod=~"{{ .pod_pattern }}"} / container_spec_memory_limit_bytes) * 100 < 85
+          timeout: "120s"
+          
+        - name: "response-time"
+          description: "Verify API response time is acceptable"
+          type: "http"
+          url: "http://{{ .service_name }}.{{ .namespace }}.svc.cluster.local:{{ .service_port }}/health"
+          max_response_time: "200ms"
+          timeout: "60s"
+    
+    # Test Execution Configuration
+    execution_config:
+      parallel_execution: true
+      max_parallel_tests: 5
+      global_timeout: "1800s"  # 30 minutes
+      
+      # Test ordering and dependencies
+      test_order:
+        - "pod_health_tests"
+        - "service_tests"
+        - "storage_tests"
+        - "config_tests"
+        - "security_tests"
+        - "performance_tests"
+      
+      # Failure handling
+      failure_handling:
+        stop_on_first_failure: false
+        retry_failed_tests: true
+        max_retries: 3
+        
+      # Reporting
+      reporting:
+        format: "junit"
+        output_file: "/tmp/k8s-deployment-test-results.xml"
+        include_logs: true
+        
+    # Environment-Specific Test Configuration
+    environments:
+      production:
+        required_test_suites:
+        - "pod_health_tests"
+        - "service_tests"
+        - "storage_tests"
+        - "config_tests"
+        - "security_tests"
+        - "performance_tests"
+        
+        critical_tests:
+        - "pod-ready-state"
+        - "service-endpoints"
+        - "pvc-bound-state"
+        - "pod-security-context"
+        
+      staging:
+        required_test_suites:
+        - "pod_health_tests"
+        - "service_tests"
+        - "storage_tests"
+        - "config_tests"
+        - "security_tests"
+        
+        critical_tests:
+        - "pod-ready-state"
+        - "service-endpoints"
+        - "pvc-bound-state"
+        
+      development:
+        required_test_suites:
+        - "pod_health_tests"
+        - "service_tests"
+        
+        critical_tests:
+        - "pod-ready-state"
+        - "service-endpoints"

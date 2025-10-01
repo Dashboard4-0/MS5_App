@@ -1,0 +1,88 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-backend
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: ms5-dashboard
+    component: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-backend-loadbalancer
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 8000
+    protocol: TCP
+    name: https
+  selector:
+    app: ms5-dashboard
+    component: backend
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-backend-monitoring
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    role: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: ms5-dashboard
+    component: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-backend-websocket
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    role: websocket
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: websocket
+  selector:
+    app: ms5-dashboard
+    component: backend

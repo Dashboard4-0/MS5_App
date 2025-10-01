@@ -1,0 +1,260 @@
+---
+# MS5.0 Floor Dashboard - Enhanced Prometheus Deployment
+# Production-grade StatefulSet with persistent storage, high availability, and security
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data-pvc
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    storage-tier: premium
+  annotations:
+    description: "Persistent storage for Prometheus metrics data with 30-day retention"
+    managed-by: "ms5-devops-team"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi  # Increased storage for 30-day retention
+  storageClassName: managed-premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    version: "v2.45.0"
+  annotations:
+    description: "Enhanced Prometheus StatefulSet with Kubernetes service discovery and federation"
+    managed-by: "ms5-devops-team"
+spec:
+  serviceName: prometheus
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: prometheus
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: prometheus
+        environment: production
+        version: "v2.45.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        fsGroup: 65534
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.45.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9090
+          name: web
+          protocol: TCP
+        - containerPort: 9091
+          name: federation
+          protocol: TCP
+        command:
+        - prometheus
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --web.console.libraries=/etc/prometheus/console_libraries
+        - --web.console.templates=/etc/prometheus/consoles
+        - --storage.tsdb.retention.time=30d  # 30-day retention
+        - --storage.tsdb.retention.size=400GB  # Size-based retention
+        - --web.enable-lifecycle
+        - --web.enable-admin-api
+        - --web.external-url=https://prometheus.ms5floor.com
+        - --web.route-prefix=/
+        - --log.level=info
+        - --log.format=json
+        - --query.max-concurrency=50
+        - --query.max-samples=50000000
+        - --query.timeout=2m
+        - --storage.tsdb.min-block-duration=2h
+        - --storage.tsdb.max-block-duration=25h
+        - --storage.tsdb.wal-compression
+        - --web.max-connections=512
+        - --web.read-timeout=30s
+        - --web.request-timeout=30s
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-secrets
+              key: azure_client_id
+              optional: true
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-secrets
+              key: azure_client_secret
+              optional: true
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-secrets
+              key: azure_tenant_id
+              optional: true
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-secrets
+              key: azure_subscription_id
+              optional: true
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            ephemeral-storage: "1Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "2Gi"
+        volumeMounts:
+        - name: prometheus-data
+          mountPath: /prometheus
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: prometheus-rules
+          mountPath: /etc/prometheus/rules
+          readOnly: true
+        - name: prometheus-tmp
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          capabilities:
+            drop:
+            - ALL
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Gracefully shutting down Prometheus..."
+                sleep 5
+      # Init container for data migration and validation
+      initContainers:
+      - name: prometheus-init
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Initializing Prometheus data directory..."
+          chown -R 65534:65534 /prometheus
+          chmod -R 755 /prometheus
+          echo "Prometheus initialization complete"
+        volumeMounts:
+        - name: prometheus-data
+          mountPath: /prometheus
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+      volumes:
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: prometheus-data-pvc
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-rules
+        configMap:
+          name: prometheus-rules
+      - name: prometheus-tmp
+        emptyDir: {}
+      # Anti-affinity to ensure pods are distributed across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["ms5-dashboard"]
+                - key: component
+                  operator: In
+                  values: ["prometheus"]
+              topologyKey: kubernetes.io/hostname
+      # Tolerations for node scheduling
+      tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      # Node selector for monitoring nodes
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/monitoring: "true"
+  # Volume claim templates for StatefulSet
+  volumeClaimTemplates:
+  - metadata:
+      name: prometheus-data
+      labels:
+        app: ms5-dashboard
+        component: prometheus
+        environment: production
+      annotations:
+        description: "Persistent storage for Prometheus metrics data"
+        managed-by: "ms5-devops-team"
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: managed-premium

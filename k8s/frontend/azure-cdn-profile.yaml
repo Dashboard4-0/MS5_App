@@ -1,0 +1,407 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms5-frontend-azure-cdn-profile
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: cdn
+    tier: frontend
+    environment: production
+    deployment: aks
+  annotations:
+    description: "MS5.0 Floor Dashboard Azure CDN Profile Configuration for AKS"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+data:
+  # Azure CDN Profile configuration
+  cdn-profile.yaml: |
+    apiVersion: cdn.azure.com/v1api20210601
+    kind: Profile
+    metadata:
+      name: ms5-cdn-profile
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Profile for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    spec:
+      location: "Global"
+      owner:
+        name: ms5-rg
+      sku:
+        name: "Premium_Verizon"
+      tags:
+        environment: production
+        application: ms5-dashboard
+        deployment: aks
+        cost-center: "IT-Infrastructure"
+        owner: "MS5-Team"
+  
+  # Azure CDN Endpoint configuration
+  cdn-endpoint.yaml: |
+    apiVersion: cdn.azure.com/v1api20210601
+    kind: Endpoint
+    metadata:
+      name: ms5-cdn-endpoint
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Endpoint for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    spec:
+      location: "Global"
+      owner:
+        name: ms5-cdn-profile
+      profile:
+        name: ms5-cdn-profile
+      isHttpsEnabled: true
+      isHttpAllowed: false
+      originHostHeader: "ms5floor.com"
+      origins:
+      - name: ms5-frontend-origin
+        hostName: "ms5-frontend-ingress.ms5-frontend.svc.cluster.local"
+        httpPort: 80
+        httpsPort: 443
+        originPath: "/static"
+        priority: 1
+        weight: 100
+      deliveryPolicy:
+        description: "CDN Delivery Policy for MS5.0 Dashboard"
+        rules:
+        - name: "StaticAssets"
+          order: 1
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/static/", "/assets/", "/images/", "/icons/"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "365.00:00:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "public, max-age=31536000, immutable"
+        - name: "APIRequests"
+          order: 2
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/api/"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "00:05:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "no-cache, no-store, must-revalidate"
+        - name: "WebSocketRequests"
+          order: 3
+          conditions:
+          - name: "UrlPath"
+            parameters:
+              operator: "BeginsWith"
+              values: ["/ws"]
+          actions:
+          - name: "CacheExpiration"
+            parameters:
+              cacheBehavior: "Override"
+              cacheDuration: "00:00:00"
+          - name: "ModifyResponseHeader"
+            parameters:
+              headerAction: "Append"
+              headerName: "Cache-Control"
+              value: "no-cache, no-store, must-revalidate"
+  
+  # Azure CDN Rules Engine configuration
+  cdn-rules-engine.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-rules-engine
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Rules Engine Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      rules-engine.json: |
+        {
+          "rules": [
+            {
+              "name": "StaticAssetsOptimization",
+              "order": 1,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/static/", "/assets/", "/images/", "/icons/"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "365.00:00:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                  }
+                },
+                {
+                  "name": "CompressContent",
+                  "parameters": {
+                    "compressionEnabled": true,
+                    "contentTypes": [
+                      "application/javascript",
+                      "application/json",
+                      "text/css",
+                      "text/html",
+                      "text/javascript",
+                      "text/plain",
+                      "text/xml"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "APIRequestsOptimization",
+              "order": 2,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/api/"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "00:05:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "WebSocketRequestsOptimization",
+              "order": 3,
+              "conditions": [
+                {
+                  "name": "UrlPath",
+                  "parameters": {
+                    "operator": "BeginsWith",
+                    "values": ["/ws"]
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "name": "CacheExpiration",
+                  "parameters": {
+                    "cacheBehavior": "Override",
+                    "cacheDuration": "00:00:00"
+                  }
+                },
+                {
+                  "name": "ModifyResponseHeader",
+                  "parameters": {
+                    "headerAction": "Append",
+                    "headerName": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+  
+  # Azure CDN Security configuration
+  cdn-security.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-security
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Security Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      security-policy.json: |
+        {
+          "securityPolicies": [
+            {
+              "name": "WAFPolicy",
+              "type": "WebApplicationFirewall",
+              "parameters": {
+                "wafPolicy": {
+                  "name": "ms5-waf-policy",
+                  "resourceGroup": "ms5-rg",
+                  "location": "Global",
+                  "sku": {
+                    "name": "Premium_AzureFrontDoor"
+                  },
+                  "properties": {
+                    "policySettings": {
+                      "enabledState": "Enabled",
+                      "mode": "Prevention",
+                      "requestBodyCheck": "Enabled",
+                      "maxRequestBodySizeInKb": 128,
+                      "fileUploadLimitInMb": 100
+                    },
+                    "managedRules": {
+                      "managedRuleSets": [
+                        {
+                          "ruleSetType": "Microsoft_DefaultRuleSet",
+                          "ruleSetVersion": "2.1",
+                          "ruleSetAction": "Block"
+                        },
+                        {
+                          "ruleSetType": "Microsoft_BotManagerRuleSet",
+                          "ruleSetVersion": "1.0",
+                          "ruleSetAction": "Block"
+                        }
+                      ]
+                    },
+                    "customRules": {
+                      "rules": [
+                        {
+                          "name": "BlockSuspiciousRequests",
+                          "priority": 1,
+                          "ruleType": "MatchRule",
+                          "action": "Block",
+                          "matchConditions": [
+                            {
+                              "matchVariable": "RequestUri",
+                              "operator": "Contains",
+                              "matchValue": ["../", "..\\", "script", "alert", "document.cookie"]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+  
+  # Azure CDN Monitoring configuration
+  cdn-monitoring.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ms5-frontend-cdn-monitoring
+      namespace: ms5-frontend
+      labels:
+        app: ms5-frontend
+        component: cdn
+        tier: frontend
+        environment: production
+        deployment: aks
+      annotations:
+        description: "Azure CDN Monitoring Configuration for MS5.0 Dashboard"
+        contact: "team@ms5floor.com"
+        version: "1.0.0"
+    data:
+      monitoring-config.json: |
+        {
+          "monitoring": {
+            "metrics": [
+              {
+                "name": "RequestCount",
+                "aggregation": "Total",
+                "interval": "PT1H"
+              },
+              {
+                "name": "BytesSent",
+                "aggregation": "Total",
+                "interval": "PT1H"
+              },
+              {
+                "name": "CacheHitRatio",
+                "aggregation": "Average",
+                "interval": "PT1H"
+              },
+              {
+                "name": "OriginLatency",
+                "aggregation": "Average",
+                "interval": "PT1H"
+              }
+            ],
+            "alerts": [
+              {
+                "name": "HighErrorRate",
+                "condition": "error_rate > 5%",
+                "severity": "High",
+                "action": "NotifyTeam"
+              },
+              {
+                "name": "LowCacheHitRatio",
+                "condition": "cache_hit_ratio < 80%",
+                "severity": "Medium",
+                "action": "NotifyTeam"
+              },
+              {
+                "name": "HighOriginLatency",
+                "condition": "origin_latency > 1000ms",
+                "severity": "High",
+                "action": "NotifyTeam"
+              }
+            ]
+          }
+        }

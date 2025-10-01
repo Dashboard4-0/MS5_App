@@ -1,0 +1,125 @@
+# MS5.0 Floor Dashboard - Frontend Service
+# 
+# This service provides:
+# - Load balancing for frontend pods
+# - Service discovery
+# - Health checking
+# - Session affinity for WebSocket connections
+# - Internal and external access
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-frontend-service
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Service"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account:certificate/certificate-id"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  # Service type
+  type: ClusterIP
+  
+  # Session affinity for WebSocket connections
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  
+  # Port configuration
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9113
+    targetPort: metrics
+    protocol: TCP
+  
+  # Selector
+  selector:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+---
+# Headless service for service discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-frontend-headless
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend Headless Service"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9113
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+---
+# External service for load balancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms5-frontend-external
+  namespace: ms5-floor-dashboard
+  labels:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Frontend External Service"
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/health"
+    last-updated: "2024-01-01T00:00:00Z"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: ms5-frontend
+    component: frontend
+    environment: production
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0

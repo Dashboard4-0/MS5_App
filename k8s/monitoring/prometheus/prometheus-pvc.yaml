@@ -1,0 +1,122 @@
+---
+# MS5.0 Floor Dashboard - Prometheus Persistent Volume Claims
+# Separate PVCs for different data types with appropriate storage classes
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-metrics-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    storage-tier: premium
+    data-type: metrics
+  annotations:
+    description: "Primary storage for Prometheus metrics data with 30-day retention"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-premium"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 400Gi  # Primary metrics storage
+  storageClassName: managed-premium
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-rules-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    storage-tier: standard
+    data-type: rules
+  annotations:
+    description: "Storage for Prometheus recording rules and long-term metrics"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-standard"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi  # Recording rules and long-term data
+  storageClassName: managed-standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-backup-data
+  namespace: monitoring
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+    storage-tier: standard
+    data-type: backup
+  annotations:
+    description: "Storage for Prometheus backup data and snapshots"
+    managed-by: "ms5-devops-team"
+    volume.beta.kubernetes.io/storage-class: "managed-standard"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi  # Backup storage
+  storageClassName: managed-standard
+---
+# Storage class for Prometheus if not using managed-premium
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-storage
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "Custom storage class optimized for Prometheus workloads"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # Premium SSD for high performance
+  cachingmode: ReadOnly  # Read-only caching for better performance
+  kind: managed
+  storageaccounttype: Premium_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+  availabilityZone: "1,2,3"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Storage class for Prometheus backup data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-backup-storage
+  labels:
+    app: ms5-dashboard
+    component: prometheus
+    environment: production
+  annotations:
+    description: "Storage class for Prometheus backup data with cost optimization"
+    managed-by: "ms5-devops-team"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Standard_LRS  # Standard SSD for backup data
+  cachingmode: None  # No caching for backup data
+  kind: managed
+  storageaccounttype: Standard_LRS
+  resourceGroup: ms5-production-rg
+  location: uksouth
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

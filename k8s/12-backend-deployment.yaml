@@ -1,0 +1,251 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms5-backend
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ms5-dashboard
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: ms5-dashboard
+        component: backend
+    spec:
+      serviceAccountName: ms5-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: backend
+        image: ms5acrprod.azurecr.io/ms5-backend:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        # Application Settings
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ENVIRONMENT
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DEBUG
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: LOG_LEVEL
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: HOST
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: PORT
+        # Security Settings
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: SECRET_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ms5-app-secrets
+              key: JWT_SECRET
+        - name: ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ALGORITHM
+        - name: ACCESS_TOKEN_EXPIRE_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ACCESS_TOKEN_EXPIRE_MINUTES
+        - name: REFRESH_TOKEN_EXPIRE_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: REFRESH_TOKEN_EXPIRE_DAYS
+        # Database Settings
+        - name: DATABASE_URL
+          value: "postgresql+asyncpg://ms5_user:$(DATABASE_PASSWORD)@postgres-primary.ms5-production.svc.cluster.local:5432/factory_telemetry"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-database-secrets
+              key: POSTGRES_PASSWORD
+        - name: DATABASE_POOL_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DATABASE_POOL_SIZE
+        - name: DATABASE_MAX_OVERFLOW
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DATABASE_MAX_OVERFLOW
+        # Redis Settings
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-primary.ms5-production.svc.cluster.local:6379/0"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ms5-redis-secrets
+              key: REDIS_PASSWORD
+        # CORS Settings
+        - name: ALLOWED_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ALLOWED_ORIGINS
+        - name: ALLOWED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ALLOWED_HOSTS
+        # WebSocket Settings
+        - name: WEBSOCKET_HEARTBEAT_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: WEBSOCKET_HEARTBEAT_INTERVAL
+        - name: WEBSOCKET_MAX_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: WEBSOCKET_MAX_CONNECTIONS
+        # Production Settings
+        - name: PRODUCTION_LINE_POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: PRODUCTION_LINE_POLL_INTERVAL
+        - name: OEE_CALCULATION_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: OEE_CALCULATION_INTERVAL
+        - name: DOWNTIME_DETECTION_THRESHOLD
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: DOWNTIME_DETECTION_THRESHOLD
+        # Monitoring Settings
+        - name: ENABLE_METRICS
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: ENABLE_METRICS
+        - name: METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ms5-app-config
+              key: METRICS_PORT
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: reports
+          mountPath: /app/reports
+        - name: uploads
+          mountPath: /app/uploads
+        - name: temp
+          mountPath: /app/temp
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /health/detailed
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Required for logs and temp files
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: reports
+        emptyDir: {}
+      - name: uploads
+        emptyDir: {}
+      - name: temp
+        emptyDir: {}
+      initContainers:
+      - name: wait-for-database
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z postgres-primary.ms5-production.svc.cluster.local 5432; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+          echo "Database is ready!"
+      - name: wait-for-redis
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z redis-primary.ms5-production.svc.cluster.local 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready!"

@@ -1,0 +1,95 @@
+name: MS5.0 AKS Blue-Green Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_image:
+        description: 'Backend image to deploy'
+        required: true
+        default: 'ms5acrprod.azurecr.io/ms5-backend:latest-production'
+      frontend_image:
+        description: 'Frontend image to deploy'
+        required: true
+        default: 'ms5acrprod.azurecr.io/ms5-frontend:latest-production'
+      namespace:
+        description: 'Target namespace'
+        required: true
+        default: 'ms5-production'
+      timeout:
+        description: 'Deployment timeout in seconds'
+        required: false
+        default: '1800'
+      rollback_on_failure:
+        description: 'Automatically rollback on failure'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  # Azure Configuration
+  AKS_CLUSTER_NAME: ms5-aks-cluster
+  AKS_RESOURCE_GROUP: ms5-rg
+  DEFAULT_TIMEOUT: 1800s
+
+jobs:
+  # Blue-Green Deployment
+  blue-green-deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Azure CLI
+        uses: azure/setup-azcli@v1
+        with:
+          azcliversion: '2.50.0'
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
+          kubectl version --client
+
+      - name: Execute Blue-Green Deployment
+        run: |
+          # Execute blue-green deployment script
+          chmod +x ./scripts/blue-green-deploy.sh
+          ./scripts/blue-green-deploy.sh \
+            --backend-image="${{ github.event.inputs.backend_image }}" \
+            --frontend-image="${{ github.event.inputs.frontend_image }}" \
+            --namespace="${{ github.event.inputs.namespace }}" \
+            --timeout="${{ github.event.inputs.timeout }}" \
+            --rollback-on-failure="${{ github.event.inputs.rollback_on_failure }}"
+
+      - name: Verify Blue-Green Deployment
+        run: |
+          # Verify all services are running
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+          kubectl get services -n ${{ github.event.inputs.namespace }}
+          
+          # Run health checks
+          chmod +x ./scripts/test_smoke.sh
+          ./scripts/test_smoke.sh production
+
+      - name: Notify Blue-Green Success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          text: 'MS5.0 Floor Dashboard successfully deployed to production via blue-green deployment!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+
+      - name: Notify Blue-Green Failure
+        uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: failure
+          text: 'MS5.0 Floor Dashboard blue-green deployment to production failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}

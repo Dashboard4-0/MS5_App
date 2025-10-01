@@ -1,0 +1,123 @@
+# Kustomization for MS5.0 Backend Staging Environment
+# Manages staging-specific configurations and overlays
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ms5-backend-staging
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Base resources from the main k8s directory
+resources:
+- ../../../12-backend-deployment.yaml
+- ../../../13-backend-services.yaml
+- ../../../14-backend-hpa.yaml
+- ../../../15-celery-worker-deployment.yaml
+- ../../../16-celery-beat-deployment.yaml
+- ../../../17-flower-deployment.yaml
+
+# Namespace for staging environment
+namespace: ms5-staging
+
+# Common labels applied to all resources
+commonLabels:
+  environment: staging
+  app.kubernetes.io/part-of: ms5-dashboard
+  app.kubernetes.io/managed-by: argocd
+
+# Common annotations
+commonAnnotations:
+  argocd.argoproj.io/sync-wave: "2"
+  config.kubernetes.io/origin: |
+    path: k8s/gitops/staging/backend/kustomization.yaml
+
+# Name prefix for staging resources
+namePrefix: staging-
+
+# Image transformations for staging
+images:
+- name: ms5acrprod.azurecr.io/ms5-backend
+  newName: ms5acrstaging.azurecr.io/ms5-backend
+  newTag: staging-latest
+- name: ms5acrprod.azurecr.io/ms5-celery
+  newName: ms5acrstaging.azurecr.io/ms5-celery
+  newTag: staging-latest
+
+# Resource patches for staging environment
+patches:
+- target:
+    kind: Deployment
+    name: ms5-backend
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "100m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "500m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "512Mi"
+
+- target:
+    kind: Deployment
+    name: ms5-celery-worker
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 1
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "128Mi"
+
+- target:
+    kind: HorizontalPodAutoscaler
+    name: ms5-backend-hpa
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 1
+    - op: replace
+      path: /spec/maxReplicas
+      value: 3
+    - op: replace
+      path: /spec/targetCPUUtilizationPercentage
+      value: 80
+
+# ConfigMap generator for staging-specific configuration
+configMapGenerator:
+- name: ms5-backend-staging-config
+  literals:
+  - ENVIRONMENT=staging
+  - DEBUG=true
+  - LOG_LEVEL=debug
+  - DATABASE_URL=postgresql://postgres:password@postgres-primary.ms5-staging.svc.cluster.local:5432/ms5_staging
+  - REDIS_URL=redis://redis-primary.ms5-staging.svc.cluster.local:6379/0
+  - CELERY_BROKER_URL=redis://redis-primary.ms5-staging.svc.cluster.local:6379/1
+  - CELERY_RESULT_BACKEND=redis://redis-primary.ms5-staging.svc.cluster.local:6379/2
+
+# Secret generator for staging-specific secrets
+secretGenerator:
+- name: ms5-backend-staging-secrets
+  literals:
+  - DATABASE_PASSWORD=staging_password
+  - SECRET_KEY=staging_secret_key_change_in_production
+  - JWT_SECRET=staging_jwt_secret
+  type: Opaque
+
+# Replica count for staging environment
+replicas:
+- name: ms5-backend
+  count: 2
+- name: ms5-celery-worker
+  count: 1

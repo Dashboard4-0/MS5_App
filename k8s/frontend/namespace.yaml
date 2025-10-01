@@ -1,0 +1,65 @@
+# MS5.0 Floor Dashboard - Frontend Namespace
+# 
+# This namespace isolates the frontend components and provides:
+# - Resource quotas for cost control
+# - Network policies for security
+# - Pod security standards
+# - Monitoring and logging configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ms5-floor-dashboard
+  labels:
+    name: ms5-floor-dashboard
+    app: ms5-frontend
+    component: frontend
+    environment: production
+    platform: kubernetes
+    version: "1.0.0"
+  annotations:
+    description: "MS5.0 Floor Dashboard - Factory management system for tablets"
+    contact: "MS5.0 Development Team"
+    created: "2024-01-01T00:00:00Z"
+    last-updated: "2024-01-01T00:00:00Z"
+---
+# Resource quota for cost control
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ms5-frontend-quota
+  namespace: ms5-floor-dashboard
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+---
+# Limit range for resource constraints
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ms5-frontend-limits
+  namespace: ms5-floor-dashboard
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "2"
+      memory: "2Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container

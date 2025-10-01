@@ -7,7 +7,8 @@ It uses Pydantic Settings for environment variable management and validation.
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -108,6 +109,53 @@ class Settings(BaseSettings):
     # Maintenance Settings
     MAINTENANCE_REMINDER_DAYS: int = Field(default=7, env="MAINTENANCE_REMINDER_DAYS")
     MAINTENANCE_OVERDUE_DAYS: int = Field(default=3, env="MAINTENANCE_OVERDUE_DAYS")
+    
+    # TimescaleDB Settings
+    TIMESCALEDB_CHUNK_TIME_INTERVAL: str = Field(
+        default="1 day",
+        env="TIMESCALEDB_CHUNK_TIME_INTERVAL",
+        description="Default chunk time interval for hypertables"
+    )
+    TIMESCALEDB_COMPRESSION_ENABLED: bool = Field(
+        default=True,
+        env="TIMESCALEDB_COMPRESSION_ENABLED",
+        description="Enable automatic compression for hypertables"
+    )
+    TIMESCALEDB_COMPRESSION_AFTER: str = Field(
+        default="7 days",
+        env="TIMESCALEDB_COMPRESSION_AFTER",
+        description="Compress chunks older than this interval"
+    )
+    TIMESCALEDB_RETENTION_POLICY: str = Field(
+        default="90 days",
+        env="TIMESCALEDB_RETENTION_POLICY",
+        description="Default retention policy for time-series data"
+    )
+    TIMESCALEDB_MAX_BACKGROUND_WORKERS: int = Field(
+        default=8,
+        env="TIMESCALEDB_MAX_BACKGROUND_WORKERS",
+        description="Maximum background workers for TimescaleDB operations"
+    )
+    TIMESCALEDB_CHUNK_TIME_INTERVAL_METRIC_HIST: str = Field(
+        default="1 hour",
+        env="TIMESCALEDB_CHUNK_TIME_INTERVAL_METRIC_HIST",
+        description="Chunk interval for high-frequency metric_hist table"
+    )
+    TIMESCALEDB_CHUNK_TIME_INTERVAL_OEE: str = Field(
+        default="1 day",
+        env="TIMESCALEDB_CHUNK_TIME_INTERVAL_OEE",
+        description="Chunk interval for OEE calculations table"
+    )
+    TIMESCALEDB_RETENTION_POLICY_METRIC_HIST: str = Field(
+        default="90 days",
+        env="TIMESCALEDB_RETENTION_POLICY_METRIC_HIST",
+        description="Retention policy for metric_hist data"
+    )
+    TIMESCALEDB_RETENTION_POLICY_OEE: str = Field(
+        default="365 days",
+        env="TIMESCALEDB_RETENTION_POLICY_OEE",
+        description="Retention policy for OEE calculations"
+    )
     
     @validator("ALLOWED_ORIGINS", pre=True)
     def parse_allowed_origins(cls, v):

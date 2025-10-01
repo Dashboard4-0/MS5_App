@@ -1,0 +1,276 @@
+---
+# Azure Key Vault CSI Driver Namespace
+# Provides isolated namespace for Key Vault CSI driver components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: azure-keyvault-csi
+  labels:
+    name: azure-keyvault-csi
+    app.kubernetes.io/name: secrets-store-csi-driver
+    app.kubernetes.io/instance: secrets-store-csi-driver
+    app.kubernetes.io/version: "1.4.0"
+    app.kubernetes.io/component: csi-driver
+    app.kubernetes.io/part-of: secrets-store-csi-driver
+    app.kubernetes.io/managed-by: Helm
+    # Security and compliance labels
+    security.kubernetes.io/enforce-pod-security-standards: "privileged"
+    compliance.kubernetes.io/audit-level: "high"
+    environment: production
+    tier: infrastructure
+  annotations:
+    description: "Azure Key Vault CSI driver namespace for secure secrets management"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+---
+# Azure Key Vault Provider Class
+# Defines how to retrieve secrets from Azure Key Vault
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-keyvault-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: secrets
+    tier: infrastructure
+    environment: production
+  annotations:
+    description: "Azure Key Vault provider class for MS5.0 Floor Dashboard secrets"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  provider: azure
+  parameters:
+    # Azure Key Vault configuration
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "${AZURE_CLIENT_ID}"
+    keyvaultName: "${AZURE_KEYVAULT_NAME}"
+    cloudName: "AzurePublicCloud"
+    tenantId: "${AZURE_TENANT_ID}"
+    # Secrets to retrieve from Key Vault
+    objects: |
+      array:
+        - |
+          objectName: ms5-database-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-redis-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-minio-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-jwt-secret
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-secret-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-grafana-admin-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: azure-client-secret
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: letsencrypt-private-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-tls-certificate
+          objectType: cert
+          objectVersion: ""
+        - |
+          objectName: ms5-tls-private-key
+          objectType: key
+          objectVersion: ""
+  # Sync secrets to Kubernetes secrets
+  secretObjects:
+  - secretName: ms5-database-secret
+    type: Opaque
+    data:
+    - objectName: ms5-database-password
+      key: password
+  - secretName: ms5-redis-secret
+    type: Opaque
+    data:
+    - objectName: ms5-redis-password
+      key: password
+  - secretName: ms5-minio-secret
+    type: Opaque
+    data:
+    - objectName: ms5-minio-password
+      key: password
+  - secretName: ms5-backend-secret
+    type: Opaque
+    data:
+    - objectName: ms5-jwt-secret
+      key: jwt-secret
+    - objectName: ms5-secret-key
+      key: secret-key
+  - secretName: ms5-grafana-secret
+    type: Opaque
+    data:
+    - objectName: ms5-grafana-admin-password
+      key: admin-password
+  - secretName: azuredns-config
+    type: Opaque
+    data:
+    - objectName: azure-client-secret
+      key: client-secret
+  - secretName: letsencrypt-prod-private-key
+    type: Opaque
+    data:
+    - objectName: letsencrypt-private-key
+      key: tls.key
+  - secretName: ms5-tls-secret
+    type: kubernetes.io/tls
+    data:
+    - objectName: ms5-tls-certificate
+      key: tls.crt
+    - objectName: ms5-tls-private-key
+      key: tls.key
+---
+# Azure Key Vault Provider Class for Frontend
+# Defines how to retrieve frontend-specific secrets from Azure Key Vault
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-frontend-keyvault-secrets
+  namespace: ms5-frontend
+  labels:
+    app: ms5-frontend
+    component: secrets
+    tier: frontend
+    environment: production
+  annotations:
+    description: "Azure Key Vault provider class for MS5.0 Frontend secrets"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  provider: azure
+  parameters:
+    # Azure Key Vault configuration
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "${AZURE_CLIENT_ID}"
+    keyvaultName: "${AZURE_KEYVAULT_NAME}"
+    cloudName: "AzurePublicCloud"
+    tenantId: "${AZURE_TENANT_ID}"
+    # Secrets to retrieve from Key Vault
+    objects: |
+      array:
+        - |
+          objectName: ms5-tls-certificate
+          objectType: cert
+          objectVersion: ""
+        - |
+          objectName: ms5-tls-private-key
+          objectType: key
+          objectVersion: ""
+        - |
+          objectName: ms5-websocket-tls-certificate
+          objectType: cert
+          objectVersion: ""
+        - |
+          objectName: ms5-websocket-tls-private-key
+          objectType: key
+          objectVersion: ""
+        - |
+          objectName: ms5-api-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-encryption-key
+          objectType: secret
+          objectVersion: ""
+  # Sync secrets to Kubernetes secrets
+  secretObjects:
+  - secretName: ms5-tls-secret
+    type: kubernetes.io/tls
+    data:
+    - objectName: ms5-tls-certificate
+      key: tls.crt
+    - objectName: ms5-tls-private-key
+      key: tls.key
+  - secretName: ms5-websocket-tls-secret
+    type: kubernetes.io/tls
+    data:
+    - objectName: ms5-websocket-tls-certificate
+      key: tls.crt
+    - objectName: ms5-websocket-tls-private-key
+      key: tls.key
+  - secretName: ms5-frontend-secret
+    type: Opaque
+    data:
+    - objectName: ms5-api-key
+      key: api-key
+    - objectName: ms5-encryption-key
+      key: encryption-key
+---
+# Azure Key Vault Provider Class for cert-manager
+# Defines how to retrieve cert-manager secrets from Azure Key Vault
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: cert-manager-keyvault-secrets
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: secrets
+    app.kubernetes.io/part-of: cert-manager
+  annotations:
+    description: "Azure Key Vault provider class for cert-manager secrets"
+    contact: "team@ms5floor.com"
+    version: "1.0.0"
+spec:
+  provider: azure
+  parameters:
+    # Azure Key Vault configuration
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "${AZURE_CLIENT_ID}"
+    keyvaultName: "${AZURE_KEYVAULT_NAME}"
+    cloudName: "AzurePublicCloud"
+    tenantId: "${AZURE_TENANT_ID}"
+    # Secrets to retrieve from Key Vault
+    objects: |
+      array:
+        - |
+          objectName: azure-client-secret
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: letsencrypt-prod-private-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: letsencrypt-staging-private-key
+          objectType: secret
+          objectVersion: ""
+  # Sync secrets to Kubernetes secrets
+  secretObjects:
+  - secretName: azuredns-config
+    type: Opaque
+    data:
+    - objectName: azure-client-secret
+      key: client-secret
+  - secretName: letsencrypt-prod-private-key
+    type: Opaque
+    data:
+    - objectName: letsencrypt-prod-private-key
+      key: tls.key
+  - secretName: letsencrypt-staging-private-key
+    type: Opaque
+    data:
+    - objectName: letsencrypt-staging-private-key
+      key: tls.key

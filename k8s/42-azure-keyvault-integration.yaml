@@ -1,0 +1,684 @@
+---
+# MS5.0 Floor Dashboard - Azure Key Vault Integration
+# Phase 7A: Core Security Implementation
+#
+# This manifest implements comprehensive Azure Key Vault integration
+# for secrets management with automated rotation, access control,
+# and audit logging.
+#
+# Security Architecture:
+# - Secrets Migration: All secrets migrated from plain text to Azure Key Vault
+# - CSI Driver: Azure Key Vault CSI driver for secret injection
+# - Access Control: Role-based access to secrets
+# - Audit Logging: Complete audit trail for secret access
+# - Rotation: Automated secret rotation policies
+
+# Azure Key Vault CSI Driver Installation
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-secrets-store-driver
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  selector:
+    matchLabels:
+      app: csi-secrets-store-driver
+  template:
+    metadata:
+      labels:
+        app: csi-secrets-store-driver
+    spec:
+      serviceAccountName: csi-secrets-store-driver
+      containers:
+      - name: driver
+        image: mcr.microsoft.com/oss/kubernetes-csi/secrets-store/driver:v1.3.0
+        args:
+        - "--endpoint=$(CSI_ENDPOINT)"
+        - "--nodeid=$(NODE_ID)"
+        - "--v=2"
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:///csi/csi.sock
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /csi
+        - name: mountpoint-dir
+          mountPath: /var/lib/kubelet/pods
+          mountPropagation: Bidirectional
+        - name: registration-dir
+          mountPath: /registration
+        ports:
+        - name: healthz
+          containerPort: 9808
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+      - name: liveness-probe
+        image: mcr.microsoft.com/oss/kubernetes-csi/livenessprobe:v2.10.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--connection-timeout=3s"
+        - "--health-port=9808"
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /csi
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+          limits:
+            cpu: 20m
+            memory: 20Mi
+      - name: node-driver-registrar
+        image: mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/secrets-store.csi.k8s.io/csi.sock
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /csi
+        - name: registration-dir
+          mountPath: /registration
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+          limits:
+            cpu: 20m
+            memory: 20Mi
+      volumes:
+      - name: socket-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/secrets-store.csi.k8s.io/csi.sock
+          type: Socket
+      - name: mountpoint-dir
+        hostPath:
+          path: /var/lib/kubelet/pods
+          type: DirectoryOrCreate
+      - name: registration-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/secrets-store.csi.k8s.io/registration
+          type: DirectoryOrCreate
+---
+# Azure Key Vault Provider Installation
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-secrets-store-provider-azure
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+spec:
+  selector:
+    matchLabels:
+      app: csi-secrets-store-provider-azure
+  template:
+    metadata:
+      labels:
+        app: csi-secrets-store-provider-azure
+    spec:
+      serviceAccountName: csi-secrets-store-provider-azure
+      containers:
+      - name: provider-azure
+        image: mcr.microsoft.com/oss/azure/secrets-store/provider-azure:1.4.0
+        args:
+        - "--endpoint=$(CSI_ENDPOINT)"
+        - "--nodeid=$(NODE_ID)"
+        - "--v=2"
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:///csi/csi.sock
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: client-id
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: client-secret
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: tenant-id
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /csi
+        - name: mountpoint-dir
+          mountPath: /var/lib/kubelet/pods
+          mountPropagation: Bidirectional
+        ports:
+        - name: healthz
+          containerPort: 9808
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+      volumes:
+      - name: socket-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/secrets-store.csi.k8s.io/csi.sock
+          type: Socket
+      - name: mountpoint-dir
+        hostPath:
+          path: /var/lib/kubelet/pods
+          type: DirectoryOrCreate
+---
+# Azure Credentials Secret (Placeholder - to be replaced with actual credentials)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-credentials
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+type: Opaque
+data:
+  client-id: <base64-encoded-client-id>
+  client-secret: <base64-encoded-client-secret>
+  tenant-id: <base64-encoded-tenant-id>
+---
+# Azure Key Vault Secret Provider Classes
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-database-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: database
+    security-level: "restricted"
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "<managed-identity-id>"
+    keyvaultName: "kv-ms5-prod-uksouth"
+    tenantId: "<tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: ms5-database-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-database-replication-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-database-backup-password
+          objectType: secret
+          objectVersion: ""
+  secretObjects:
+  - secretName: ms5-database-secrets
+    type: Opaque
+    data:
+    - objectName: ms5-database-password
+      key: POSTGRES_PASSWORD
+    - objectName: ms5-database-replication-password
+      key: POSTGRES_REPLICATION_PASSWORD
+    - objectName: ms5-database-backup-password
+      key: POSTGRES_BACKUP_PASSWORD
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-redis-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: redis
+    security-level: "restricted"
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "<managed-identity-id>"
+    keyvaultName: "kv-ms5-prod-uksouth"
+    tenantId: "<tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: ms5-redis-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-redis-master-password
+          objectType: secret
+          objectVersion: ""
+  secretObjects:
+  - secretName: ms5-redis-secrets
+    type: Opaque
+    data:
+    - objectName: ms5-redis-password
+      key: REDIS_PASSWORD
+    - objectName: ms5-redis-master-password
+      key: REDIS_MASTER_PASSWORD
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-minio-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: minio
+    security-level: "restricted"
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "<managed-identity-id>"
+    keyvaultName: "kv-ms5-prod-uksouth"
+    tenantId: "<tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: ms5-minio-access-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-minio-secret-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-minio-console-password
+          objectType: secret
+          objectVersion: ""
+  secretObjects:
+  - secretName: ms5-minio-secrets
+    type: Opaque
+    data:
+    - objectName: ms5-minio-access-key
+      key: MINIO_ROOT_USER
+    - objectName: ms5-minio-secret-key
+      key: MINIO_ROOT_PASSWORD
+    - objectName: ms5-minio-console-password
+      key: MINIO_CONSOLE_PASSWORD
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-backend-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: backend
+    security-level: "restricted"
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "<managed-identity-id>"
+    keyvaultName: "kv-ms5-prod-uksouth"
+    tenantId: "<tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: ms5-jwt-secret
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-api-key
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-smtp-credentials
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-webhook-secret
+          objectType: secret
+          objectVersion: ""
+  secretObjects:
+  - secretName: ms5-backend-secrets
+    type: Opaque
+    data:
+    - objectName: ms5-jwt-secret
+      key: JWT_SECRET
+    - objectName: ms5-api-key
+      key: API_KEY
+    - objectName: ms5-smtp-credentials
+      key: SMTP_CREDENTIALS
+    - objectName: ms5-webhook-secret
+      key: WEBHOOK_SECRET
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: ms5-monitoring-secrets
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: monitoring
+    security-level: "restricted"
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "<managed-identity-id>"
+    keyvaultName: "kv-ms5-prod-uksouth"
+    tenantId: "<tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: ms5-grafana-admin-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-prometheus-basic-auth
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: ms5-alertmanager-webhook-url
+          objectType: secret
+          objectVersion: ""
+  secretObjects:
+  - secretName: ms5-monitoring-secrets
+    type: Opaque
+    data:
+    - objectName: ms5-grafana-admin-password
+      key: GRAFANA_ADMIN_PASSWORD
+    - objectName: ms5-prometheus-basic-auth
+      key: PROMETHEUS_BASIC_AUTH
+    - objectName: ms5-alertmanager-webhook-url
+      key: ALERTMANAGER_WEBHOOK_URL
+---
+# Secret Rotation Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret-rotation-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  rotation-policy.yaml: |
+    # Secret Rotation Policy Configuration
+    # Automated secret rotation for enhanced security
+    
+    rotationPolicies:
+      # Database passwords - rotate every 90 days
+      database:
+        rotationInterval: "90d"
+        notificationDays: [30, 7, 1]  # Notify 30, 7, and 1 days before expiry
+        autoRotation: true
+        secrets:
+          - "ms5-database-password"
+          - "ms5-database-replication-password"
+          - "ms5-database-backup-password"
+      
+      # Redis passwords - rotate every 60 days
+      redis:
+        rotationInterval: "60d"
+        notificationDays: [14, 3, 1]
+        autoRotation: true
+        secrets:
+          - "ms5-redis-password"
+          - "ms5-redis-master-password"
+      
+      # MinIO credentials - rotate every 120 days
+      minio:
+        rotationInterval: "120d"
+        notificationDays: [30, 7, 1]
+        autoRotation: true
+        secrets:
+          - "ms5-minio-access-key"
+          - "ms5-minio-secret-key"
+          - "ms5-minio-console-password"
+      
+      # Backend secrets - rotate every 30 days
+      backend:
+        rotationInterval: "30d"
+        notificationDays: [7, 3, 1]
+        autoRotation: true
+        secrets:
+          - "ms5-jwt-secret"
+          - "ms5-api-key"
+          - "ms5-smtp-credentials"
+          - "ms5-webhook-secret"
+      
+      # Monitoring secrets - rotate every 180 days
+      monitoring:
+        rotationInterval: "180d"
+        notificationDays: [30, 14, 7, 1]
+        autoRotation: true
+        secrets:
+          - "ms5-grafana-admin-password"
+          - "ms5-prometheus-basic-auth"
+          - "ms5-alertmanager-webhook-url"
+---
+# Secret Access Control and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-secrets-store-driver
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-secrets-store-provider-azure
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: csi-secrets-store-driver
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["csidrivers"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["secrets-store.csi.x-k8s.io"]
+  resources: ["secretproviderclasses"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: csi-secrets-store-driver
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+subjects:
+- kind: ServiceAccount
+  name: csi-secrets-store-driver
+  namespace: ms5-production
+roleRef:
+  kind: ClusterRole
+  name: csi-secrets-store-driver
+  apiGroup: rbac.authorization.k8s.io
+---
+# Secret Audit Logging Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret-audit-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  audit-policy.yaml: |
+    # Secret Access Audit Policy
+    # Comprehensive audit logging for secret access
+    
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    # Audit secret access
+    - level: Metadata
+      namespaces: ["ms5-production"]
+      resources:
+      - group: ""
+        resources: ["secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    
+    # Audit secret provider class access
+    - level: Metadata
+      namespaces: ["ms5-production"]
+      resources:
+      - group: "secrets-store.csi.x-k8s.io"
+        resources: ["secretproviderclasses"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    
+    # Audit pod creation with secret volumes
+    - level: RequestResponse
+      namespaces: ["ms5-production"]
+      resources:
+      - group: ""
+        resources: ["pods"]
+      verbs: ["create", "update", "patch"]
+      omitStages: ["RequestReceived"]
+---
+# Secret Monitoring and Alerting Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret-monitoring-config
+  namespace: ms5-production
+  labels:
+    app: ms5-dashboard
+    component: security
+    security-level: "restricted"
+data:
+  secret-alerts.yaml: |
+    # Secret monitoring alerts
+    
+    groups:
+    - name: secret-security-monitoring
+      rules:
+      - alert: SecretAccessFailure
+        expr: increase(secret_access_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Secret access failure detected"
+          description: "Failed to access secret {{ $labels.secret_name }} from {{ $labels.pod_name }}"
+      
+      - alert: SecretRotationFailure
+        expr: secret_rotation_status{status="failed"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Secret rotation failed"
+          description: "Failed to rotate secret {{ $labels.secret_name }}"
+      
+      - alert: SecretExpiringSoon
+        expr: (secret_expiration_timestamp - time()) / 86400 < 7
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Secret expiring soon"
+          description: "Secret {{ $labels.secret_name }} expires in {{ $value }} days"
+      
+      - alert: UnauthorizedSecretAccess
+        expr: increase(unauthorized_secret_access_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Unauthorized secret access attempt"
+          description: "Unauthorized access attempt to secret {{ $labels.secret_name }} from {{ $labels.pod_name }}"
+      
+      - alert: SecretProviderClassFailure
+        expr: secretproviderclass_status{status="failed"} == 1
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Secret Provider Class failure"
+          description: "Secret Provider Class {{ $labels.name }} failed to provision secrets"
